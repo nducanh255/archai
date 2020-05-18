@@ -40,16 +40,10 @@ steps:
     verbosity: 'Verbose'
     alertWarningLevel: 'High'
 
-- task: uploadScanResults@1
+- task: corygehr.air-autoassess.uploadScanResults.uploadScanResults@1
+  displayName: 'Upload Scan Results for Analysis'
   inputs:
-    uploadUrl: '$(UploadUrl)'
     areaPathParent: 'archai'
-
-# - task: corygehr.air-autoassess.uploadScanResults.uploadScanResults@1
-#   displayName: 'Upload Scan Results for Analysis'
-#   inputs:
-#     areaPathParent: '{Insert Area Path for Work Items}'
-#     areaPathChild: '{Optionally, enter a child area path from the parent above}'
-#     uploadUrl: 'https://airbuildscan.azurewebsites.net/api/Upload'
-#   env:
-#     SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+    uploadUrl: 'https://airbuildscan.azurewebsites.net/api/Upload'
+  env:
+    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
