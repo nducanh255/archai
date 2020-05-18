@@ -172,7 +172,11 @@ class Trainer(EnforceOverrides):
                 # which causes reshuffling due to automatic epoch counting
                 # here we make sure that val_dl has same epoch as train_dl
                 if hasattr(val_dl.sampler, 'set_epoch'):
-                    val_dl.sampler.set_epoch(self._metrics.epochs())
+                    val_dl.sampler.set_epoch(self._metrics.epochs()-1)
+                assert train_dl.sampler.epoch == val_dl.sampler.epoch
+                tidx = list(train_dl.sampler)
+                vidx = list(val_dl.sampler)
+                assert all(ti not in vidx for ti in tidx)
                 val_metrics = self._tester.test(val_dl)
 
         # update val metrics
