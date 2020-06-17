@@ -56,8 +56,7 @@ class GsArchTrainer(ArchTrainer):
                     if hasattr(edge._op, 'PRIMITIVES') and type(edge._op) == GsOp:                        
                         node_alphas.extend(alpha for op, alpha in edge._op.ops())
                     
-                # TODO: will creating a tensor from a list of tensors preserve the graph?
-                node_alphas = torch.Tensor(node_alphas)
+                node_alphas = torch.stack(node_alphas)
                                 
                 if node_alphas.nelement() > 0:
                     # sample ops via gumbel softmax

@@ -34,8 +34,7 @@ class GsFinalizers(Finalizers):
                 alphas = [alpha for op, alpha in edge._op.ops()]
                 node_alphas.extend(alphas)
 
-        # TODO: will creating a tensor from a list of tensors preserve the graph?
-        node_alphas = torch.Tensor(node_alphas)
+        node_alphas = torch.stack(node_alphas)
 
         assert node_alphas.nelement() > 0
 
