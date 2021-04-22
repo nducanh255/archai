@@ -91,7 +91,7 @@
             "request": "launch",
             "program": "${cwd}/scripts/main.py",
             "console": "integratedTerminal",
-            "args": ["--full", "--algos", "petridish"]
+            "args": ["--full", "--algos", "petridish", "--datasets", "mit67"]
         },
         {
             "name": "Petridish-Eval-ImageNet",
