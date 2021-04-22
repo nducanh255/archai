@@ -15,7 +15,7 @@ from archai.common.config import Config
 from archai.common import utils
 
 
-class Mit67Provider(DatasetProvider):
+class AircraftProvider(DatasetProvider):
     def __init__(self, conf_dataset:Config):
         super().__init__(conf_dataset)
         self._dataroot = utils.full_path(conf_dataset['dataroot'])
@@ -26,11 +26,11 @@ class Mit67Provider(DatasetProvider):
         trainset, testset = None, None
 
         if load_train:
-            trainpath = os.path.join(self._dataroot, 'mit67', 'train')
+            trainpath = os.path.join(self._dataroot, 'aircraft', 'train')
             trainset = torchvision.datasets.ImageFolder(trainpath, transform=transform_train)
         if load_test:
-            testpath = os.path.join(self._dataroot, 'mit67', 'test')
-            testset = torchvision.datasets.ImageFolder(testpath, transform=transform_test)
+            testpath = os.path.join(self._dataroot, 'aircraft', 'test')
+            testset = torchvision.datasets.ImageFolder(testpath, transform=transform_train)
 
         return trainset, testset
 
@@ -64,4 +64,4 @@ class Mit67Provider(DatasetProvider):
 
         return train_transform, test_transform
 
-register_dataset_provider('mit67', Mit67Provider)
+register_dataset_provider('aircraft', AircraftProvider)
