@@ -26,11 +26,11 @@ class AircraftProvider(DatasetProvider):
         trainset, testset = None, None
 
         if load_train:
-            trainpath = os.path.join(self._dataroot, 'aircraft', 'train')
+            trainpath = os.path.join(self._dataroot, 'aircraft', 'train')            
             trainset = torchvision.datasets.ImageFolder(trainpath, transform=transform_train)
         if load_test:
             testpath = os.path.join(self._dataroot, 'aircraft', 'test')
-            testset = torchvision.datasets.ImageFolder(testpath, transform=transform_train)
+            testset = torchvision.datasets.ImageFolder(testpath, transform=transform_test)
 
         return trainset, testset
 
