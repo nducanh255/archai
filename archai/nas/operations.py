@@ -2,7 +2,7 @@
 # Licensed under the MIT license.
 
 from argparse import ArgumentError
-from typing import Callable, Iterable, Iterator, List, Mapping, Tuple, Dict, Optional, Union
+from typing import Any, Callable, Iterable, Iterator, List, Mapping, Tuple, Dict, Optional, Union
 from abc import ABC, abstractmethod
 import copy
 import math
@@ -129,10 +129,8 @@ class Op(ArchModule, ABC, EnforceOverrides):
     def can_drop_path(self)->bool:
         return True
 
-
 class PoolBN(Op):
     """AvgPool or MaxPool - BN """
-
     def __init__(self, pool_type:str, op_desc:OpDesc, affine:bool):
         """
         Args:
@@ -159,8 +157,8 @@ class PoolBN(Op):
         # self.bn = nn.BatchNorm2d(ch_in, affine=affine)
 
     @overrides
-    def forward(self, x):
-        out = self.pool(x)
+    def forward(self, input):
+        out = self.pool(input)
         #out = self.bn(out)
         return out
 
@@ -173,8 +171,8 @@ class SkipConnect(Op):
                               else FactorizedReduce(op_desc, affine)
 
     @overrides
-    def forward(self, x:Tensor)->Tensor:
-        return self._op(x)
+    def forward(self, input:Tensor):
+        return self._op(input)
 
     @overrides
     def can_drop_path(self)->bool:
@@ -208,8 +206,8 @@ class FacConv(Op):
         )
 
     @overrides
-    def forward(self, x):
-        return self.net(x)
+    def forward(self, input):
+        return self.net(input)
 
 
 class ReLUConvBN(Op): # std DARTS op has BN at the end
@@ -229,8 +227,8 @@ class ReLUConvBN(Op): # std DARTS op has BN at the end
         )
 
     @overrides
-    def forward(self, x):
-        return self.op(x)
+    def forward(self, input):
+        return self.op(input)
 
 
 class ConvBNReLU(Op): # NAS bench op has BN in the middle
@@ -250,8 +248,8 @@ class ConvBNReLU(Op): # NAS bench op has BN in the middle
         )
 
     @overrides
-    def forward(self, x):
-        return self.op(x)
+    def forward(self, input):
+        return self.op(input)
 
 class DilConv(Op):
     """ (Dilated) depthwise separable conv
@@ -278,8 +276,8 @@ class DilConv(Op):
         )
 
     @overrides
-    def forward(self, x):
-        return self.op(x)
+    def forward(self, input):
+        return self.op(input)
 
 
 class SepConv(Op):
@@ -300,8 +298,8 @@ class SepConv(Op):
                     padding, dilation=1, affine=affine))
 
     @overrides
-    def forward(self, x):
-        return self.op(x)
+    def forward(self, input):
+        return self.op(input)
 
 
 class Identity(Op):
@@ -312,8 +310,8 @@ class Identity(Op):
         assert conv_params.ch_in == conv_params.ch_out
 
     @overrides
-    def forward(self, x):
-        return x
+    def forward(self, input):
+        return input
 
     @overrides
     def can_drop_path(self)->bool:
@@ -331,10 +329,10 @@ class Zero(Op):
         self.stride = stride
 
     @overrides
-    def forward(self, x):
+    def forward(self, input):
         if self.stride == 1:
-            return x.mul(0.)
-        return x[:, :, ::self.stride, ::self.stride].mul(0.)
+            return input.mul(0.)
+        return input[:, :, ::self.stride, ::self.stride].mul(0.)
 
 class FactorizedReduce(Op):
     """
@@ -361,8 +359,8 @@ class FactorizedReduce(Op):
         self.bn = nn.BatchNorm2d(ch_out, affine=affine)
 
     @overrides
-    def forward(self, x):
-        x = self.relu(x)
+    def forward(self, input):
+        x = self.relu(input)
 
         # x: torch.Size([32, 32, 32, 32])
         # conv1: [b, c_out//2, d//2, d//2]
@@ -398,8 +396,8 @@ class StemConv3x3(StemBase):
         )
 
     @overrides
-    def forward(self, x):
-        return self._op(x)
+    def forward(self, input):
+        return self._op(input)
 
     @overrides
     def can_drop_path(self)->bool:
@@ -422,8 +420,8 @@ class StemConv3x3Relu(StemBase): # used in NASbench-101
         )
 
     @overrides
-    def forward(self, x):
-        return self._op(x)
+    def forward(self, input):
+        return self._op(input)
 
     @overrides
     def can_drop_path(self)->bool:
@@ -447,8 +445,8 @@ class StemConv3x3S4(StemBase):
         )
 
     @overrides
-    def forward(self, x):
-        return self._op(x)
+    def forward(self, input):
+        return self._op(input)
 
     @overrides
     def can_drop_path(self)->bool:
@@ -477,8 +475,8 @@ class StemConv3x3S4S2(StemBase):
         )
 
     @overrides
-    def forward(self, x):
-        return self._op(x)
+    def forward(self, input):
+        return self._op(input)
 
     @overrides
     def can_drop_path(self)->bool:
@@ -490,8 +488,8 @@ class AvgPool2d7x7(Op):
         self._op = nn.AvgPool2d(7)
 
     @overrides
-    def forward(self, x):
-        return self._op(x)
+    def forward(self, input):
+        return self._op(input)
 
     @overrides
     def can_drop_path(self)->bool:
@@ -503,8 +501,8 @@ class PoolAdaptiveAvg2D(Op):
         self._op = nn.AdaptiveAvgPool2d(1)
 
     @overrides
-    def forward(self, x):
-        return self._op(x)
+    def forward(self, input):
+        return self._op(input)
 
     @overrides
     def can_drop_path(self)->bool:
@@ -515,8 +513,8 @@ class PoolMeanTensor(Op): # used in Nasbench-101
         super().__init__()
 
     @overrides
-    def forward(self, x):
-        return torch.mean(x, (2, 3))
+    def forward(self, input):
+        return torch.mean(input, (2, 3))
 
     @overrides
     def can_drop_path(self)->bool:
@@ -532,8 +530,8 @@ class LinearOp(Op):
         self._op = nn.Linear(n_ch, n_classes)
 
     @overrides
-    def forward(self, x:torch.Tensor):
-        flattened = x.view(x.size(0), -1)
+    def forward(self, input:torch.Tensor):
+        flattened = input.view(input.size(0), -1)
         return self._op(flattened)
 
     @overrides
