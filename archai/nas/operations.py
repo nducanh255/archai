@@ -122,7 +122,7 @@ class Op(ArchModule, ABC, EnforceOverrides):
         return desc, None # desc, rank (None means op is unranked and cannot be removed)
 
     def ops(self)->Iterator[Tuple['Op', float]]: # type: ignore
-        """Return contituent ops, if this op is primitive just return self"""
+        """Return constituent ops, if this op is primitive just return self"""
         yield self, math.nan
 
     # if op should not be dropped during drop path then return False
