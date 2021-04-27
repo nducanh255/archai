@@ -36,14 +36,15 @@ class AircraftProvider(DatasetProvider):
 
     @overrides
     def get_transforms(self)->tuple:
-        # MEAN, STD computed for mit67
+        # TODO: update MEAN, STD, currently mit67 values
         MEAN = [0.4893, 0.4270, 0.3625]
         STD = [0.2631, 0.2565, 0.2582]
 
         # transformations match that in
         # https://github.com/antoyang/NAS-Benchmark/blob/master/DARTS/preproc.py
+        img_size = 64
         train_transf = [
-            transforms.RandomResizedCrop(224),
+            transforms.RandomResizedCrop(img_size),
             transforms.RandomHorizontalFlip(),
             transforms.ColorJitter(
                 brightness=0.4,
@@ -52,7 +53,7 @@ class AircraftProvider(DatasetProvider):
                 hue=0.2)
         ]
 
-        test_transf = [transforms.Resize(256), transforms.CenterCrop(224)]
+        test_transf = [transforms.Resize(72), transforms.CenterCrop(img_size)]
 
         normalize = [
             transforms.ToTensor(),
