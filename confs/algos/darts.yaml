@@ -13,7 +13,7 @@ common:
   tb_dir: '$expdir/tb' # path where tensorboard logs would be stored
   checkpoint:
     filename: '$expdir/checkpoint.pth'
-    freq: 10
+    freq: 1
 
   # reddis address of Ray cluster. Use None for single node run
   # otherwise it should something like host:6379. Make sure to run on head node:

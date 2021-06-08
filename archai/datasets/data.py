@@ -25,6 +25,7 @@ from archai.common import common
 from ..common.common import logger
 from ..common import utils, apex_utils
 from archai.datasets.dataset_provider import DatasetProvider, get_provider_type
+# from archai.datasets.providers.simclr_provider import create_simclr_provider
 from ..common.config import Config
 from .limit_dataset import LimitDataset, DatasetLike
 from .distributed_stratified_sampler import DistributedStratifiedSampler
@@ -84,6 +85,54 @@ def create_dataset_provider(conf_dataset:Config)->DatasetProvider:
     logger.info({'ds_name': ds_name, 'dataroot':dataroot, 'storage_name':storage_name})
 
     ds_provider_type = get_provider_type(ds_name)
+    return ds_provider_type(conf_dataset)
+
+def get_data_ssl(conf_loader:Config)->DataLoaders:
+    logger.pushd('data')
+
+    # region conf vars
+    # dataset
+    conf_dataset = conf_loader['dataset']
+    max_batches = conf_dataset['max_batches']
+
+    aug = conf_loader['aug']
+    cutout = conf_loader['cutout']
+    val_ratio = conf_loader['val_ratio']
+    val_fold = conf_loader['val_fold']
+    load_train = conf_loader['load_train']
+    train_batch = conf_loader['train_batch']
+    train_workers = conf_loader['train_workers']
+    load_test = conf_loader['load_test']
+    test_batch = conf_loader['test_batch']
+    test_workers = conf_loader['test_workers']
+    conf_apex  = conf_loader['apex']
+    # endregion
+
+    ds_provider = create_dataset_provider_ssl(conf_dataset)
+
+    apex = apex_utils.ApexUtils(conf_apex, logger)
+
+    train_dl, val_dl, test_dl = get_dataloaders(ds_provider,
+        load_train=load_train, train_batch_size=train_batch,
+        load_test=load_test, test_batch_size=test_batch,
+        aug=aug, cutout=cutout,  val_ratio=val_ratio, val_fold=val_fold,
+        train_workers=train_workers, test_workers=test_workers,
+        max_batches=max_batches, apex=apex)
+
+    assert train_dl is not None
+
+    logger.popd()
+
+    return DataLoaders(train_dl=train_dl, val_dl=val_dl, test_dl=test_dl)
+
+def create_dataset_provider_ssl(conf_dataset:Config)->DatasetProvider:
+    ds_name = conf_dataset['name']
+    dataroot = utils.full_path(conf_dataset['dataroot'])
+    storage_name = conf_dataset['storage_name']
+
+    logger.info({'ds_name': ds_name, 'dataroot':dataroot, 'storage_name':storage_name})
+
+    ds_provider_type = get_provider_type(ds_name+"_simclr")
     return ds_provider_type(conf_dataset)
 
 def get_dataloaders(ds_provider:DatasetProvider,

@@ -11,13 +11,14 @@ from torch.optim import lr_scheduler, SGD, Adam
 from torch.optim.lr_scheduler import _LRScheduler
 from torch.optim.optimizer import Optimizer
 from torch.nn.modules.loss import _WeightedLoss, _Loss
+from .lars import LARS
 import torch.nn.functional as F
 
 import statopt
 
 from .config import Config
 from .cocob import CocobBackprop
-from .ml_losses import SmoothCrossEntropyLoss
+from .ml_losses import SmoothCrossEntropyLoss, NTXentLoss
 from .warmup_scheduler import GradualWarmupScheduler
 
 
@@ -57,6 +58,12 @@ def create_optimizer(conf_opt:Config, params)->Optimizer:
     elif optim_type == 'salsa':
         return statopt.SALSA(params,
             alpha=conf_opt['alpha'])
+    elif optim_type == 'lars':
+         return LARS(params,
+            lr=lr,
+            momentum=conf_opt['momentum'],
+            trust_coefficient=conf_opt['trust_coeff'],
+            weight_decay=decay)
     else:
         raise ValueError('invalid optimizer type=%s' % optim_type)
 
@@ -161,6 +168,8 @@ def get_lossfn(conf_lossfn:Config)->_Loss:
         return nn.CrossEntropyLoss()
     elif type == 'CrossEntropyLabelSmooth':
         return SmoothCrossEntropyLoss(smoothing=conf_lossfn['smoothing'])
+    elif type == 'NTXentLoss':
+        return NTXentLoss(temperature = conf_lossfn['temperature'], eps= conf_lossfn['eps'])
     else:
         raise ValueError('criterian type "{}" is not supported'.format(type))
 
