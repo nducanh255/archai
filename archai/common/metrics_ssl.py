@@ -2,6 +2,7 @@
 # Licensed under the MIT license.
 
 import time
+import math
 import copy
 from typing import List, Mapping, Optional, Tuple
 import pathlib
@@ -57,6 +58,7 @@ class MetricsSimClr:
 
     def post_run(self, test_metrics:Optional['MetricsSimClr']=None)->None:
         self.run_metrics.post_run(test_metrics)
+        best_train, best_val, best_test = self.run_metrics.best_epoch()
 
         # logging
         if self.logger_freq > 0:
@@ -70,7 +72,6 @@ class MetricsSimClr:
                                 'dist_run_sum': self.reduce_sum(self.run_metrics.duration())})
 
 
-            best_train, best_val, best_test = self.run_metrics.best_epoch()
             with logger.pushd('best_train'):
                 logger.info({'epoch': best_train.index,
                             'loss': best_train.loss.avg})
@@ -127,6 +128,8 @@ class MetricsSimClr:
     def post_epoch(self, lr:float=math.nan, val_metrics:Optional['MetricsSimClr']=None):
         epoch = self.run_metrics.cur_epoch()
         epoch.post_epoch(lr, val_metrics)
+        if val_metrics:
+            self.run_metrics.best_train, self.run_metrics.best_val, self.run_metrics.best_test = self.run_metrics.best_epoch()
 
         val_epoch_metrics = None
         if val_metrics:
@@ -282,6 +285,7 @@ class RunMetricsSimClr:
         self.end_time = math.nan
         self.epoch = -1
         self.test_metrics:Optional[MetricsSimClr] = None
+        self.best_train = self.best_val = self.best_test = None
 
     def pre_run(self):
         self.start_time = time.time()
@@ -302,15 +306,15 @@ class RunMetricsSimClr:
 
     def best_epoch(self)->Tuple[EpochMetricsSimClr, Optional[EpochMetricsSimClr],
                                 Optional[EpochMetricsSimClr]]: # [train, val, test]
-        best_train = max(self.epochs_metrics, key=lambda e:e.loss.avg)
+        best_train = min(self.epochs_metrics, key=lambda e:e.loss.avg)
 
-        best_val = max(self.epochs_metrics,
-            key=lambda e:e.val_metrics.loss.avg if e.val_metrics else -1)
+        best_val = min(self.epochs_metrics,
+            key=lambda e:e.val_metrics.loss.avg if e.val_metrics else float('inf'))
         best_val = best_val.val_metrics if best_val.val_metrics else None
 
         best_test = self.test_metrics.run_metrics.epochs_metrics[-1] \
                     if self.test_metrics else None
-
+        
         return best_train, best_val, best_test
 
     def epoch_time_avg(self):

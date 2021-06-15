@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from overrides import EnforceOverrides
 
 from archai.common.metrics import Metrics
-from archai.common.tester import Tester
+from archai.common.tester import Tester, TesterLinear
 from archai.common.config import Config
 from archai.common import utils, ml_utils
 from archai.common.common import logger
@@ -53,7 +53,7 @@ class Trainer(EnforceOverrides):
         self._lossfn = ml_utils.get_lossfn(conf_lossfn)
         # using separate apex for Tester is not possible because we must use
         # same distributed model as Trainer and hence they must share apex
-        self._tester = Tester(conf_validation, model, self._apex) \
+        self._tester = TesterLinear(conf_validation, model, self._apex) \
                         if conf_validation else None
         self._metrics:Optional[Metrics] = None
 
@@ -354,6 +354,111 @@ class TrainerLinear(Trainer):
     @overrides
     def _train_epoch(self, train_dl: DataLoader)->None:
         steps = len(train_dl)
+        self.model.fc.train()
+        self.model.backbone.eval()
+
+        logger.pushd('steps')
+        for step, (x, y) in enumerate(train_dl):
+            logger.pushd(step)
+
+            # TODO: please check that no algorithm is invalidated by swapping prestep with zero grad
+            self._multi_optim.zero_grad()
+
+            self.pre_step(x, y)
+
+            # divide batch in to chunks if needed so it fits in GPU RAM
+            if self.batch_chunks > 1:
+                if self.conf_optim["type"]=="lbfgs":
+                    raise NotImplementedError('Not implemented LBFGS for batch_chunks>1')
+                x_chunks, y_chunks = torch.chunk(x, self.batch_chunks), torch.chunk(y, self.batch_chunks)
+            else:
+                x_chunks, y_chunks = (x,), (y,)
+
+            logits_chunks = []
+            loss_sum, loss_count = 0.0, 0
+            
+            if self.conf_optim["type"]=="lbfgs":
+                for xc, yc in zip(x_chunks, y_chunks):
+                    xc, yc = xc.to(self.get_device(), non_blocking=True), yc.to(self.get_device(), non_blocking=True)
+
+                    with torch.no_grad():
+                        feats = self.model.backbone(xc)[-1]
+
+                    def closure():
+                        logits_c, aux_logits = self.model.fc(feats), None
+                        tupled_out = isinstance(logits_c, Tuple) and len(logits_c) >=2
+                        # if self._aux_weight: # TODO: some other way to validate?
+                        #     assert tupled_out, "aux_logits cannot be None unless aux tower is disabled"
+                        if tupled_out: # then we are using model created by desc
+                            logits_c, aux_logits = logits_c[0], logits_c[1]
+                        loss_c = self.compute_loss(self._lossfn, yc, logits_c,
+                                                self._aux_weight, aux_logits)
+
+                        self._apex.backward(loss_c, self._multi_optim)
+                        return loss_c
+                    # TODO: original darts clips alphas as well but pt.darts doesn't
+                    self._apex.clip_grad(self._grad_clip, self.model, self._multi_optim)
+                    self._multi_optim.step(closure)
+                    self._apex.sync_devices()
+
+                    logits_c = self.model.fc(feats)
+                    loss_c = closure()
+                    loss_sum += loss_c.item() * len(logits_c)
+                    loss_count += len(logits_c)
+                    logits_chunks.append(logits_c.detach().cpu())
+
+                    # TODO: we possibly need to sync so all replicas are upto date
+
+            else:
+                for xc, yc in zip(x_chunks, y_chunks):
+                    xc, yc = xc.to(self.get_device(), non_blocking=True), yc.to(self.get_device(), non_blocking=True)
+
+                    with torch.no_grad():
+                        feats = self.model.backbone(xc)[-1]
+
+                    logits_c, aux_logits = self.model.fc(feats), None
+                    tupled_out = isinstance(logits_c, Tuple) and len(logits_c) >=2
+                    # if self._aux_weight: # TODO: some other way to validate?
+                    #     assert tupled_out, "aux_logits cannot be None unless aux tower is disabled"
+                    if tupled_out: # then we are using model created by desc
+                        logits_c, aux_logits = logits_c[0], logits_c[1]
+                    loss_c = self.compute_loss(self._lossfn, yc, logits_c,
+                                            self._aux_weight, aux_logits)
+
+                    self._apex.backward(loss_c, self._multi_optim)
+
+                    loss_sum += loss_c.item() * len(logits_c)
+                    loss_count += len(logits_c)
+                    logits_chunks.append(logits_c.detach().cpu())
+
+                # TODO: original darts clips alphas as well but pt.darts doesn't
+                self._apex.clip_grad(self._grad_clip, self.model, self._multi_optim)
+
+                self._multi_optim.step()
+
+                # TODO: we possibly need to sync so all replicas are upto date
+                self._apex.sync_devices()
+
+            self.post_step(x, y,
+                           ml_utils.join_chunks(logits_chunks),
+                           torch.tensor(loss_sum/loss_count),
+                           steps)
+            logger.popd()
+
+            # end of step
+
+        self._multi_optim.epoch()
+        logger.popd()
+
+class TrainerFinetune(Trainer):
+    
+    def __init__(self, conf_train:Config, model:nn.Module,
+                 checkpoint:Optional[CheckPoint]=None)->None:
+        super(TrainerFinetune, self).__init__(conf_train, model, checkpoint)
+
+    @overrides
+    def _train_epoch(self, train_dl: DataLoader)->None:
+        steps = len(train_dl)
         self.model.train()
 
         logger.pushd('steps')
@@ -377,9 +482,8 @@ class TrainerLinear(Trainer):
             for xc, yc in zip(x_chunks, y_chunks):
                 xc, yc = xc.to(self.get_device(), non_blocking=True), yc.to(self.get_device(), non_blocking=True)
 
-                with torch.no_grad():
-                    feats = self.model.backbone(xc)[-1]
-                logits_c, aux_logits = self.model.fc(feats)[-1], None
+                feats = self.model.backbone(xc)[-1]
+                logits_c, aux_logits = self.model.fc(feats), None
                 tupled_out = isinstance(logits_c, Tuple) and len(logits_c) >=2
                 # if self._aux_weight: # TODO: some other way to validate?
                 #     assert tupled_out, "aux_logits cannot be None unless aux tower is disabled"
@@ -412,69 +516,3 @@ class TrainerLinear(Trainer):
 
         self._multi_optim.epoch()
         logger.popd()
-
-# class TrainerFinetune(Trainer):
-    
-#     def __init__(self, conf_train:Config, model:nn.Module,
-#                  checkpoint:Optional[CheckPoint]=None)->None:
-#         super(TrainerFinetune, self).__init__(conf_train, model, checkpoint)
-
-#     def _train_epoch(self, train_dl: DataLoader)->None:
-#         steps = len(train_dl)
-#         self.model.train()
-
-#         logger.pushd('steps')
-#         for step, (x, y) in enumerate(train_dl):
-#             logger.pushd(step)
-#             assert self.model.training # derived class might alter the mode
-
-#             # TODO: please check that no algorithm is invalidated by swapping prestep with zero grad
-#             self._multi_optim.zero_grad()
-
-#             self.pre_step(x, y)
-
-#             # divide batch in to chunks if needed so it fits in GPU RAM
-#             if self.batch_chunks > 1:
-#                 x_chunks, y_chunks = torch.chunk(x, self.batch_chunks), torch.chunk(y, self.batch_chunks)
-#             else:
-#                 x_chunks, y_chunks = (x,), (y,)
-
-#             logits_chunks = []
-#             loss_sum, loss_count = 0.0, 0
-#             for xc, yc in zip(x_chunks, y_chunks):
-#                 xc, yc = xc.to(self.get_device(), non_blocking=True), yc.to(self.get_device(), non_blocking=True)
-
-#                 feats = self.model.backbone(xc)[-1]
-#                 logits_c, aux_logits = self.model.fc(feats)[-1], None
-#                 tupled_out = isinstance(logits_c, Tuple) and len(logits_c) >=2
-#                 # if self._aux_weight: # TODO: some other way to validate?
-#                 #     assert tupled_out, "aux_logits cannot be None unless aux tower is disabled"
-#                 if tupled_out: # then we are using model created by desc
-#                     logits_c, aux_logits = logits_c[0], logits_c[1]
-#                 loss_c = self.compute_loss(self._lossfn, yc, logits_c,
-#                                         self._aux_weight, aux_logits)
-
-#                 self._apex.backward(loss_c, self._multi_optim)
-
-#                 loss_sum += loss_c.item() * len(logits_c)
-#                 loss_count += len(logits_c)
-#                 logits_chunks.append(logits_c.detach().cpu())
-
-#             # TODO: original darts clips alphas as well but pt.darts doesn't
-#             self._apex.clip_grad(self._grad_clip, self.model, self._multi_optim)
-
-#             self._multi_optim.step()
-
-#             # TODO: we possibly need to sync so all replicas are upto date
-#             self._apex.sync_devices()
-
-#             self.post_step(x, y,
-#                            ml_utils.join_chunks(logits_chunks),
-#                            torch.tensor(loss_sum/loss_count),
-#                            steps)
-#             logger.popd()
-
-#             # end of step
-
-#         self._multi_optim.epoch()
-#         logger.popd()

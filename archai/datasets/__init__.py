@@ -12,3 +12,4 @@ from .providers.mit67_provider import Mit67Provider
 from .providers.sport8_provider import Sport8Provider
 from .providers.flower102_provider import Flower102Provider
 from .providers.simclr_cifar100provider import SimClrCifar100Provider
+from .providers.simclr_cifar10provider import SimClrCifar10Provider

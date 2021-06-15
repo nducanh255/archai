@@ -209,7 +209,16 @@ class TrainerSimClr(EnforceOverrides):
         if self._checkpoint is not None and self._apex.is_master() and \
             self._checkpoint.freq > 0 and (self._metrics.epochs() % self._checkpoint.freq == 0 or \
                     self._metrics.epochs() >= self._epochs):
+            
+            best_train = self._checkpoint["trainer_best_train"] \
+                        if "trainer_best_train" in self._checkpoint.data.keys() else None
+            best_val = self._checkpoint["trainer_best_val"] \
+                        if "trainer_best_val" in self._checkpoint.data.keys() else None
             self._checkpoint.new()
+            if best_train:
+                self._checkpoint["trainer_best_train"] = best_train
+            if best_val:
+                self._checkpoint["trainer_best_val"] = best_val
             self.update_checkpoint(self._checkpoint)
             self._checkpoint.commit()
 
@@ -249,6 +258,16 @@ class TrainerSimClr(EnforceOverrides):
             'multi_optim': self._multi_optim.state_dict(),
             'amp': self._apex.state_dict()
         }
+        cur_train_loss = self._metrics.run_metrics.cur_epoch().loss.avg
+        cur_val_loss = self._metrics.run_metrics.cur_epoch().val_metrics.loss.avg \
+                    if self._metrics.run_metrics.cur_epoch().val_metrics is not None else -1
+        best_train_loss = self._metrics.run_metrics.best_train.loss.avg if self._metrics.run_metrics.best_train is not None else -1
+        best_val_loss = self._metrics.run_metrics.best_val.loss.avg if self._metrics.run_metrics.best_val is not None else -1
+        if cur_train_loss == best_train_loss:
+            self._checkpoint['trainer_best_train'] = state
+        if cur_val_loss == best_val_loss:
+            self._checkpoint['trainer_best_val'] = state
+
         self._checkpoint['trainer'] = state
 
     def _train_epoch(self, train_dl: DataLoader)->None:

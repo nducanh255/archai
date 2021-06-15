@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-from typing import Iterator, List, Optional
+from typing import Iterator, List, Optional, Callable
 from collections import UserList
 
 from torch import nn, Tensor
@@ -30,9 +30,12 @@ class MultiOptim:
         for optim_sched in self._optim_scheds:
             optim_sched.optim.zero_grad()
 
-    def step(self)->None:
+    def step(self, closure: Callable = None)->None:
         for optim_sched in self._optim_scheds:
-            optim_sched.optim.step()
+            if closure is not None:
+                optim_sched.optim.step(closure)
+            else:
+                optim_sched.optim.step()
             if optim_sched.sched and not optim_sched.sched_on_epoch:
                 optim_sched.sched.step(epoch=None)
 

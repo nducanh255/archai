@@ -8,38 +8,14 @@ from archai.common import utils
 from torchvision import transforms
 import torchvision
 
-# def create_simclr_provider(base_class:DatasetProvider, conf_dataset:Config)->DatasetProvider:
-#     print(base_class)
-#     class SimClrProvider(base_class):
-#         def __init__(self, conf_dataset:Config):
-#             super().__init__(conf_dataset)
-#             self._dataroot = utils.full_path(conf_dataset['dataroot'])
-#             self.jitter_strength = conf_dataset['jitter_strength']
-#             self.input_height = conf_dataset['input_height']
-#             self.gaussian_blur = conf_dataset['gaussian_blur']
-#             self.normalize = conf_dataset['normalize']
-#             # ds_name = conf_dataset['name']
-#             # ds_provider_type = get_provider_type(ds_name)
-#             # self.parent_ds = ds_provider_type(conf_dataset)
-
-#         @overrides
-#         def get_transforms(self)->tuple:
-#             train_transform = SimCLRTrainDataTransform(self.input_height,
-#                 self.gaussian_blur, self.jitter_strength, self.normalize)
-#             test_transform = SimCLREvalDataTransform(self.input_height,
-#                 self.gaussian_blur, self.jitter_strength, self.normalize)
-
-#             return train_transform, test_transform
-
-#     return SimClrProvider(conf_dataset)
-
-class SimClrCifar100Provider(DatasetProvider):
+class SimClrCifar10Provider(DatasetProvider):
     def __init__(self, conf_dataset:Config):
         super().__init__(conf_dataset)
         self._dataroot = utils.full_path(conf_dataset['dataroot'])
         self.jitter_strength = conf_dataset['jitter_strength']
         self.input_height = conf_dataset['input_height']
         self.gaussian_blur = conf_dataset['gaussian_blur']
+        
         if conf_dataset['normalize']:
             self.normalize = transforms.Normalize(
                                 mean=[x / 255.0 for x in [125.3, 123.0, 113.9]],
@@ -54,10 +30,10 @@ class SimClrCifar100Provider(DatasetProvider):
         trainset, testset = None, None
 
         if load_train:
-            trainset = torchvision.datasets.CIFAR100(root=self._dataroot, train=True,
+            trainset = torchvision.datasets.CIFAR10(root=self._dataroot, train=True,
                 download=True, transform=transform_train)
         if load_test:
-            testset = torchvision.datasets.CIFAR100(root=self._dataroot, train=False,
+            testset = torchvision.datasets.CIFAR10(root=self._dataroot, train=False,
                 download=True, transform=transform_test)
 
         return trainset, testset
@@ -71,4 +47,4 @@ class SimClrCifar100Provider(DatasetProvider):
 
         return train_transform, test_transform
 
-register_dataset_provider('cifar100_simclr', SimClrCifar100Provider)
+register_dataset_provider('cifar10_simclr', SimClrCifar10Provider)

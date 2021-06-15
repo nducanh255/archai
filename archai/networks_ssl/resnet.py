@@ -143,6 +143,7 @@ class ResNet(nn.Module):
         depth:int,
         layers: List[int],
         bottleneck: bool = False,
+        compress: bool = False,
         return_feats_layers = False,
         zero_init_residual: bool = False,
         groups: int = 1,
@@ -154,6 +155,7 @@ class ResNet(nn.Module):
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
+        self.compress = compress
         self.dataset = dataset
         self.return_feats_layers = return_feats_layers
 
@@ -171,21 +173,36 @@ class ResNet(nn.Module):
 
         block = Bottleneck if bottleneck else BasicBlock
         if self.dataset.startswith('cifar'):
-            self.inplanes = 16
-            #logger.info(bottleneck)
-            if bottleneck == True:
-                n = int((depth - 2) / 9)
-            else:
-                n = int((depth - 2) / 6)
+            if compress:
+                self.inplanes = 16
+                #logger.info(bottleneck)
+                if bottleneck == True:
+                    n = int((depth - 2) / 9)
+                else:
+                    n = int((depth - 2) / 6)
 
-            self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False)
-            self.bn1 = norm_layer(self.inplanes)
-            self.relu = nn.ReLU(inplace=True)
-            self.layer1 = self._make_layer(block, 16, n)
-            self.layer2 = self._make_layer(block, 32, n, stride=2)
-            self.layer3 = self._make_layer(block, 64, n, stride=2)
-            # self.avgpool = nn.AvgPool2d(8)
-            self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+                self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False)
+                self.bn1 = norm_layer(self.inplanes)
+                self.relu = nn.ReLU(inplace=True)
+                self.layer1 = self._make_layer(block, 16, n)
+                self.layer2 = self._make_layer(block, 32, n, stride=2)
+                self.layer3 = self._make_layer(block, 64, n, stride=2)
+                # self.avgpool = nn.AvgPool2d(8)
+                self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+            else:
+                self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=1,
+                                    bias=False)
+                self.bn1 = norm_layer(self.inplanes)
+                self.relu = nn.ReLU(inplace=True)
+                self.layer1 = self._make_layer(block, 64, layers[0])
+                self.layer2 = self._make_layer(block, 128, layers[1], stride=2,
+                                            dilate=replace_stride_with_dilation[0])
+                self.layer3 = self._make_layer(block, 256, layers[2], stride=2,
+                                            dilate=replace_stride_with_dilation[1])
+                self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
+                                            dilate=replace_stride_with_dilation[2])
+                self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+
         elif self.dataset == 'imagenet':
             self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
                                 bias=False)
@@ -256,6 +273,9 @@ class ResNet(nn.Module):
             out.append(x)
             x = self.layer3(x)
             out.append(x)
+            if not self.compress:
+                x = self.layer4(x)
+                out.append(x)
 
             x = self.avgpool(x)
             x = x.view(x.size(0), -1)
@@ -289,15 +309,16 @@ def _resnet(
     depth: int,
     layers: List[int],
     bottleneck: bool,
+    compress: bool,
     pretrained: bool = False,
     progress: bool = False,
     **kwargs: Any
 ) -> ResNet:
-    model = ResNet(dataset, depth, layers, bottleneck, **kwargs)
-    if pretrained:
-        state_dict = load_state_dict_from_url(model_urls[arch],
-                                              progress=progress)
-        model.load_state_dict(state_dict)
+    model = ResNet(dataset, depth, layers, bottleneck, compress, **kwargs)
+    # if pretrained:
+    #     state_dict = load_state_dict_from_url(model_urls[arch],
+    #                                           progress=progress)
+    #     model.load_state_dict(state_dict)
     return model
 
 def resnet18(dataset:str, pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet:

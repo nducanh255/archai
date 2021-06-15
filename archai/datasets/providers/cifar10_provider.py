@@ -10,6 +10,7 @@ import torchvision
 from torchvision.transforms import transforms
 
 from archai.datasets.dataset_provider import DatasetProvider, register_dataset_provider, TrainTestDatasets
+from archai.datasets.transforms.simclr_transforms import SimCLRFinetuneTransform
 from archai.common.config import Config
 from archai.common import utils
 
@@ -17,6 +18,17 @@ class Cifar10Provider(DatasetProvider):
     def __init__(self, conf_dataset:Config):
         super().__init__(conf_dataset)
         self._dataroot = utils.full_path(conf_dataset['dataroot'])
+        self.jitter_strength = conf_dataset['jitter_strength']
+        self.input_height = conf_dataset['input_height']
+        self.gaussian_blur = conf_dataset['gaussian_blur']
+        
+        if conf_dataset['normalize']:
+            self.normalize = transforms.Normalize(
+                                mean=[x / 255.0 for x in [125.3, 123.0, 113.9]],
+                                std=[x / 255.0 for x in [63.0, 62.1, 66.7]],
+                )
+        else:
+            self.normalize = None
 
     @overrides
     def get_datasets(self, load_train:bool, load_test:bool,
@@ -34,20 +46,27 @@ class Cifar10Provider(DatasetProvider):
 
     @overrides
     def get_transforms(self)->tuple:
-        MEAN = [0.49139968, 0.48215827, 0.44653124]
-        STD = [0.24703233, 0.24348505, 0.26158768]
-        transf = [
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip()
-        ]
+        # MEAN = [0.49139968, 0.48215827, 0.44653124]
+        # STD = [0.24703233, 0.24348505, 0.26158768]
+        # transf = [
+        #     transforms.RandomCrop(32, padding=4),
+        #     transforms.RandomHorizontalFlip()
+        # ]
 
-        normalize = [
-            transforms.ToTensor(),
-            transforms.Normalize(MEAN, STD)
-        ]
+        # normalize = [
+        #     transforms.ToTensor(),
+        #     transforms.Normalize(MEAN, STD)
+        # ]
 
-        train_transform = transforms.Compose(transf + normalize)
-        test_transform = transforms.Compose(normalize)
+        # train_transform = transforms.Compose(transf + normalize)
+        # test_transform = transforms.Compose(normalize)
+        # print("running finetune transform")
+        # print(self.input_height, self.jitter_strength, self.normalize)
+        # exit()
+
+        train_transform = SimCLRFinetuneTransform(self.input_height, self.jitter_strength, self.normalize, False)
+        test_transform = SimCLRFinetuneTransform(self.input_height, self.jitter_strength, self.normalize, True)
+        return train_transform, test_transform
 
         return train_transform, test_transform
 

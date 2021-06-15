@@ -149,8 +149,8 @@ class SimCLRFinetuneTransform(object):
             ]
         else:
             data_transforms = [
-                transforms.Resize(int(self.input_height + 0.1 * self.input_height)),
-                transforms.CenterCrop(self.input_height)
+                # transforms.Resize(int(self.input_height + 0.1 * self.input_height)),
+                # transforms.CenterCrop(self.input_height)
             ]
 
         if normalize is None:

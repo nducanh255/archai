@@ -7,7 +7,7 @@ import math
 
 import  torch
 from torch import Tensor, nn
-from torch.optim import lr_scheduler, SGD, Adam
+from torch.optim import lr_scheduler, SGD, Adam, LBFGS
 from torch.optim.lr_scheduler import _LRScheduler
 from torch.optim.optimizer import Optimizer
 from torch.nn.modules.loss import _WeightedLoss, _Loss
@@ -64,6 +64,8 @@ def create_optimizer(conf_opt:Config, params)->Optimizer:
             momentum=conf_opt['momentum'],
             trust_coefficient=conf_opt['trust_coeff'],
             weight_decay=decay)
+    elif optim_type == 'lbfgs':
+        return LBFGS(params, lr=lr)
     else:
         raise ValueError('invalid optimizer type=%s' % optim_type)
 
@@ -136,10 +138,10 @@ def create_lr_scheduler(conf_lrs:Config, epochs:int, optimizer:Optimizer,
                             epochs=epochs-warmup_epochs,
                             steps_per_epoch=steps_per_epoch,
                         )  # TODO: other params
-        elif not lr_scheduler_type:
+        elif not lr_scheduler_type or lr_scheduler_type == "none":
                 scheduler = None
         else:
-            raise ValueError('invalid lr_schduler=%s' % lr_scheduler_type)
+            raise ValueError('invalid lr_scheduler=%s' % lr_scheduler_type)
 
         # select warmup for LR schedule
         if warmup_epochs:
