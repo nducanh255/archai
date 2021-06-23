@@ -180,7 +180,7 @@ class TrainerSimClr(EnforceOverrides):
         test_metrics = None
         # first run test before checkpointing, otherwise we won't have val metrics
         if data_loaders.test_dl and self._tester:
-            test_metrics = self._tester.test(data_loaders.test_dl)
+            test_metrics = self._tester.test(data_loaders.train_dl)
 
         self._metrics.post_run(test_metrics=test_metrics)
 

@@ -2,6 +2,7 @@
 # Licensed under the MIT license.
 
 import os
+import yaml
 import torch
 import torch.nn as nn
 from archai.networks_ssl.simclr import ModelSimCLR
@@ -15,12 +16,20 @@ def train_test(conf:Config):
     conf_loader = conf['loader']
     conf_trainer = conf['trainer']
     conf_dataset = conf_loader['dataset']
-    conf_model = conf[conf_trainer['model']]
     conf_checkpoint = conf['common']['checkpoint']
+    train_config_path = os.path.join(os.path.dirname(conf['common']['load_checkpoint']),"config_used.yaml")
+    with open(train_config_path) as f:
+        config_train = yaml.load(f, Loader=yaml.Loader)
+    # conf_trainer['batch_chunks'] = config_train['trainer']['batch_chunks']
+    conf_trainer['model'] = config_train['trainer']['model']
+    # conf_dataset['jitter_strength'] = config_train['loader']['dataset']['jitter_strength']
+
+    conf_model = conf[conf_trainer['model']]
 
     # create model
     model = ModelSimCLR(conf_dataset['name'], conf_model['depth'], conf_model['layers'], conf_model['bottleneck'],
-        conf_model['compress'], conf_model['hidden_dim'], conf_model['out_features'])
+        conf_model['compress'], conf_model['hidden_dim'], conf_model['out_features'], groups = conf_model['groups'],
+        width_per_group=conf_model['width_per_group'])
     model = model.to(torch.device('cuda', 0))
     ckpt = torch.load(conf['common']['load_checkpoint'])
     print("Loading model from epoch {}".format(ckpt['trainer']['last_epoch']+1))

@@ -1,8 +1,8 @@
 __include__: "../datasets/cifar10.yaml" # default dataset settings are for cifar
 
 common:
-  experiment_name: 'SimClr_Cifar100' # you should supply from command line
-  experiment_desc: 'SimClr_Cifar100'
+  experiment_name: 'SimClr_Cifar10' # you should supply from command line
+  experiment_desc: 'SimClr_Cifar10'
   # expdir: '~/logdir/models'
   logdir: '~/logdir/'
   log_prefix: 'log' # prefix for log files that will becreated (log.log and log.yaml), no log files if ''
@@ -60,6 +60,7 @@ loader:
     _copy: '/dataset'
     jitter_strength: 0.5
     input_height: 32
+    gaussian_blur: False
     normalize: True
   # dataset:
   #   max_batches: 2
@@ -67,28 +68,30 @@ trainer:
   title: 'eval_train'
   apex:
     _copy: '/common/apex'
-  epochs: 60
+  epochs: 100
   logger_freq: 10
   drop_path_prob: 0.0
   grad_clip: 0.0
   aux_weight: 0.0
   batch_chunks: 1 # split batch into these many chunks and accumulate gradients so we can support GPUs with lower RAM
-  model: "resnetv1"
+  model: "resnet18"
   lossfn:
     type: 'CrossEntropyLoss'
   optimizer:
     type: 'sgd' 
-    lr: 2.0 # init learning rate
+    lr: 5.0 # init learning rate
     decay: 0.0 # pytorch default is 0.0
     momentum: 0.9 # pytorch default is 0.0
     nesterov: False # pytorch default is False
     decay_bn: .NaN # if NaN then same as decay otherwise apply different decay to BN layers
+    betas: [0.9,0.999]
   # optimizer:
   #   type: 'lbfgs' 
   #   lr: 1.0 # init learning rate
   lr_schedule:
-    type: 'multi_step'
-    milestones: [25, 50, 75]
+    type: 'cosine'
+    min_lr: 1.0e-4
+    # milestones: [25, 50, 75]
     gamma: 0.1
     warmup:  # increases LR for 0 to current in specified epochs and then hands over to main scheduler
       multiplier: 1

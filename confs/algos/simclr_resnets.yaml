@@ -137,3 +137,803 @@ resnet_v11:
     compress: False
     width_per_group: 64
     groups: 8  ##
+
+resnet_v12:
+    depth: 29
+    layers: [2, 2, 2, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v13:
+    depth: 32
+    layers: [2, 2, 2, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v14:
+    depth: 29
+    layers: [2, 2, 3, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v15:
+    depth: 32
+    layers: [2, 2, 3, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v16:
+    depth: 35
+    layers: [2, 2, 3, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v17:
+    depth: 32
+    layers: [2, 2, 4, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v18:
+    depth: 35
+    layers: [2, 2, 4, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v19:
+    depth: 38
+    layers: [2, 2, 4, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v20:
+    depth: 29
+    layers: [2, 3, 2, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v21:
+    depth: 32
+    layers: [2, 3, 2, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v22:
+    depth: 35
+    layers: [2, 3, 2, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v23:
+    depth: 32
+    layers: [2, 3, 3, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v24:
+    depth: 35
+    layers: [2, 3, 3, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v25:
+    depth: 38
+    layers: [2, 3, 3, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v26:
+    depth: 35
+    layers: [2, 3, 4, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v27:
+    depth: 38
+    layers: [2, 3, 4, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v28:
+    depth: 41
+    layers: [2, 3, 4, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v29:
+    depth: 32
+    layers: [2, 4, 2, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v30:
+    depth: 35
+    layers: [2, 4, 2, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v31:
+    depth: 38
+    layers: [2, 4, 2, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v32:
+    depth: 35
+    layers: [2, 4, 3, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v33:
+    depth: 38
+    layers: [2, 4, 3, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v34:
+    depth: 41
+    layers: [2, 4, 3, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v35:
+    depth: 38
+    layers: [2, 4, 4, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v36:
+    depth: 41
+    layers: [2, 4, 4, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v37:
+    depth: 44
+    layers: [2, 4, 4, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v38:
+    depth: 29
+    layers: [3, 2, 2, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v39:
+    depth: 32
+    layers: [3, 2, 2, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v40:
+    depth: 35
+    layers: [3, 2, 2, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v41:
+    depth: 32
+    layers: [3, 2, 3, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v42:
+    depth: 35
+    layers: [3, 2, 3, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v43:
+    depth: 38
+    layers: [3, 2, 3, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v44:
+    depth: 35
+    layers: [3, 2, 4, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v45:
+    depth: 38
+    layers: [3, 2, 4, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v46:
+    depth: 41
+    layers: [3, 2, 4, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v47:
+    depth: 32
+    layers: [3, 3, 2, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v48:
+    depth: 35
+    layers: [3, 3, 2, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v49:
+    depth: 38
+    layers: [3, 3, 2, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v50:
+    depth: 35
+    layers: [3, 3, 3, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v51:
+    depth: 38
+    layers: [3, 3, 3, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v52:
+    depth: 41
+    layers: [3, 3, 3, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v53:
+    depth: 38
+    layers: [3, 3, 4, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v54:
+    depth: 41
+    layers: [3, 3, 4, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v55:
+    depth: 44
+    layers: [3, 3, 4, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v56:
+    depth: 35
+    layers: [3, 4, 2, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v57:
+    depth: 38
+    layers: [3, 4, 2, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v58:
+    depth: 41
+    layers: [3, 4, 2, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v59:
+    depth: 38
+    layers: [3, 4, 3, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v60:
+    depth: 41
+    layers: [3, 4, 3, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v61:
+    depth: 44
+    layers: [3, 4, 3, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v62:
+    depth: 41
+    layers: [3, 4, 4, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v63:
+    depth: 44
+    layers: [3, 4, 4, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v64:
+    depth: 47
+    layers: [3, 4, 4, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v65:
+    depth: 32
+    layers: [4, 2, 2, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v66:
+    depth: 35
+    layers: [4, 2, 2, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v67:
+    depth: 38
+    layers: [4, 2, 2, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v68:
+    depth: 35
+    layers: [4, 2, 3, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v69:
+    depth: 38
+    layers: [4, 2, 3, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v70:
+    depth: 41
+    layers: [4, 2, 3, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v71:
+    depth: 38
+    layers: [4, 2, 4, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v72:
+    depth: 41
+    layers: [4, 2, 4, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v73:
+    depth: 44
+    layers: [4, 2, 4, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v74:
+    depth: 35
+    layers: [4, 3, 2, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v75:
+    depth: 38
+    layers: [4, 3, 2, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v76:
+    depth: 41
+    layers: [4, 3, 2, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v77:
+    depth: 38
+    layers: [4, 3, 3, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v78:
+    depth: 41
+    layers: [4, 3, 3, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v79:
+    depth: 44
+    layers: [4, 3, 3, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v80:
+    depth: 41
+    layers: [4, 3, 4, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v81:
+    depth: 44
+    layers: [4, 3, 4, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v82:
+    depth: 47
+    layers: [4, 3, 4, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v83:
+    depth: 38
+    layers: [4, 4, 2, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v84:
+    depth: 41
+    layers: [4, 4, 2, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v85:
+    depth: 44
+    layers: [4, 4, 2, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v86:
+    depth: 41
+    layers: [4, 4, 3, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v87:
+    depth: 44
+    layers: [4, 4, 3, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v88:
+    depth: 47
+    layers: [4, 4, 3, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v89:
+    depth: 44
+    layers: [4, 4, 4, 2]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v90:
+    depth: 47
+    layers: [4, 4, 4, 3]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1
+
+resnet_v91:
+    depth: 50
+    layers: [4, 4, 4, 4]
+    bottleneck: True
+    hidden_dim: 2048
+    out_features: 128
+    compress: False
+    width_per_group: 64
+    groups: 1

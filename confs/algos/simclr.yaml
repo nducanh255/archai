@@ -76,7 +76,7 @@ trainer:
   model: "resnet18"
   lossfn:
     type: 'NTXentLoss'
-    temperature: 0.1
+    temperature: 0.5
     eps: 1.0e-6
   optimizer:
     # type: 'adam'
@@ -103,6 +103,6 @@ trainer:
     freq: 10 # perform validation only every N epochs
     lossfn:
       type: 'NTXentLoss'
-      temperature: 0.1
+      temperature: 0.5
       eps: 1.0e-6
 

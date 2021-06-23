@@ -207,7 +207,7 @@ class ApexUtils:
             r_op = self._op_map[op]
             dist.all_reduce(rt, op=r_op)
             if op=='mean':
-                rt /= self.world_size
+                rt = rt/self.world_size # If in-place op, throws "RuntimeError: result type Float can't be cast to the desired output type Long"
 
             if converted and len(rt.shape)==0:
                 return rt.item()
