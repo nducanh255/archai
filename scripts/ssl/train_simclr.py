@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+import yaml
 import torch
 from archai.networks_ssl.simclr import ModelSimCLR
 from archai.common.trainer_ssl import TrainerSimClr
@@ -13,8 +14,10 @@ def train_test(conf_eval:Config):
     conf_loader = conf_eval['loader']
     conf_trainer = conf_eval['trainer']
     conf_dataset = conf_loader['dataset']
-    conf_model = conf_eval[conf_trainer['model']]
     conf_checkpoint = conf['common']['checkpoint']
+    with open('confs/algos/simclr_resnets.yaml', 'r') as f:
+        conf_models = yaml.load(f, Loader=yaml.Loader)
+    conf_model = conf_models[conf_trainer['model']]
 
     # create model
     model = ModelSimCLR(conf_dataset['name'], conf_model['depth'], conf_model['layers'], conf_model['bottleneck'],
@@ -35,7 +38,7 @@ def train_test(conf_eval:Config):
 
 
 if __name__ == '__main__':
-    conf = common_init(config_filepath='confs/algos/simclr.yaml;confs/algos/simclr_resnets.yaml')
+    conf = common_init(config_filepath='confs/algos/simclr.yaml')
     
 
     train_test(conf)

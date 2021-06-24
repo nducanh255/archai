@@ -8,7 +8,7 @@ import torch.nn as nn
 from archai.networks_ssl.simclr import ModelSimCLR
 from archai.common.trainer import TrainerLinear
 from archai.common.config import Config
-from archai.common.common import common_init
+from archai.common.common import common_init, _create_sysinfo
 from archai.datasets import data
 from archai.common.checkpoint import CheckPoint
 
@@ -22,10 +22,11 @@ def train_test(conf:Config):
         config_train = yaml.load(f, Loader=yaml.Loader)
     # conf_trainer['batch_chunks'] = config_train['trainer']['batch_chunks']
     conf_trainer['model'] = config_train['trainer']['model']
-    # conf_dataset['jitter_strength'] = config_train['loader']['dataset']['jitter_strength']
+    with open('confs/algos/simclr_resnets.yaml', 'r') as f:
+        conf_models = yaml.load(f, Loader=yaml.Loader)
+    conf_model = conf_models[conf_trainer['model']]
 
-    conf_model = conf[conf_trainer['model']]
-
+    _create_sysinfo(conf)
     # create model
     model = ModelSimCLR(conf_dataset['name'], conf_model['depth'], conf_model['layers'], conf_model['bottleneck'],
         conf_model['compress'], conf_model['hidden_dim'], conf_model['out_features'], groups = conf_model['groups'],

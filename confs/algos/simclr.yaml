@@ -85,7 +85,7 @@ trainer:
     # betas: [0.9,0.999] # pytorch default is 0.0
     # decay_bn: .NaN # if NaN then same as decay otherwise apply different decay to BN layers
     type: 'lars'
-    lr: 1.0 # init learning rate
+    lr: 5.0 # init learning rate
     decay: 1.0e-4 # pytorch default is 0.0
     momentum: 0.9 # pytorch default is 0.0
     trust_coeff: 0.001
