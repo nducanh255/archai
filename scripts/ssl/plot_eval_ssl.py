@@ -1,3 +1,4 @@
+#test
 import os
 import yaml
 from archai.networks_ssl.simclr import ModelSimCLR
