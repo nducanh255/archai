@@ -20,4 +20,8 @@ RUN pwd
 WORKDIR "/workspace/apex"
 RUN pip install --user -v --disable-pip-version-check --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
 WORKDIR "/workspace" 
+RUN apt-get update
+RUN apt-get install ffmpeg libsm6 libxext6  -y
+# RUN git clone https://github.com/microsoft/archai.git
+# RUN cd archai && pip install -e .
 
