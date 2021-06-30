@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 from archai.networks_ssl.resnet import _resnet
+from archai.networks_ssl.vggnet import _vggnet
 from typing import Type, Any, Callable, Union, List, Optional
 
 class Projection(nn.Module):
@@ -25,11 +26,11 @@ class Projection(nn.Module):
         return out
 
 
-class ModelSimCLR(nn.Module):
+class ModelSimCLRResNet(nn.Module):
     
     def __init__(self, dataset: str, depth:int, layers: List[int], bottleneck: bool,
         compress:bool, hidden_dim: int, out_features:int, **kwargs: Any):
-        super(ModelSimCLR, self).__init__()
+        super(ModelSimCLRResNet, self).__init__()
         self.backbone = _resnet(dataset, depth, layers, bottleneck, compress, **kwargs)
         if dataset.startswith('cifar'):
             input_dim = (64 if compress else 512)*(4 if bottleneck else 1)
@@ -39,5 +40,19 @@ class ModelSimCLR(nn.Module):
 
     def forward(self, x):
         h = self.backbone(x)[-1]
+        z = self.projection(h)
+        return z
+
+class ModelSimCLRVGGNet(nn.Module):
+    
+    def __init__(self, dataset: str, layers: List[int], batch_norm: bool,
+        hidden_dim:int, out_features: int, out_features_vgg:int, **kwargs: Any):
+        super(ModelSimCLRVGGNet, self).__init__()
+        self.backbone = _vggnet(dataset, layers, batch_norm, out_features_vgg = out_features_vgg, **kwargs)
+        input_dim = out_features_vgg
+        self.projection = Projection(input_dim, hidden_dim, out_features)
+
+    def forward(self, x):
+        h = self.backbone(x)
         z = self.projection(h)
         return z

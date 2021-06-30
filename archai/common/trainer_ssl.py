@@ -112,7 +112,7 @@ class TrainerSimClr(EnforceOverrides):
             self._set_epoch(epoch, data_loaders)
             self.pre_epoch(data_loaders)
             self._train_epoch(data_loaders.train_dl)
-            self.post_epoch(data_loaders)
+            self.post_epoch(data_loaders,epoch)
             logger.popd()
         logger.popd()
         self.post_fit(data_loaders)
@@ -187,7 +187,7 @@ class TrainerSimClr(EnforceOverrides):
     def pre_epoch(self, data_loaders:data.DataLoaders)->None:
         self._metrics.pre_epoch(lr=self._multi_optim.get_lr(0, 0))
 
-    def post_epoch(self, data_loaders:data.DataLoaders)->None:
+    def post_epoch(self, data_loaders:data.DataLoaders, epoch:int)->None:
         val_metrics = None
         # first run test before checkpointing, otherwise we won't have val metrics
         if data_loaders.val_dl and self._tester and self._validation_freq > 0:
@@ -219,6 +219,7 @@ class TrainerSimClr(EnforceOverrides):
                 self._checkpoint["trainer_best_train"] = best_train
             if best_val:
                 self._checkpoint["trainer_best_val"] = best_val
+            self._checkpoint["epoch"] = epoch
             self.update_checkpoint(self._checkpoint)
             self._checkpoint.commit()
 

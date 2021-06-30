@@ -24,4 +24,8 @@ RUN apt-get update
 RUN apt-get install ffmpeg libsm6 libxext6  -y
 # RUN git clone https://github.com/microsoft/archai.git
 # RUN cd archai && pip install -e .
+RUN pip install pip==9.0.0
+RUN pip install ruamel.yaml==0.16 --disable-pip-version-check
+RUN pip install --upgrade pip
+RUN conda install google-auth google-auth-oauthlib
 

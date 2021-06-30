@@ -4,6 +4,7 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         {
             "name": "All-Toy-NoPareto",
             "type": "python",
@@ -267,6 +268,15 @@
             "args": ["--results-dir", "C:\\Users\\dedey\\Documents\\archaiphilly\\phillytools\\bilevel_default_20200521",
             "--out-dir", "C:\\Users\\dedey\\archai_experiment_reports", "--collate"]
         },
+        // {
+        //     "name": "Simclr cifa10 distributed",
+        //     "type": "python",
+        //     "request": "launch",
+        //     "program": "${cwd}/scripts/ssl/train_simclr.py",
+        //     "console": "integratedTerminal",
+        //     "args": ["--results-dir", "C:\\Users\\dedey\\Documents\\archaiphilly\\phillytools\\bilevel_default_20200521",
+        //     "--out-dir", "C:\\Users\\dedey\\archai_experiment_reports", "--collate"]
+        // },
         {
             "name": "CurrentFile",
             "type": "python",

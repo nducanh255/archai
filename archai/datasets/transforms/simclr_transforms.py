@@ -4,7 +4,7 @@
 # code in this file is adpated from PyTorchLightning/lightning-bolts
 # https://github.com/PyTorchLightning/lightning-bolts/blob/master/pl_bolts/models/self_supervised/simclr/transforms.py
 
-import cv2 
+# import cv2 
 import numpy as np
 from torchvision.transforms import transforms
 
