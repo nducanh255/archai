@@ -53,6 +53,6 @@ class ModelSimCLRVGGNet(nn.Module):
         self.projection = Projection(input_dim, hidden_dim, out_features)
 
     def forward(self, x):
-        h = self.backbone(x)
+        h = self.backbone(x)[-1]
         z = self.projection(h)
         return z

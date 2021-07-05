@@ -64,6 +64,10 @@ class Config(UserDict):
                 help='config filepath in yaml format, can be list separated by ;')
             self.args, self.extra_args = parser.parse_known_args()
             config_filepath = self.args.config or config_filepath
+            if config_filepath and '--dataset_yaml' in self.extra_args:
+                dataset_yaml = self.extra_args[self.extra_args.index('--dataset_yaml')+1]
+                config_filepath += f';{dataset_yaml}'
+            print(config_filepath)
 
         if config_filepath:
             for filepath in config_filepath.strip().split(';'):

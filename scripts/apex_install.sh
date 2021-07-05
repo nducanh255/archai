@@ -12,6 +12,7 @@ else
     git clone https://github.com/NVIDIA/apex
     cd apex
     # pip install --user -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
+    export MKL_THREADING_LAYER=GNU
     pip install --user -v --disable-pip-version-check --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
     popd
 fi

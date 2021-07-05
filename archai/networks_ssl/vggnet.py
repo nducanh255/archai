@@ -83,7 +83,7 @@ class VGG(nn.Module):
             x = self.avgpool(x)
         x = torch.flatten(x, 1)
         x = self.classifier(x)
-        return x
+        return [x]
 
     def _initialize_weights(self) -> None:
         for m in self.modules():

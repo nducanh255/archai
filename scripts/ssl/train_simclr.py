@@ -38,8 +38,6 @@ def train_test(conf_eval:Config):
     model = model.to(torch.device('cuda', 0))
     print('Number of trainable params: {:.2f}M'
           .format(sum(p.numel() for p in model.backbone.parameters() if p.requires_grad)/1e6))
-    # print(conf_dataset['name'])
-    # exit()
     # get data
     data_loaders = data.get_data_ssl(conf_loader)
 
@@ -51,8 +49,6 @@ def train_test(conf_eval:Config):
 
 if __name__ == '__main__':
     conf = common_init(config_filepath='confs/algos/simclr.yaml')
-    
-
     train_test(conf)
 
 

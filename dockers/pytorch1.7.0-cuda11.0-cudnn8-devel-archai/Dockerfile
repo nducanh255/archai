@@ -19,6 +19,7 @@ RUN git clone https://github.com/NVIDIA/apex
 RUN ls -l
 RUN pwd
 WORKDIR "/workspace/apex"
+ENV MKL_THREADING_LAYER GNU
 RUN pip install --user -v --disable-pip-version-check --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
 WORKDIR "/workspace" 
 RUN pip install pip==9.0.0

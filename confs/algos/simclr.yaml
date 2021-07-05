@@ -1,4 +1,4 @@
-__include__: "../datasets/cifar10.yaml" # default dataset settings are for cifar
+# __include__: "../datasets/cifar10.yaml" # default dataset settings are for cifar
 
 common:
   experiment_name: 'SimClr_Cifar10' # you should supply from command line
@@ -86,7 +86,7 @@ trainer:
     # decay_bn: .NaN # if NaN then same as decay otherwise apply different decay to BN layers
     type: 'lars'
     lr: 5.0 # init learning rate
-    decay: 1.0e-4 # pytorch default is 0.0
+    decay: 1.0e-6 # pytorch default is 0.0
     momentum: 0.9 # pytorch default is 0.0
     trust_coeff: 0.001
     decay_bn: .NaN # if NaN then same as decay otherwise apply different decay to BN layers
