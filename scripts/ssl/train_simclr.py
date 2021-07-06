@@ -2,7 +2,9 @@
 # Licensed under the MIT license.
 
 import yaml
+import time
 import torch
+import shutil
 from archai.networks_ssl.simclr import ModelSimCLRResNet, ModelSimCLRVGGNet
 from archai.common.trainer_ssl import TrainerSimClr
 from archai.common.config import Config
@@ -10,11 +12,12 @@ from archai.common.common import common_init
 from archai.datasets import data
 from archai.common.checkpoint import CheckPoint
 
-def train_test(conf_eval:Config):
-    conf_loader = conf_eval['loader']
-    conf_trainer = conf_eval['trainer']
+def train_test(conf_main:Config):
+    conf_loader = conf_main['loader']
+    conf_trainer = conf_main['trainer']
     conf_dataset = conf_loader['dataset']
-    conf_checkpoint = conf['common']['checkpoint']
+    conf_common = conf_main['common']
+    conf_checkpoint = conf_common['checkpoint']
     if "resnet" in conf_trainer['model']:
         with open('confs/algos/simclr_resnets.yaml', 'r') as f:
             conf_models = yaml.load(f, Loader=yaml.Loader)
@@ -43,8 +46,22 @@ def train_test(conf_eval:Config):
 
     # train!
     ckpt = CheckPoint(conf_checkpoint, load_existing=False)
+    if conf_checkpoint['resume']:
+        print("Resuming")
+        found = ckpt.resume(conf_checkpoint)
+        # resume_logger(conf_main)    
+        if not found:
+            conf_common['resume'] = conf_checkpoint['resume'] = conf_common['apex']['resume'] = \
+            conf_loader['apex']['resume'] = conf_trainer['apex']['resume'] = False
+            conf_common['resumedir'] = conf_checkpoint['resumedir'] = ''
+
+        #     raise Exception("Ckpt not loaded")
     trainer = TrainerSimClr(conf_trainer, model, ckpt)
+    st = time.time()
     trainer.fit(data_loaders)
+    print(time.time()-st)
+    # if conf_common['save_intermediate']:
+    #     shutil.rmtree(conf_common['intermediatedir'])
 
 
 if __name__ == '__main__':

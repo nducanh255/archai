@@ -12,9 +12,18 @@ common:
   seed: 2.0
   tb_enable: False # if True then TensorBoard logging is enabled (may impact perf)
   tb_dir: '$expdir/tb' # path where tensorboard logs would be stored
+  resume: False
+  resumedir: ''
+  save_intermediate: False
+  intermediatedir: ''
   checkpoint:
     filename: '$expdir/checkpoint.pth'
     freq: 10
+    experiment_name: '_copy: /common/experiment_name'
+    resume: '_copy: /common/resume'
+    resumedir: '_copy: /common/resumedir'
+    save_intermediate: '_copy: /common/save_intermediate'
+    intermediatedir: '_copy: /common/intermediatedir'
 
   # reddis address of Ray cluster. Use None for single node run
   # otherwise it should something like host:6379. Make sure to run on head node:
@@ -36,10 +45,10 @@ common:
     ray:
       enabled: False # initialize ray. Note: ray cannot be used if apex distributed is enabled
       local_mode: False # if True then ray runs in serial mode
+    resume: '_copy: /common/checkpoint/resume'
 
   smoke_test: False
   only_eval: False
-  resume: True
 
 
 loader:
@@ -65,6 +74,7 @@ loader:
 
 trainer:
   title: 'eval_train'
+  resume: '_copy: /common/checkpoint/resume'
   apex:
     _copy: '/common/apex'
   epochs: 300

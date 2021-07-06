@@ -26,6 +26,12 @@ class CheckPoint(UserDict):
 
         # region config vars
         self.filepath = utils.full_path(conf_checkpoint['filename'])
+        self._save_intermediate = conf_checkpoint['save_intermediate']
+        self.intermediate_filepath = os.path.join(conf_checkpoint['intermediatedir'], 
+                                                  conf_checkpoint['experiment_name'],
+                                                  os.path.basename(utils.full_path(conf_checkpoint['filename']))
+                                                  )
+
         self.freq = conf_checkpoint['freq']
         # endregion
 
@@ -38,6 +44,20 @@ class CheckPoint(UserDict):
         assert self.is_empty()
         if self.filepath and os.path.exists(self.filepath):
             d = torch.load(self.filepath, map_location=torch.device('cpu'))
+            self.clear()
+            self.update(d)
+            return True
+        return False
+
+    def resume(self, conf_checkpoint:Config)->bool:
+        resumedir = conf_checkpoint['resumedir']
+        experiment_name = conf_checkpoint['experiment_name']
+        resumedir = utils.full_path(resumedir)
+        resumedir = os.path.join(resumedir, experiment_name)
+        filename = os.path.basename(utils.full_path(conf_checkpoint['filename']))
+        filepath = os.path.join(resumedir, filename)
+        if filepath and os.path.exists(filepath):
+            d = torch.load(filepath, map_location=torch.device('cpu'))
             self.clear()
             self.update(d)
             return True
@@ -59,6 +79,8 @@ class CheckPoint(UserDict):
     def commit(self)->None:
         assert self.filepath and not self.is_empty()
         torch.save(self.data, self.filepath)
+        if self._save_intermediate and os.path.exists(os.path.dirname(self.intermediate_filepath)):
+            torch.save(self.data, self.intermediate_filepath)
         # clean up after commit so we don't hold up references
 
     def is_empty(self)->bool:

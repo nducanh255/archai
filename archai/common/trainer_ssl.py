@@ -26,7 +26,7 @@ class TrainerSimClr(EnforceOverrides):
     def __init__(self, conf_train:Config, model:nn.Module,
                  checkpoint:Optional[CheckPoint]=None)->None:
         # region config vars
-        self.conf_train = conf_train
+        self._conf_train = conf_train
         conf_lossfn = conf_train['lossfn']
         self._grad_clip = conf_train['grad_clip']
         self._drop_path_prob = conf_train['drop_path_prob']
@@ -40,7 +40,6 @@ class TrainerSimClr(EnforceOverrides):
         conf_apex = conf_train['apex']
         self._validation_freq = 0 if conf_validation is None else conf_validation['freq']
         # endregion
-
         logger.pushd(self._title + '__init__')
 
         self._apex = ApexUtils(conf_apex, logger)

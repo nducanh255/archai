@@ -2,6 +2,8 @@
 # Licensed under the MIT license.
 
 from typing import Any, Mapping, Optional, Union, List, Iterator
+from . import utils
+from .config import Config
 from collections import OrderedDict
 import logging
 import time
@@ -28,6 +30,36 @@ class OrderedDictLogger:
         super().__init__()
         self.reset(filepath, logger, save_delay, yaml_log=yaml_log)
 
+    def init_conf_vars(self, conf_common:Config):
+        
+        self._save_intermediate = conf_common['save_intermediate']
+        self._intermediatedir = conf_common['intermediatedir']
+        if self._save_intermediate:
+            intermediatedir = self._intermediatedir
+            experiment_name = conf_common['experiment_name']
+            logdir = conf_common['logdir']
+            logdir = os.path.join(utils.full_path(logdir), experiment_name)
+            if intermediatedir:
+                intermediatedir = utils.full_path(intermediatedir)
+                expdir = os.path.join(intermediatedir, experiment_name)
+
+                # directory for non-master replica logs
+                distdir = os.path.join(expdir, 'dist')
+            else:
+                expdir = distdir = intermediatedir
+
+            log_prefix = conf_common['log_prefix']
+
+            if utils.is_main_process():
+                intermediatedir, log_suffix = expdir, ''
+            else:
+                intermediatedir, log_suffix = distdir, '_' + str(os.getpid())
+                logdir = os.path.join(logdir, 'dist')
+
+            self._sys_log_filepath = utils.full_path(os.path.join(logdir, f'{log_prefix}{log_suffix}.log'))
+            self._intermediate_sys_log_filepath = utils.full_path(os.path.join(intermediatedir, f'{log_prefix}{log_suffix}.log'))
+            self._intermediate_logs_yaml_filepath = utils.full_path(os.path.join(intermediatedir, f'{log_prefix}{log_suffix}.yaml'))
+
     def reset(self, filepath:Optional[str], logger:Optional[logging.Logger],
                  save_delay:Optional[float]=30.0,
                  load_existing_file=False, backup_existing_file=True, yaml_log=True) -> None:
@@ -46,7 +78,8 @@ class OrderedDictLogger:
         root_od = OrderedDict()
         if self._yaml_log and filepath and os.path.exists(filepath):
             if load_existing_file:
-                root_od = yaml.load(self._filepath, Loader=yaml.Loader)
+                with open(filepath, 'r') as f:
+                    root_od = yaml.load(f, Loader=yaml.Loader)
             if backup_existing_file:
                 cur_p = pathlib.Path(filepath)
                 new_p = cur_p.with_name(cur_p.stem + '.' + str(int(time.time()))
@@ -56,13 +89,13 @@ class OrderedDictLogger:
                 cur_p.rename(new_p)
         self._stack:List[Optional[OrderedDict]] = [root_od]
 
-    def debug(self, dict:TItems, level:Optional[int]=logging.DEBUG, exists_ok=False)->None:
+    def debug(self, dict:TItems, level:Optional[int]=logging.DEBUG, exists_ok=True)->None:
         self.info(dict, level, exists_ok)
 
-    def warn(self, dict:TItems, level:Optional[int]=logging.WARN, exists_ok=False)->None:
+    def warn(self, dict:TItems, level:Optional[int]=logging.WARN, exists_ok=True)->None:
         self.info(dict, level, exists_ok)
 
-    def info(self, dict:TItems, level:Optional[int]=logging.INFO, exists_ok=False)->None:
+    def info(self, dict:TItems, level:Optional[int]=logging.INFO, exists_ok=True)->None:
         self._call_count += 1 # provides default key when key is not specified
 
         if isinstance(dict, Mapping): # if logging dict then just update current section
@@ -75,10 +108,14 @@ class OrderedDictLogger:
 
         if level is not None and self._logger:
             self._logger.log(msg=self.path() + ' ' + msg, level=level)
+            if self._save_intermediate and os.path.exists(self._intermediatedir):
+                shutil.copy(self._sys_log_filepath, self._intermediate_sys_log_filepath)
 
         if self._save_delay is not None and \
                 time.time() - self._last_save > self._save_delay:
             self.save()
+            if self._save_intermediate and os.path.exists(self._intermediatedir):
+                shutil.copy(self._filepath, self._intermediate_logs_yaml_filepath)
             self._last_save = time.time()
 
     def _root(self)->OrderedDict:
@@ -97,6 +134,7 @@ class OrderedDictLogger:
         if filepath:
             with open(filepath, 'w') as f:
                 yaml.dump(self._root(), f)
+
 
     def load(self, filepath:str)->None:
         with open(filepath, 'r') as f:
@@ -129,6 +167,8 @@ class OrderedDictLogger:
             if p not in node:
                 node[p] = OrderedDict()
             node = node[p]
+
+        # print(node, key, self._stack)
         node[str(key)] = val
 
     def _ensure_paths(self)->None:

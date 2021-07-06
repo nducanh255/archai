@@ -4,6 +4,7 @@
 import logging
 import numpy as np
 import os
+from distutils.dir_util import copy_tree
 from typing import List, Iterable, Union, Optional, Tuple
 import atexit
 import subprocess
@@ -169,6 +170,9 @@ def common_init(config_filepath: Optional[str]=None,
     # create experiment dir
     create_dirs(conf, clean_expdir)
 
+    # create intermediate exp dir
+    create_intermediate_dirs(conf)
+
     # create global logger
     create_logger(conf)
 
@@ -217,6 +221,8 @@ def create_tb_writer(conf:Config, is_master=True)-> SummaryWriterAny:
                  'tb_enable': tb_enable,
                  'tb_dir': tb_dir})
 
+    if tb_enable and conf_common['resume']:
+        raise NotImplementedError('Not implemented resuming tensorboard summary writer!') #TODO
     WriterClass = SummaryWriter if tb_enable else SummaryWriterDummy
 
     return WriterClass(log_dir=tb_dir)
@@ -311,11 +317,23 @@ def create_dirs(conf:Config, clean_expdir:bool)->Optional[str]:
                  # create info file for current system
                  'PT_DATA_DIR': pt_data_dir, 'PT_OUTPUT_DIR': pt_output_dir})
 
+def create_intermediate_dirs(conf:Config)->None:
+    conf_common = get_conf_common(conf)
+    logdir = conf_common['logdir']
+    intermediatedir = conf_common['intermediatedir']
+    if intermediatedir:
+        os.makedirs(intermediatedir,exist_ok=True)
+        copy_tree(logdir, intermediatedir)
+
 def create_logger(conf:Config):
+    conf_common = get_conf_common(conf)
+    if conf_common['resume'] and os.path.exists(conf_common['resumedir']):
+        copy_tree(conf_common['resumedir'], conf_common['logdir'])
+
     global logger
+    logger.init_conf_vars(conf_common)
     logger.close()  # close any previous instances
 
-    conf_common = get_conf_common(conf)
     expdir = conf_common['expdir']
     distdir = conf_common['distdir']
     log_prefix = conf_common['log_prefix']
@@ -345,7 +363,7 @@ def create_logger(conf:Config):
 
     # reset to new file path
     logger.reset(logs_yaml_filepath, sys_logger, yaml_log=yaml_log,
-                 backup_existing_file=False)
+                 load_existing_file=conf_common['resume'], backup_existing_file=False)
     logger.info({'command_line': ' '.join(sys.argv) if utils.is_main_process() else f'Child process: {utils.process_name()}-{os.getpid()}'})
     logger.info({'process_name': utils.process_name(), 'is_main_process': utils.is_main_process(),
                  'main_process_pid':utils.main_process_pid(), 'pid':os.getpid(), 'ppid':os.getppid(), 'is_debugging': utils.is_debugging()})

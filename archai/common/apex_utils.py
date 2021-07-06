@@ -23,6 +23,7 @@ from archai.common.multi_optim import MultiOptim
 class ApexUtils:
     def __init__(self, apex_config:Config, logger:Optional[OrderedDictLogger])->None:
         # region conf vars
+        self._apex_config = apex_config
         self._enabled = apex_config['enabled'] # global switch to disable anything apex
         self._distributed_enabled = apex_config['distributed_enabled'] # enable/disable distributed mode
         self._mixed_prec_enabled = apex_config['mixed_prec_enabled'] # enable/disable distributed mode
