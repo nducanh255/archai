@@ -1,0 +1,1 @@
+{"project_name": "mojan_archai", "storage_account_name": "archai", "container_name": "amulet", "blob_storage_account_name": "archai", "registry_name": "projects", "targets": {}, "local_path": "/home/t-mojanj/Projects/archai", "default_output_dir": "/home/t-mojanj/Projects/archai/amlt", "project_uuid": "7374914370.96205-e80b2c4e-bda3-4d92-9b3b-4422884d9804", "version": "8.0.5"}

@@ -37,9 +37,10 @@ from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import create_exp_d
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import l2_promote
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import log_env_info
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import register_ignoring_timeout_handler
-
 from archai.common import utils, common
 
+from archai.nlp.nvidia_transformer_xl.mem_transformer import AdaptiveEmbedding, DecoderLayer, MultiHeadAttn, PositionwiseFF, ProjectedAdaptiveLogSoftmax
+from archai.nlp.nvidia_transformer_xl.utils import get_parameter_breakdown
 
 def parse_args():
     parent_parser = argparse.ArgumentParser(
@@ -58,6 +59,7 @@ def parse_args():
 
     if config_args.config is not None and config_args.config_file is not None:
         config_file_path = utils.full_path(os.path.join('.', 'archai', 'nlp', 'nvidia_transformer_xl', config_args.config_file))
+        # config_file_path = utils.full_path(os.path.join('.', config_args.config_file))
         with open(config_file_path) as f:
             config = yaml.load(f, Loader=yaml.FullLoader)[config_args.config]['train']
     else:
@@ -110,6 +112,8 @@ def parse_args():
                                   'socket_unique_continuous',
                                   'disabled'],
                          help='type of CPU affinity')
+    general.add_argument('--get_params', action='store_true',
+                         help='Get parameter breakdown for different layers')
 
     dataset = parser.add_argument_group('dataset setup')
     dataset.add_argument('--data', type=str, default=None,
@@ -705,9 +709,10 @@ def main():
     pt_data_dir, pt_output_dir = common.pt_dirs()
     args.data = args.data or pt_data_dir or common.default_dataroot()
     args.data = utils.full_path(os.path.join(args.data,'textpred', exp_utils.dataset_dir_name(args.dataset)))
-    args.work_dir =  utils.full_path(pt_output_dir or \
-                        os.path.join(args.work_dir, args.experiment_name)
-                    , create=True)
+    args.work_dir =  utils.full_path(pt_output_dir or os.path.join(args.work_dir, args.experiment_name), create=True)
+
+    print('path to data:', pt_data_dir)
+    print('path to results:', pt_output_dir)
 
     with nv_distributed.sync_workers() as rank:
         if rank == 0:
@@ -952,6 +957,9 @@ def main():
     logging.info('=' * 100)
     logging.info('#params = {}'.format(args.n_all_param))
     logging.info('#non emb params = {}'.format(args.n_nonemb_param))
+
+    if args.get_params:
+        all_params, decoder_params = get_parameter_breakdown(model, layerType=[AdaptiveEmbedding, DecoderLayer, ProjectedAdaptiveLogSoftmax])
 
     train_step = 0
     start_epoch = 1

@@ -300,7 +300,7 @@ class Corpus(object):
 
 def get_lm_corpus(datadir, dataset, vocab, max_size=None):
     if vocab == 'word':
-        fn = os.path.join(datadir, 'cache.pt')
+        fn = os.path.join(datadir, 'cache_'+str(max_size)+'.pt')
     elif vocab == 'bpe':
         fn = os.path.join(datadir, 'cache.pt.'+ str(max_size) +'.bpe')
     else:
