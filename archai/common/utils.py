@@ -343,6 +343,8 @@ if 'main_process_pid' not in os.environ:
     os.environ['main_process_pid'] = str(os.getpid())
 def is_main_process()->bool:
     """Returns True if this process was started as main process instead of child process during multiprocessing"""
+    if "RANK" in os.environ:
+        return int(os.environ["RANK"]) == 0
     return multiprocessing.current_process().name == 'MainProcess' and os.environ['main_process_pid'] == str(os.getpid())
 def main_process_pid()->int:
     return int(os.environ['main_process_pid'])

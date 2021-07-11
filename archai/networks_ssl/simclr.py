@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from archai.networks_ssl.resnet import _resnet
 from archai.networks_ssl.vggnet import _vggnet
+from archai.networks_ssl.vit import _vit
 from typing import Type, Any, Callable, Union, List, Optional
 
 class Projection(nn.Module):
@@ -50,6 +51,19 @@ class ModelSimCLRVGGNet(nn.Module):
         super(ModelSimCLRVGGNet, self).__init__()
         self.backbone = _vggnet(dataset, layers, batch_norm, out_features_vgg = out_features_vgg, **kwargs)
         input_dim = out_features_vgg
+        self.projection = Projection(input_dim, hidden_dim, out_features)
+
+    def forward(self, x):
+        h = self.backbone(x)[-1]
+        z = self.projection(h)
+        return z
+
+class ModelSimCLRViT(nn.Module):
+    
+    def __init__(self, dim:int, hidden_dim:int, out_features: int, **kwargs: Any):
+        super(ModelSimCLRViT, self).__init__()
+        self.backbone = _vit(dim=dim, **kwargs)
+        input_dim = dim
         self.projection = Projection(input_dim, hidden_dim, out_features)
 
     def forward(self, x):

@@ -4,6 +4,7 @@
 import logging
 import numpy as np
 import os
+import shutil
 from distutils.dir_util import copy_tree
 from typing import List, Iterable, Union, Optional, Tuple
 import atexit
@@ -170,6 +171,9 @@ def common_init(config_filepath: Optional[str]=None,
     # create experiment dir
     create_dirs(conf, clean_expdir)
 
+    # copy from resume dir if exists
+    copy_resume_dirs(conf)
+
     # create intermediate exp dir
     create_intermediate_dirs(conf)
 
@@ -319,16 +323,63 @@ def create_dirs(conf:Config, clean_expdir:bool)->Optional[str]:
 
 def create_intermediate_dirs(conf:Config)->None:
     conf_common = get_conf_common(conf)
-    logdir = conf_common['logdir']
-    intermediatedir = conf_common['intermediatedir']
-    if intermediatedir:
-        os.makedirs(intermediatedir,exist_ok=True)
-        copy_tree(logdir, intermediatedir)
+    conf_checkpoint = conf_common['checkpoint']
+    intermediatedir = os.path.join(conf_common['intermediatedir'],get_experiment_name(conf))
+    logdir = os.path.join(conf_common['logdir'],get_experiment_name(conf))
+    if conf_common['save_intermediate']:
+        print(f'Copying logs and ckpts from {logdir} to {intermediatedir}')
+        os.makedirs(conf_common['intermediatedir'], exist_ok=True)
+        os.makedirs(intermediatedir, exist_ok=True)
+        log_suffix = ''
+        log_prefix = conf_common['log_prefix']
+        intermediate_ckpt_path = os.path.join(intermediatedir,os.path.basename(utils.full_path(conf_checkpoint['filename'])))
+        intermediate_sys_log_filepath = utils.full_path(os.path.join(intermediatedir, f'{log_prefix}{log_suffix}.log'))
+        intermediate_logs_yaml_filepath = utils.full_path(os.path.join(intermediatedir, f'{log_prefix}{log_suffix}.yaml'))
+        sys_log_filepath = utils.full_path(os.path.join(logdir, f'{log_prefix}{log_suffix}.log'))
+        logs_yaml_filepath = utils.full_path(os.path.join(logdir, f'{log_prefix}{log_suffix}.yaml'))
+        ckpt_path = os.path.join(logdir,os.path.basename(utils.full_path(conf_checkpoint['filename'])))
+        if os.path.exists(ckpt_path):
+            shutil.copy(ckpt_path, intermediate_ckpt_path)
+        if os.path.exists(logs_yaml_filepath):
+            shutil.copy(logs_yaml_filepath, intermediate_logs_yaml_filepath)
+        if os.path.exists(sys_log_filepath):
+            shutil.copy(sys_log_filepath, intermediate_sys_log_filepath)
+        # if os.path.exists(os.path.join(logdir,'dist')):
+        #     os.makedirs(os.path.join(intermediatedir,'dist'),exist_ok=True)
+        #     copy_tree(os.path.join(logdir,'dist'),os.path.join(intermediatedir,'dist'))
+
+def copy_resume_dirs(conf:Config)->None:
+    conf_common = get_conf_common(conf)
+    conf_checkpoint = conf_common['checkpoint']
+    resumedir = os.path.join(conf_common['resumedir'],get_experiment_name(conf))
+    logdir = os.path.join(conf_common['logdir'],get_experiment_name(conf))
+    if conf_common['resume']:
+        resume_ckpt_path = os.path.join(resumedir,os.path.basename(utils.full_path(conf_checkpoint['filename'])))
+        if os.path.exists(resume_ckpt_path):
+            print(f'Copying logs and ckpts from {resumedir} to {logdir}')
+            log_suffix = ''
+            log_prefix = conf_common['log_prefix']
+            resume_sys_log_filepath = utils.full_path(os.path.join(resumedir, f'{log_prefix}{log_suffix}.log'))
+            resume_logs_yaml_filepath = utils.full_path(os.path.join(resumedir, f'{log_prefix}{log_suffix}.yaml'))
+            sys_log_filepath = utils.full_path(os.path.join(logdir, f'{log_prefix}{log_suffix}.log'))
+            logs_yaml_filepath = utils.full_path(os.path.join(logdir, f'{log_prefix}{log_suffix}.yaml'))
+            ckpt_path = os.path.join(logdir,os.path.basename(utils.full_path(conf_checkpoint['filename'])))
+            shutil.copy(resume_sys_log_filepath, sys_log_filepath)
+            shutil.copy(resume_logs_yaml_filepath, logs_yaml_filepath)
+            shutil.copy(resume_ckpt_path, ckpt_path)
+            # if os.path.exists(os.path.join(logdir,'dist')):
+            #     os.makedirs(os.path.join(logdir,'dist'),exist_ok=True)
+            #     copy_tree(os.path.join(resumedir,'dist'),os.path.join(logdir,'dist'))
+        else:
+            print('Resume ckpt not found')
+            # if os.path.exists(conf_common['resumedir']):
+            #     shutil.rmtree(conf_common['resumedir'])
+            conf_common['resume'] = conf_checkpoint['resume'] = conf_common['apex']['resume'] = \
+            conf_common['apex']['resume'] = conf_common['apex']['resume'] = False
+            conf_common['resumedir'] = conf_checkpoint['resumedir'] = ''
 
 def create_logger(conf:Config):
     conf_common = get_conf_common(conf)
-    if conf_common['resume'] and os.path.exists(conf_common['resumedir']):
-        copy_tree(conf_common['resumedir'], conf_common['logdir'])
 
     global logger
     logger.init_conf_vars(conf_common)
@@ -343,7 +394,7 @@ def create_logger(conf:Config):
     if utils.is_main_process():
         logdir, log_suffix = expdir, ''
     else:
-        logdir, log_suffix = distdir, '_' + str(os.getpid())
+        logdir, log_suffix = distdir, '_' + str(os.environ["RANK"])
 
     # ensure folders
     os.makedirs(logdir, exist_ok=True)
@@ -362,15 +413,10 @@ def create_logger(conf:Config):
             'log_prefix not specified, logs will be stdout only')
 
     # reset to new file path
-    logger.reset(logs_yaml_filepath, sys_logger, yaml_log=yaml_log,
+    logger.reset(logs_yaml_filepath, sys_logger, yaml_log=yaml_log, save_delay=conf_common['save_delay'],
                  load_existing_file=conf_common['resume'], backup_existing_file=False)
     logger.info({'command_line': ' '.join(sys.argv) if utils.is_main_process() else f'Child process: {utils.process_name()}-{os.getpid()}'})
     logger.info({'process_name': utils.process_name(), 'is_main_process': utils.is_main_process(),
                  'main_process_pid':utils.main_process_pid(), 'pid':os.getpid(), 'ppid':os.getppid(), 'is_debugging': utils.is_debugging()})
     logger.info({'experiment_name': experiment_name, 'datetime:': datetime.datetime.now()})
     logger.info({'logs_yaml_filepath': logs_yaml_filepath, 'sys_log_filepath': sys_log_filepath})
-
-
-
-
-

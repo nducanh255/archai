@@ -12,7 +12,7 @@ args = parser.parse_args()
 args.output_dir = os.path.abspath(
                     os.path.expanduser(
                         os.path.expandvars(args.output_dir)))
-print(args.output_dir)
+print(args.output_dir, os.listdir('/var/tmp/dataroot'))
 file_path = os.path.join(args.output_dir,"SimClr_Cifar10")
 file_path = args.output_dir
 # os.mkdir(args.output_dir)

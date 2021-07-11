@@ -1,5 +1,5 @@
 import yaml
-
+bruh
 # resnets = {}
 # count = 12
 # for l1 in [2,3,4]:
@@ -51,54 +51,100 @@ import yaml
 # out_features_vgg: int = 4096
 
 
-vggnets = {}
-count = 1
-for l1 in [1,2,3]:
-    for l2 in [1,2,3]:
-        for l3 in [2,3,4]:
-            for l4 in [2,3,4]:
-                for l5 in [2,3,4]:
-                    for hidden_features_vgg in [512,4096]:
-                        for out_features_vgg in [512,4096]:
-                            if hidden_features_vgg > out_features_vgg:
-                                continue
-                            for classifier_type in ['A','B','C','D']:
-                                for drop_prob in [0.0, 0.25, 0.5]:
-                                    for batch_norm in [True,False]:
-                                        layers = [l1,l2,l3,l4,l5]
-                                        cur_vggnet = {
-                                                    "depth": sum(layers)+3,
-                                                    "layers": layers,
-                                                    "classifier_type": classifier_type,
-                                                    "hidden_features_vgg": hidden_features_vgg,
-                                                    "out_features_vgg": out_features_vgg,
-                                                    "batch_norm": batch_norm,
-                                                    "drop_prob": drop_prob,
-                                                    "hidden_dim": 2048,
-                                                    "out_features": 128,
-                                        }
-                                        name = f"vggnet_l{''.join(str(l) for l in layers)}_h{hidden_features_vgg}_o{out_features_vgg}_d{drop_prob}_{classifier_type}"
-                                        name += ("_bn" if batch_norm else "")
-                                        vggnets[name] = cur_vggnet
-                                        if hidden_features_vgg == 4096 and out_features_vgg == 4096 and drop_prob == 0.5:
-                                            if layers in [[1, 1, 2, 2, 2], [2, 2, 2, 2, 2], [2, 2, 3, 3, 3], [2, 2, 4, 4, 4,]]:
-                                                name = f"vgg{sum(layers)+3}_{classifier_type}"
-                                                name += ("_bn" if batch_norm else "")
-                                                vggnets[name] = cur_vggnet
-                    count += 1
+# vggnets = {}
+# count = 1
+# for l1 in [1,2,3]:
+#     for l2 in [1,2,3]:
+#         for l3 in [2,3,4]:
+#             for l4 in [2,3,4]:
+#                 for l5 in [2,3,4]:
+#                     for hidden_features_vgg in [512,4096]:
+#                         for out_features_vgg in [512,4096]:
+#                             if hidden_features_vgg > out_features_vgg:
+#                                 continue
+#                             for classifier_type in ['A','B','C','D']:
+#                                 for drop_prob in [0.0, 0.25, 0.5]:
+#                                     for batch_norm in [True,False]:
+#                                         layers = [l1,l2,l3,l4,l5]
+#                                         cur_vggnet = {
+#                                                     "depth": sum(layers)+3,
+#                                                     "layers": layers,
+#                                                     "classifier_type": classifier_type,
+#                                                     "hidden_features_vgg": hidden_features_vgg,
+#                                                     "out_features_vgg": out_features_vgg,
+#                                                     "batch_norm": batch_norm,
+#                                                     "drop_prob": drop_prob,
+#                                                     "hidden_dim": 2048,
+#                                                     "out_features": 128,
+#                                         }
+#                                         name = f"vggnet_l{''.join(str(l) for l in layers)}_h{hidden_features_vgg}_o{out_features_vgg}_d{drop_prob}_{classifier_type}"
+#                                         name += ("_bn" if batch_norm else "")
+#                                         vggnets[name] = cur_vggnet
+#                                         if hidden_features_vgg == 4096 and out_features_vgg == 4096 and drop_prob == 0.5:
+#                                             if layers in [[1, 1, 2, 2, 2], [2, 2, 2, 2, 2], [2, 2, 3, 3, 3], [2, 2, 4, 4, 4,]]:
+#                                                 name = f"vgg{sum(layers)+3}_{classifier_type}"
+#                                                 name += ("_bn" if batch_norm else "")
+#                                                 vggnets[name] = cur_vggnet
+#                     count += 1
 
-with open('confs/algos/simclr_vggnets.yaml','w') as f:
+# with open('confs/algos/simclr_vggnets.yaml','w') as f:
+#     f.write("\n")
+#     for name, cur_vggnet in vggnets.items():
+#         depth, layers, classifier_type, hidden_features_vgg, out_features_vgg, batch_norm, drop_prob, hidden_dim, out_features = cur_vggnet.values()
+#         f.write(f"\n{name}:\n")
+#         f.write(f"    depth: {depth}\n")
+#         f.write(f"    layers: [{layers[0]}, {layers[1]}, {layers[2]}, {layers[3]}, {layers[4]}]\n")
+#         f.write(f"    classifier_type: {classifier_type}\n")
+#         f.write(f"    hidden_features_vgg: {hidden_features_vgg}\n")
+#         f.write(f"    out_features_vgg: {out_features_vgg}\n")
+#         f.write(f"    batch_norm: {batch_norm}\n")
+#         f.write(f"    drop_prob: {drop_prob}\n")
+#         f.write(f"    hidden_dim: {hidden_dim}\n")
+#         f.write(f"    out_features: {out_features}\n")
+
+
+        # model = ModelSimCLRViT(image_size = conf_model["image_size"], patch_size = conf_model["patch_size"], dim = conf_model["dim"],
+        #         depth = conf_model["depth"], heads = conf_model["heads"], mlp_dim = conf_model["mlp_dim"], pool_dim = conf_model["pool_dim"],
+        #         channels = conf_models["channels"], dim_head = conf_models["dim_head"], dropout = conf_models["dropout"],
+        #         emb_dropout = conf_models["emb_dropout"])
+
+vits = {}
+count = 1
+for patch_size in [16,32]:
+    for dim in [256, 512, 1024, 2048]:
+        for depth in [2, 4, 6, 8, 10]:
+            for heads in [4, 8, 16, 32]:
+                for mlp_dim in [256, 512, 1024, 2048]:
+                    for pool in ['cls','mean']:
+                        for dim_head in [32, 64, 128]:
+                            for dropout in [0.0, 0.1, 0.2]:
+                                    cur_vit = {
+                                                "patch_size": patch_size,
+                                                "dim": dim,
+                                                "depth": depth,
+                                                "heads": heads,
+                                                "mlp_dim": mlp_dim,
+                                                "pool": pool,
+                                                "dim_head": dim_head,
+                                                "dropout": dropout
+                                    }
+                                    name = f"vit_ps{patch_size}_dim{dim}_depth{depth}_heads{heads}_mlpdim{mlp_dim}_dimhead{dim_head}_dropout{dropout}_{pool}"
+                                    vits[name] = cur_vit
+
+with open('confs/algos/simclr_vits.yaml','w') as f:
     f.write("\n")
-    for name, cur_vggnet in vggnets.items():
-        depth, layers, classifier_type, hidden_features_vgg, out_features_vgg, batch_norm, drop_prob, hidden_dim, out_features = cur_vggnet.values()
+    for name, cur_vit in vits.items():
+        patch_size, dim, depth, heads, mlp_dim, pool, dim_head, dropout = cur_vit.values()
         f.write(f"\n{name}:\n")
+        f.write(f"    patch_size: {patch_size}\n")
+        f.write(f"    dim: {dim}\n")
         f.write(f"    depth: {depth}\n")
-        f.write(f"    layers: [{layers[0]}, {layers[1]}, {layers[2]}, {layers[3]}, {layers[4]}]\n")
-        f.write(f"    classifier_type: {classifier_type}\n")
-        f.write(f"    hidden_features_vgg: {hidden_features_vgg}\n")
-        f.write(f"    out_features_vgg: {out_features_vgg}\n")
-        f.write(f"    batch_norm: {batch_norm}\n")
-        f.write(f"    drop_prob: {drop_prob}\n")
-        f.write(f"    hidden_dim: {hidden_dim}\n")
-        f.write(f"    out_features: {out_features}\n")
-    # yaml.dump(resnets, f, sort_keys=False)
+        f.write(f"    heads: {heads}\n")
+        f.write(f"    mlp_dim: {mlp_dim}\n")
+        f.write(f"    pool: '{pool}'\n")
+        f.write(f"    channels: 3\n")
+        f.write(f"    dim_head: {dim_head}\n")
+        f.write(f"    dropout: {dropout}\n")
+        f.write(f"    emb_dropout: {dropout}\n")
+        f.write(f"    hidden_dim: 2048\n")
+        f.write(f"    out_features: 128\n")

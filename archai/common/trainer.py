@@ -354,8 +354,12 @@ class TrainerLinear(Trainer):
     @overrides
     def _train_epoch(self, train_dl: DataLoader)->None:
         steps = len(train_dl)
-        self.model.fc.train()
-        self.model.backbone.eval()
+        if self._apex._enabled and self._apex._distributed_enabled:
+            self.model.module.fc.train()
+            self.model.module.backbone.eval()
+        else:
+            self.model.fc.train()
+            self.model.backbone.eval()
 
         logger.pushd('steps')
         for step, (x, y) in enumerate(train_dl):
@@ -414,9 +418,15 @@ class TrainerLinear(Trainer):
                     xc, yc = xc.to(self.get_device(), non_blocking=True), yc.to(self.get_device(), non_blocking=True)
 
                     with torch.no_grad():
-                        feats = self.model.backbone(xc)[-1]
+                        if self._apex._enabled and self._apex._distributed_enabled:
+                            feats = self.model.module.backbone(xc)[-1]
+                        else:
+                            feats = self.model.backbone(xc)[-1]
 
-                    logits_c, aux_logits = self.model.fc(feats), None
+                    if self._apex._enabled and self._apex._distributed_enabled:
+                        logits_c, aux_logits = self.model.module.fc(feats), None
+                    else:
+                        logits_c, aux_logits = self.model.fc(feats), None
                     tupled_out = isinstance(logits_c, Tuple) and len(logits_c) >=2
                     # if self._aux_weight: # TODO: some other way to validate?
                     #     assert tupled_out, "aux_logits cannot be None unless aux tower is disabled"

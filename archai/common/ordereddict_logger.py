@@ -53,12 +53,13 @@ class OrderedDictLogger:
             if utils.is_main_process():
                 intermediatedir, log_suffix = expdir, ''
             else:
-                intermediatedir, log_suffix = distdir, '_' + str(os.getpid())
+                intermediatedir, log_suffix = distdir, '_' + str(os.environ["RANK"])
                 logdir = os.path.join(logdir, 'dist')
 
             self._sys_log_filepath = utils.full_path(os.path.join(logdir, f'{log_prefix}{log_suffix}.log'))
             self._intermediate_sys_log_filepath = utils.full_path(os.path.join(intermediatedir, f'{log_prefix}{log_suffix}.log'))
             self._intermediate_logs_yaml_filepath = utils.full_path(os.path.join(intermediatedir, f'{log_prefix}{log_suffix}.yaml'))
+
 
     def reset(self, filepath:Optional[str], logger:Optional[logging.Logger],
                  save_delay:Optional[float]=30.0,
@@ -108,13 +109,13 @@ class OrderedDictLogger:
 
         if level is not None and self._logger:
             self._logger.log(msg=self.path() + ' ' + msg, level=level)
-            if self._save_intermediate and os.path.exists(self._intermediatedir):
+            if self._save_intermediate and os.path.exists(self._intermediatedir) and utils.is_main_process():
                 shutil.copy(self._sys_log_filepath, self._intermediate_sys_log_filepath)
 
         if self._save_delay is not None and \
                 time.time() - self._last_save > self._save_delay:
             self.save()
-            if self._save_intermediate and os.path.exists(self._intermediatedir):
+            if self._save_intermediate and os.path.exists(self._intermediatedir) and utils.is_main_process():
                 shutil.copy(self._filepath, self._intermediate_logs_yaml_filepath)
             self._last_save = time.time()
 

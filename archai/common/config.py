@@ -67,7 +67,6 @@ class Config(UserDict):
             if config_filepath and '--dataset_yaml' in self.extra_args:
                 dataset_yaml = self.extra_args[self.extra_args.index('--dataset_yaml')+1]
                 config_filepath += f';{dataset_yaml}'
-            print(config_filepath)
 
         if config_filepath:
             for filepath in config_filepath.strip().split(';'):
@@ -80,6 +79,7 @@ class Config(UserDict):
         if resolve_redirects:
             yaml_utils.resolve_all(resolved_conf)
 
+        resolved_conf = copy.deepcopy(self)
         # Let's do final overrides from args
         self._update_from_args(param_args, resolved_conf)      # merge from params
         self._update_from_args(self.extra_args, resolved_conf) # merge from command line

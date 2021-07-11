@@ -107,6 +107,8 @@ class TrainerSimClr(EnforceOverrides):
 
         logger.pushd('epochs')
         for epoch in range(self._start_epoch, self._epochs):
+            # if epoch == 6:
+            #     dsgadgsfdgsfd
             logger.pushd(epoch)
             self._set_epoch(epoch, data_loaders)
             self.pre_epoch(data_loaders)

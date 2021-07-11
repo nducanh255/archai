@@ -5,10 +5,11 @@ import os
 import yaml
 import torch
 import torch.nn as nn
-from archai.networks_ssl.simclr import ModelSimCLRResNet, ModelSimCLRVGGNet
+from archai.common import utils
+from archai.networks_ssl.simclr import ModelSimCLRResNet, ModelSimCLRVGGNet, ModelSimCLRViT
 from archai.common.trainer import TrainerLinear
 from archai.common.config import Config
-from archai.common.common import common_init, _create_sysinfo
+from archai.common.common import _create_sysinfo, common_init, create_conf, get_state, init_from, update_envvars
 from archai.datasets import data
 from archai.common.checkpoint import CheckPoint
 
@@ -28,6 +29,9 @@ def train_test(conf:Config):
     elif "vgg" in conf_trainer['model']:
         with open('confs/algos/simclr_vggnets.yaml', 'r') as f:
             conf_models = yaml.load(f, Loader=yaml.Loader)
+    elif "vit" in conf_trainer['model']:
+        with open('confs/algos/simclr_vits.yaml', 'r') as f:
+            conf_models = yaml.load(f, Loader=yaml.Loader)
     else:
         raise Exception(f"Not implemented SimCLR for model {conf_trainer['model']}")
     conf_model = conf_models[conf_trainer['model']]
@@ -35,17 +39,22 @@ def train_test(conf:Config):
     _create_sysinfo(conf)
     # create model
     if "resnet" in conf_trainer['model']:
-        model = ModelSimCLRResNet(conf_dataset['name'], conf_model['depth'], conf_model['layers'], conf_model['bottleneck'],
+        model = ModelSimCLRResNet(config_train['dataset']['name'], conf_model['depth'], conf_model['layers'], conf_model['bottleneck'],
             conf_model['compress'], conf_model['hidden_dim'], conf_model['out_features'], groups = conf_model['groups'],
             width_per_group=conf_model['width_per_group'])
     elif "vgg" in conf_trainer['model']:
-        model = ModelSimCLRVGGNet(conf_dataset['name'], conf_model['layers'], conf_model['batch_norm'], conf_model['hidden_dim'], 
+        model = ModelSimCLRVGGNet(config_train['dataset']['name'], conf_model['layers'], conf_model['batch_norm'], conf_model['hidden_dim'], 
             conf_model['out_features'], conf_model['out_features_vgg'], classifier_type = conf_model['classifier_type'], 
             init_weights = True, drop_prob=conf_model['drop_prob'], hidden_features_vgg=conf_model['hidden_features_vgg'])
-
+    elif "vit" in conf_trainer['model']:
+        model = ModelSimCLRViT(image_size = config_train['dataset']["input_height"], patch_size = conf_model["patch_size"], dim = conf_model["dim"],
+                depth = conf_model["depth"], heads = conf_model["heads"], mlp_dim = conf_model["mlp_dim"], pool = conf_model["pool"],
+                channels = conf_model["channels"], dim_head = conf_model["dim_head"], dropout = conf_model["dropout"],
+                emb_dropout = conf_model["emb_dropout"], hidden_dim = conf_model["hidden_dim"], out_features = conf_model["out_features"])
     model = model.to(torch.device('cuda', 0))
     ckpt = torch.load(conf['common']['load_checkpoint'])
-    if ckpt['trainer']['last_epoch']+1 != config_train['trainer']['epochs']:
+    print(ckpt['trainer']['last_epoch']+1)
+    if ckpt['trainer']['last_epoch']+1 < 100:#ckpt['trainer']['last_epoch']+1 != config_train['trainer']['epochs']:
         raise Exception("Model training not finished, exiting evaluation...")
     print("Loading model from epoch {}".format(ckpt['trainer']['last_epoch']+1))
     model_state_dict = ckpt['trainer']['model']
@@ -63,7 +72,10 @@ def train_test(conf:Config):
         input_dim = (64 if conf_model['compress'] else 512)*(4 if conf_model['bottleneck'] else 1)
     elif "vgg" in conf_trainer['model']:
         input_dim = conf_model['out_features_vgg']
+    elif "vit" in conf_trainer['model']:
+        input_dim = conf_model['dim']
     model.fc = nn.Linear(input_dim, conf_dataset['n_classes'])
+    model = model.to(torch.device('cuda', 0))
 
     # get data
     data_loaders = data.get_data(conf_loader)
@@ -75,8 +87,16 @@ def train_test(conf:Config):
 
 
 if __name__ == '__main__':
-    conf = common_init(config_filepath='confs/algos/simclr_eval.yaml')
-
+    if utils.is_main_process():
+        conf = common_init(config_filepath='confs/algos/simclr_eval.yaml')
+        print('Running main process')
+    else:
+        conf = create_conf(config_filepath='confs/algos/simclr.yaml')
+        Config.set_inst(conf)
+        update_envvars(conf)
+        commonstate = get_state()
+        init_from(commonstate)
+        print('Running child process')
     train_test(conf)
 
 
