@@ -30,7 +30,7 @@ class Sport8Provider(DatasetProvider):
             trainset = torchvision.datasets.ImageFolder(trainpath, transform=transform_train)
         if load_test:
             testpath = os.path.join(self._dataroot, 'sport8', 'test')
-            testset = torchvision.datasets.ImageFolder(testpath, transform=transform_train)
+            testset = torchvision.datasets.ImageFolder(testpath, transform=transform_test)
 
         return trainset, testset
 

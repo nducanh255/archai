@@ -161,6 +161,8 @@ if __name__ == '__main__':
         # download the csv files for the train and test split
         # from 'NAS Evaluation is Frustrating' repo
         # note that download_url doesn't work in vscode debug mode
+        # NOTE: this is non-standard split compared to the original 
+        # source of the dataset
         test_file_url = 'https://raw.githubusercontent.com/antoyang/NAS-Benchmark/master/data/MIT67_test.csv'
         train_file_urls = ['https://raw.githubusercontent.com/antoyang/NAS-Benchmark/master/data/MIT67_train1.csv', 'https://raw.githubusercontent.com/antoyang/NAS-Benchmark/master/data/MIT67_train2.csv',
                            'https://raw.githubusercontent.com/antoyang/NAS-Benchmark/master/data/MIT67_train3.csv', 'https://raw.githubusercontent.com/antoyang/NAS-Benchmark/master/data/MIT67_train4.csv']

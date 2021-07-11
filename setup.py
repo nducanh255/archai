@@ -11,9 +11,9 @@ install_requires=[
     'hyperopt', #  @ git+https://github.com/hyperopt/hyperopt.git
     'tensorwatch>=0.9.1', 'tensorboard',
     'pretrainedmodels', 'tqdm', 'sklearn', 'matplotlib', 'psutil',
-    'requests', 'seaborn', 'h5py', 'rarfile', 'einops',
+    'requests', 'seaborn', 'h5py', 'rarfile', 'einops', 'opencv-python'
     'gorilla', 'pyyaml', 'overrides<4.0.0', 'runstats', 'psutil', 'statopt',
-    'pyunpack', 'patool', 'ray>=1.0.0', 'Send2Trash', 'opencv-python'
+    'pyunpack', 'patool', 'grpcio>=1.37.0',  'ray>=1.3.0', 'Send2Trash'
 ]
 
 setuptools.setup(

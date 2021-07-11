@@ -14,3 +14,5 @@ from .providers.flower102_provider import Flower102Provider
 from .providers.simclr_cifar100provider import SimClrCifar100Provider
 from .providers.simclr_cifar10provider import SimClrCifar10Provider
 from .providers.simclr_imagenetprovider import SimClrImageNetProvider
+from .providers.aircraft_provider import AircraftProvider
+from .providers.aircraft_bing_provider import AircraftBingProvider
