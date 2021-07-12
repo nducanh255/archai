@@ -275,12 +275,12 @@ def filepath_without_ext(filepath:str)->str:
     return str(pathlib.Path(filepath).with_suffix(''))
 
 def filepath_ext(filepath:str)->str:
-    """Returns 'd.e.f' for '/a/b/c/d.e.f' """
+    """Returns '.f' for '/a/b/c/d.e.f' """
     return pathlib.Path(filepath).suffix
 
 def filepath_name_ext(filepath:str)->str:
-    """Returns '.f' for '/a/b/c/d.e.f' """
-    return pathlib.Path(filepath).suffix
+    """Returns 'd.e.f' for '/a/b/c/d.e.f' """
+    return pathlib.Path(filepath).name
 
 def filepath_name_only(filepath:str)->str:
     """Returns 'd.e' for '/a/b/c/d.e.f' """
