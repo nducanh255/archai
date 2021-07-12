@@ -15,7 +15,7 @@ from archai.common.config import Config
 from archai.common import utils
 
 
-class Food101Provider(DatasetProvider):
+class Food101BingProvider(DatasetProvider):
     def __init__(self, conf_dataset:Config):
         super().__init__(conf_dataset)
         self._dataroot = utils.full_path(conf_dataset['dataroot'])
@@ -26,7 +26,7 @@ class Food101Provider(DatasetProvider):
         trainset, testset = None, None
 
         if load_train:
-            trainpath = os.path.join(self._dataroot, 'food-101', 'train')
+            trainpath = os.path.join(self._dataroot, 'food-101', 'train_bing')
             trainset = torchvision.datasets.ImageFolder(trainpath, transform=transform_train)
         if load_test:
             testpath = os.path.join(self._dataroot, 'food-101', 'test')
@@ -68,4 +68,4 @@ class Food101Provider(DatasetProvider):
 
         return train_transform, test_transform
 
-register_dataset_provider('food101', Food101Provider)
+register_dataset_provider('food101_bing', Food101BingProvider)

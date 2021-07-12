@@ -10,7 +10,7 @@ from torch.utils.data.dataset import Dataset
 import torchvision
 from torchvision.transforms import transforms
 
-from archai.datasets.dataset_provider import DatasetProvider, register_dataset_provider, TrainTestDatasets
+from archai.datasets.dataset_provider import DatasetProvider, ImgSize, register_dataset_provider, TrainTestDatasets
 from archai.common.config import Config
 from archai.common import utils
 
@@ -35,16 +35,18 @@ class AircraftBingProvider(DatasetProvider):
         return trainset, testset
 
     @overrides
-    def get_transforms(self)->tuple:
+    def get_transforms(self, img_size:ImgSize)->tuple:
         # TODO: update MEAN, STD, currently mit67 values
         MEAN = [0.4893, 0.4270, 0.3625]
         STD = [0.2631, 0.2565, 0.2582]
 
         # transformations match that in
         # https://github.com/antoyang/NAS-Benchmark/blob/master/DARTS/preproc.py
-        img_size = 64
+        if isinstance(img_size, int):
+            img_size = (img_size, img_size)
+
         train_transf = [
-            transforms.RandomResizedCrop(img_size),
+            transforms.RandomResizedCrop(img_size, scale=(0.75, 1)),
             transforms.RandomHorizontalFlip(),
             transforms.ColorJitter(
                 brightness=0.4,
@@ -53,7 +55,9 @@ class AircraftBingProvider(DatasetProvider):
                 hue=0.2)
         ]
 
-        test_transf = [transforms.Resize(72), transforms.CenterCrop(img_size)]
+        margin_size = (int(img_size[0] + img_size[0]*0.1), int(img_size[1] + img_size[1]*0.1))
+        test_transf = [transforms.Resize(margin_size), transforms.CenterCrop(img_size)]
+        #test_transf = [transforms.Resize(72), transforms.CenterCrop(img_size)]
 
         normalize = [
             transforms.ToTensor(),

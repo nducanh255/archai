@@ -50,6 +50,7 @@ def get_data(conf_loader:Config)->DataLoaders:
     cutout = conf_loader['cutout']
     val_ratio = conf_loader['val_ratio']
     val_fold = conf_loader['val_fold']
+    img_size = conf_loader.get('img_size', None)
     load_train = conf_loader['load_train']
     train_batch = conf_loader['train_batch']
     train_workers = conf_loader['train_workers']
@@ -66,9 +67,9 @@ def get_data(conf_loader:Config)->DataLoaders:
     train_dl, val_dl, test_dl = get_dataloaders(ds_provider,
         load_train=load_train, train_batch_size=train_batch,
         load_test=load_test, test_batch_size=test_batch,
-        aug=aug, cutout=cutout,  val_ratio=val_ratio, val_fold=val_fold,
-        train_workers=train_workers, test_workers=test_workers,
-        max_batches=max_batches, apex=apex)
+        aug=aug, cutout=cutout, val_ratio=val_ratio, val_fold=val_fold,
+        img_size=img_size, train_workers=train_workers, 
+        test_workers=test_workers, max_batches=max_batches, apex=apex)
 
     assert train_dl is not None
 
@@ -90,8 +91,8 @@ def get_dataloaders(ds_provider:DatasetProvider,
     load_train:bool, train_batch_size:int,
     load_test:bool, test_batch_size:int,
     aug, cutout:int, val_ratio:float, apex:apex_utils.ApexUtils,
-    val_fold=0, train_workers:Optional[int]=None, test_workers:Optional[int]=None,
-    target_lb=-1, max_batches:int=-1) \
+    val_fold=0, img_size:Optional[int]=None, train_workers:Optional[int]=None, 
+    test_workers:Optional[int]=None, target_lb=-1, max_batches:int=-1) \
         -> Tuple[Optional[DataLoader], Optional[DataLoader], Optional[DataLoader]]:
 
     # if debugging in vscode, workers > 0 gets termination
@@ -109,7 +110,7 @@ def get_dataloaders(ds_provider:DatasetProvider,
     logger.info({'train_workers': train_workers, 'val_workers': val_workers,
                  'test_workers':test_workers})
 
-    transform_train, transform_test = ds_provider.get_transforms()
+    transform_train, transform_test = ds_provider.get_transforms(img_size)
     add_named_augs(transform_train, aug, cutout)
 
     trainset, testset = _get_datasets(ds_provider,
