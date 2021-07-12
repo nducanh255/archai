@@ -89,12 +89,12 @@ class Model(ArchModule):
         for ci, (cell, aux_tower) in enumerate(zip(self.cells, self._aux_towers)):
             #print(s0.shape, s1.shape, end='')
             s0, s1 = s1, cell.forward(s0, s1)
-            #print(ci, s0.shape, s1.shape, torch.cuda.memory_allocated()/1.0e6)
+            # print(ci, s0.shape, s1.shape, torch.cuda.memory_allocated()/1.0e6)
 
             # TODO: this mimics darts but won't work for multiple aux towers
             if aux_tower is not None and self.training:
                 logits_aux = aux_tower(s1)
-                #print(ci, 'aux', logits_aux.shape)
+                # print(ci, 'aux', logits_aux.shape)
 
         # s1 is now the last cell's output
         out = self.pool_op(s1)
@@ -130,7 +130,8 @@ class AuxTower(nn.Module):
             nn.Conv2d(aux_tower_desc.ch_in, 128, 1, bias=False),
             nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
-            nn.Conv2d(128, 768, 2, bias=False),
+            # nn.Conv2d(128, 768, 2, bias=False),
+            nn.Conv2d(128, 768, 4, bias=False),
             # TODO: This batchnorm was omitted in orginal implementation due to a typo.
             nn.BatchNorm2d(768),
             nn.ReLU(inplace=True),
@@ -139,5 +140,6 @@ class AuxTower(nn.Module):
 
     def forward(self, x:torch.Tensor):
         x = self.features(x)
+        # print('aux features', x.shape)
         x = self.logits_op(x.view(x.size(0), -1))
         return x
