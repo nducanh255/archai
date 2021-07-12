@@ -245,6 +245,14 @@ def parse_args():
     val.add_argument('--eval_interval', type=int, default=5000,
                      help='Evaluation interval')
 
+    fear = parser.add_argument_group('FEAR setup')
+    fear.add_argument('--ppl_threshold', type=lambda s: [float(item) for item in s.split(',')], default=None,
+                        help='Delimited list of perplexity thresholds for extracting the FEAR checkpoint')
+    fear.add_argument('--use_train', action='store_true',
+                          help='Use training ppl for extracting FEAR checkpoint, if not selected, uses validation ppl')
+    fear.add_argument('--fear_terminate', action='store_true',
+                          help='Terminate training after extracting the FEAR checkpoint')
+
     dist = parser.add_argument_group('distributed setup')
     dist.add_argument('--local_rank',  type=int,
                       default=os.getenv('LOCAL_RANK', 0),
@@ -252,6 +260,7 @@ def parse_args():
 
     parser.set_defaults(**config)
     args, _ = parser.parse_known_args()
+    args.ppl_threshold = list(np.sort(args.ppl_threshold))[::-1]
 
     args.tied = not args.not_tied
 
@@ -291,7 +300,7 @@ def parse_args():
 
 def save_checkpoint(args, model, model_config, optimizer, scheduler, scaler,
                     vocab, epoch, batch, last_iter, train_step, best_val_loss,
-                    is_best, work_dir):
+                    is_best, work_dir, is_fear=False, ppl_threshold=None):
     if args.fp16:
         if args.amp == 'pytorch':
             amp_state = scaler.state_dict()
@@ -317,8 +326,19 @@ def save_checkpoint(args, model, model_config, optimizer, scheduler, scaler,
         'best_val_loss': best_val_loss,
         }
 
-    last_chkpt_fname = 'checkpoint_last.pt'
+    # Saving intermediate checkpoint for FEAR step 1
+    if is_fear:
+        with nv_distributed.sync_workers() as rank:
+            fear_chkpt_fname = 'checkpoint_fear_threshold_'+str(ppl_threshold)+'.pt'
+            fear_chkpt_path = os.path.join(work_dir, fear_chkpt_fname)
+            if rank == 0:
+                # always save last checkpoint
+                logging.info(f'Saving checkpoint to {fear_chkpt_path}')
+                torch.save(state, fear_chkpt_path)
+    
+        return
 
+    last_chkpt_fname = 'checkpoint_last.pt'
     with nv_distributed.sync_workers() as rank:
         last_chkpt_path = os.path.join(work_dir, last_chkpt_fname)
         if rank == 0:
@@ -498,7 +518,7 @@ def train_iteration(model, i, mems, data_chunks, target_chunks, scaler,
 def train(tr_iter, va_iter, model, para_model, model_config, optimizer,
           optimizer_sparse, scheduler, scheduler_sparse, scaler, vocab, epoch,
           last_batch, last_iter, train_step, best_val_loss, meters,
-          device, args):
+          device, args, fear_activated=0):
     # Turn on training mode which enables dropout.
     model.train()
 
@@ -575,7 +595,7 @@ def train(tr_iter, va_iter, model, para_model, model_config, optimizer,
             scheduler.step(train_step)
             if scheduler_sparse:
                 scheduler_sparse.step(train_step)
-
+            
         if train_step % args.log_interval == 0:
             cur_loss = train_loss / log_step
             cur_loss = nv_distributed.all_reduce_item(cur_loss, op='mean')
@@ -679,13 +699,47 @@ def train(tr_iter, va_iter, model, para_model, model_config, optimizer,
             # subtract eval time from timers for training
             log_start_time += time.time() - eval_start_time
 
+        if args.ppl_threshold is not None and len(args.ppl_threshold): # check to see if fear is enabled
+            if args.use_train:
+                cur_loss = train_loss / log_step
+                cur_loss = nv_distributed.all_reduce_item(cur_loss, op='mean')
+                curr_ppl = math.exp(cur_loss)
+            
+            else: # use validation perplexity
+                val_loss = evaluate(va_iter, model, args)
+                val_loss = nv_distributed.all_reduce_item(val_loss, op='mean')
+                curr_ppl = math.exp(val_loss)
+
+            if curr_ppl <= args.ppl_threshold[0] and not fear_activated:
+                logging.info('-' * 100)
+                log_str = ' Saving FEAR checkpoint at {} ppl {:9.2f}'.format('train' if args.use_train else 'val', curr_ppl)
+                logging.info(log_str)
+                logging.info('-' * 100)
+
+                save_checkpoint(args, model, model_config, optimizer, scheduler,
+                        scaler, vocab, epoch, batch, last_iter,
+                        train_step, best_val_loss, is_best=False,
+                        work_dir=args.work_dir, is_fear=True, ppl_threshold=args.ppl_threshold[0])
+
+                args.ppl_threshold.pop(0)
+                if len(args.ppl_threshold)==0:   # if there are no more perplexity thresholds, terminate fear stage 1
+                    fear_activated = 1
+
+            # stop training
+            if args.fear_terminate and fear_activated:
+                log_str = 'Terminating training for FEAR Stage 1'
+                logging.info(log_str)
+                break
+        
         if interrupted:
             logging.info(f'Received SIGTERM, exiting')
             sys.exit(0)
 
         if is_final_step:
             break
-    return train_step, best_val_loss
+    
+    return train_step, best_val_loss, fear_activated
+
 
 def main():
     args = parse_args()
@@ -710,9 +764,6 @@ def main():
     args.data = args.data or pt_data_dir or common.default_dataroot()
     args.data = utils.full_path(os.path.join(args.data,'textpred', exp_utils.dataset_dir_name(args.dataset)))
     args.work_dir =  utils.full_path(pt_output_dir or os.path.join(args.work_dir, args.experiment_name), create=True)
-
-    print('path to data:', pt_data_dir)
-    print('path to results:', pt_output_dir)
 
     with nv_distributed.sync_workers() as rank:
         if rank == 0:
@@ -954,11 +1005,18 @@ def main():
     logging.info('=' * 100)
     for k, v in args.__dict__.items():
         logging.info('    - {} : {}'.format(k, v))
+
+    # Dump training configuration in a yaml file
+    config_file = os.path.join(args.work_dir, 'config.yaml')
+    with open(config_file, 'w') as f:
+        yaml.dump(args.__dict__, f, indent=2)
+
     logging.info('=' * 100)
     logging.info('#params = {}'.format(args.n_all_param))
     logging.info('#non emb params = {}'.format(args.n_nonemb_param))
 
     if args.get_params:
+        #TODO: add other types of decoder layers to the list
         all_params, decoder_params = get_parameter_breakdown(model, layerType=[AdaptiveEmbedding, DecoderLayer, ProjectedAdaptiveLogSoftmax])
 
     train_step = 0
@@ -1005,17 +1063,18 @@ def main():
     # Loop over epochs.
     # At any point you can hit Ctrl + C to break out of training early.
     start_time = time.time()
+    fear_activated = 0
     try:
         for epoch in itertools.count(start=start_epoch):
             if args.roll: # enable random shifts in datasets
                 tr_iter.roll(seed=args.seed + epoch)
-            train_step, best_val_loss = train(
-                tr_iter, va_iter, model, para_model, model_config,
-                optimizer, optimizer_sparse, scheduler,
-                scheduler_sparse, scaler, vocab, epoch, last_batch,
-                last_iter, train_step, best_val_loss, meters,
-                device, args
-                )
+            train_step, best_val_loss, fear_activated = train(
+                                            tr_iter, va_iter, model, para_model, model_config,
+                                            optimizer, optimizer_sparse, scheduler,
+                                            scheduler_sparse, scaler, vocab, epoch, last_batch,
+                                            last_iter, train_step, best_val_loss, meters,
+                                            device, args, fear_activated
+                                            )
 
             last_batch = 0
             last_iter = 0
@@ -1024,6 +1083,12 @@ def main():
                 logging.info('-' * 100)
                 logging.info('End of training')
                 break
+
+            if fear_activated and args.fear_terminate:
+                logging.info('-' * 100)
+                logging.info('End of training')
+                break
+
     except KeyboardInterrupt:
         logging.info('-' * 100)
         logging.info('Exiting from training early')

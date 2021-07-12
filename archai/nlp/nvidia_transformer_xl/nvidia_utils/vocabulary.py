@@ -92,6 +92,7 @@ class Vocab(object):
             for line in f:
                 symb = line.strip().split()[0]
                 self.add_symbol(symb)
+
         self.unk_idx = self.sym2idx['<UNK>']
 
     def build_vocab(self):
@@ -113,6 +114,9 @@ class Vocab(object):
                 if cnt < self.min_freq:
                     break
                 self.add_symbol(sym)
+            
+            self.add_symbol('<UNK>')
+            self.unk_idx = self.sym2idx['<UNK>']
 
             print('final vocab size {} from {} unique tokens'.format(
                 len(self), len(self.counter)))
@@ -169,7 +173,7 @@ class Vocab(object):
         if sym in self.sym2idx:
             return self.sym2idx[sym]
         else:
-            # print('encounter unk {}'.format(sym))
+            print('encounter unk {}'.format(sym))
             assert '<eos>' not in sym
             assert hasattr(self, 'unk_idx')
             return self.sym2idx.get(sym, self.unk_idx)
