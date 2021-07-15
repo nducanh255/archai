@@ -16,18 +16,18 @@ search:
     - set -e -o xtrace
     - bash scripts/apex_install.sh
     - pip install --user -e .
-    - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py                                       --config
-      {config} --config_file wt103_base_FEAR.yaml                                       --attn_type
-      2 --n_layer {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                       --d_inner
+    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                       --config
+      {config} --config_file wt103_base_FEAR.yaml                                       --n_layer
+      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                       --d_inner
       {d_inner} --d_embed {d_embed} --div_val {div_val}
     name: train_xl_config_8
-    sku: G8
+    sku: G4
   max_trials: 2
   params:
   - name: config
     spec: discrete
     values:
-    - dgx1_8gpu_fp16
+    - dgx1_4gpu_fp32
   - name: n_layer
     spec: discrete
     values:
@@ -35,19 +35,11 @@ search:
   - name: n_head
     spec: discrete
     values:
-    - 7
+    - 4
   - name: d_model
     spec: discrete
     values:
-    - 256
-  - name: d_head
-    spec: discrete
-    values:
-    - 32
-  - name: d_inner
-    spec: discrete
-    values:
-    - 512
+    - 128
   - name: d_embed
     spec: discrete
     values:
@@ -55,7 +47,15 @@ search:
   - name: div_val
     spec: discrete
     values:
-    - 1
+    - 2
+  - name: d_head
+    spec: discrete
+    values:
+    - 32
+  - name: d_inner
+    spec: discrete
+    values:
+    - 761
   type: grid
 storage:
   us_east:

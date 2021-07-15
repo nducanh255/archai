@@ -229,6 +229,10 @@ def default_dataroot()->str:
     # the home folder on ITP VMs is super slow so use local temp directory instead
     return '/var/tmp/dataroot' if is_pt() else '~/dataroot'
 
+def default_resultroot()->str:
+    # if amlt job, reads from mapped parent job, else, reads from local dir
+    return os.environ.get('AMLT_MAP_INPUT_DIR') if is_pt() else '~/logdir/nv_xformer_xl/prev_jobs'    
+
 def _update_conf(conf:Config)->None:
     """Updates conf with full paths resolving enviromental vars"""
 

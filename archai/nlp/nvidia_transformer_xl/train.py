@@ -59,7 +59,6 @@ def parse_args():
 
     if config_args.config is not None and config_args.config_file is not None:
         config_file_path = utils.full_path(os.path.join('.', 'archai', 'nlp', 'nvidia_transformer_xl', config_args.config_file))
-        # config_file_path = utils.full_path(os.path.join('.', config_args.config_file))
         with open(config_file_path) as f:
             config = yaml.load(f, Loader=yaml.FullLoader)[config_args.config]['train']
     else:
@@ -260,7 +259,7 @@ def parse_args():
 
     parser.set_defaults(**config)
     args, _ = parser.parse_known_args()
-    args.ppl_threshold = list(np.sort(args.ppl_threshold))[::-1]
+    args.ppl_threshold = np.sort(args.ppl_threshold)[::-1].tolist()
 
     args.tied = not args.not_tied
 
@@ -644,6 +643,36 @@ def train(tr_iter, va_iter, model, para_model, model_config, optimizer,
             logging.info(log_str)
             dllogger.log(step=tuple([train_step]), data=dllogger_data)
 
+            if args.ppl_threshold is not None and len(args.ppl_threshold): # check to see if fear is enabled
+                if args.use_train:
+                    curr_ppl = math.exp(cur_loss)
+                
+                else: # use validation perplexity
+                    val_loss = evaluate(va_iter, model, args)
+                    val_loss = nv_distributed.all_reduce_item(val_loss, op='mean')
+                    curr_ppl = math.exp(val_loss)
+
+                if curr_ppl <= args.ppl_threshold[0] and not fear_activated:
+                    logging.info('-' * 100)
+                    log_str = ' Saving FEAR checkpoint at {} ppl {:9.2f}'.format('train' if args.use_train else 'val', curr_ppl)
+                    logging.info(log_str)
+                    logging.info('-' * 100)
+
+                    save_checkpoint(args, model, model_config, optimizer, scheduler,
+                            scaler, vocab, epoch, batch, last_iter,
+                            train_step, best_val_loss, is_best=False,
+                            work_dir=args.work_dir, is_fear=True, ppl_threshold=args.ppl_threshold[0])
+
+                    args.ppl_threshold.pop(0)
+                    if len(args.ppl_threshold)==0:   # if there are no more perplexity thresholds, terminate fear stage 1
+                        fear_activated = 1
+
+                # stop training
+                if args.fear_terminate and fear_activated:
+                    log_str = 'Terminating training for FEAR Stage 1'
+                    logging.info(log_str)
+                    break
+
         do_periodic_eval = train_step % args.eval_interval == 0
         is_final_step = train_step == args.max_step
         interrupted = False #timeout_handler.interrupted
@@ -698,38 +727,6 @@ def train(tr_iter, va_iter, model, para_model, model_config, optimizer,
 
             # subtract eval time from timers for training
             log_start_time += time.time() - eval_start_time
-
-        if args.ppl_threshold is not None and len(args.ppl_threshold): # check to see if fear is enabled
-            if args.use_train:
-                cur_loss = train_loss / log_step
-                cur_loss = nv_distributed.all_reduce_item(cur_loss, op='mean')
-                curr_ppl = math.exp(cur_loss)
-            
-            else: # use validation perplexity
-                val_loss = evaluate(va_iter, model, args)
-                val_loss = nv_distributed.all_reduce_item(val_loss, op='mean')
-                curr_ppl = math.exp(val_loss)
-
-            if curr_ppl <= args.ppl_threshold[0] and not fear_activated:
-                logging.info('-' * 100)
-                log_str = ' Saving FEAR checkpoint at {} ppl {:9.2f}'.format('train' if args.use_train else 'val', curr_ppl)
-                logging.info(log_str)
-                logging.info('-' * 100)
-
-                save_checkpoint(args, model, model_config, optimizer, scheduler,
-                        scaler, vocab, epoch, batch, last_iter,
-                        train_step, best_val_loss, is_best=False,
-                        work_dir=args.work_dir, is_fear=True, ppl_threshold=args.ppl_threshold[0])
-
-                args.ppl_threshold.pop(0)
-                if len(args.ppl_threshold)==0:   # if there are no more perplexity thresholds, terminate fear stage 1
-                    fear_activated = 1
-
-            # stop training
-            if args.fear_terminate and fear_activated:
-                log_str = 'Terminating training for FEAR Stage 1'
-                logging.info(log_str)
-                break
         
         if interrupted:
             logging.info(f'Received SIGTERM, exiting')
