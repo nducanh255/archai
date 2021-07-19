@@ -16,13 +16,13 @@ search:
     - set -e -o xtrace
     - bash scripts/apex_install.sh
     - pip install --user -e .
-    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                       --config
-      {config} --config_file wt103_base_FEAR.yaml                                       --n_layer
-      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                       --d_inner
-      {d_inner} --d_embed {d_embed} --div_val {div_val}
-    name: train_xl_config_11
+    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
+      {config} --config_file wt103_base_FEAR.yaml                                         --n_layer
+      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
+      {d_inner} --d_embed {d_embed} --div_val {div_val} --max_step {max_step}
+    name: train_xl_config_11_{max_step}
     sku: G4
-  max_trials: 2
+  max_trials: 8
   params:
   - name: config
     spec: discrete
@@ -56,6 +56,16 @@ search:
     spec: discrete
     values:
     - 1337
+  - name: max_step
+    spec: discrete
+    values:
+    - 5000
+    - 10000
+    - 15000
+    - 20000
+    - 25000
+    - 30000
+    - 35000
   type: grid
 storage:
   us_east:

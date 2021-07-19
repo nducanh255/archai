@@ -10,16 +10,19 @@ import collections
 
 _mapping_tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
 
-def dict_representer(dumper, data):
-  return dumper.represent_mapping(_mapping_tag, data.items())
+def meta_constructor_mapping(loader, node):
+    value = loader.construct_mapping(node)
+    return value
 
-def dict_constructor(loader, node):
-  return collections.OrderedDict(loader.construct_pairs(node))
+def meta_constructor_sequence(loader, node):
+    value = loader.construct_sequence(node)
+    return value
 
-# yaml.add_representer(collections.OrderedDict, dict_representer)
-# yaml.add_constructor(_mapping_tag, dict_constructor)		
+yaml.add_constructor(u'tag:yaml.org,2002:python/object/apply:numpy.core.multiarray.scalar', meta_constructor_sequence)
+yaml.add_constructor(u'tag:yaml.org,2002:python/object/apply:numpy.dtype', meta_constructor_mapping)
 		
-fear_stage = 2
+fear_stage = 3   #3: baseline
+n_unfreeze = 3
 
 gpu_config = ['dgx1_4gpu_fp32'] # dgx1_8gpu_fp16, dgx1_1gpu_fp16, toy, default, dgx1_4gpu_fp16
 n_gpus = 4
@@ -173,8 +176,7 @@ if __name__ == '__main__':
           bash_idx += 1
           per_bash = 0
 
-  else:
-    batch_configs = 8
+  elif fear_stage==2:
     targets = ['itpeastusv100cl', 'itpeastusv100cl2', 'itplabrr1cl1']
     bash_idx = 0
     while True:
@@ -191,7 +193,7 @@ if __name__ == '__main__':
               break
             
             if job_idx % batch_configs == 0:
-              f.write('amlt map --yes -t {} ~/Projects/archaiphilly/map.yaml :fear_stage2 fear_stage_1 :train_xl_config_{}'.format(targets[t], job_idx))
+              f.write('amlt map --yes -t {} ~/Projects/archaiphilly/map.yaml :fear_stage2_unfreeze_{} fear_stage_1 :train_xl_config_{}'.format(targets[t], n_unfreeze, job_idx))
             else:
               f.write(' :train_xl_config_{}'.format(job_idx))
           f.write(' fear_stage_2\n')  
@@ -203,3 +205,71 @@ if __name__ == '__main__':
 
       bash_idx += 1
       
+  else:
+    files = os.listdir(path_to_configs)
+    for f in files:
+      if '.yaml' in f:
+        with open(os.path.join(path_to_configs, f), 'r') as file:
+          prev_config = yaml.load(file)
+
+        job_name = 'train_xl_config_' + f.replace('.yaml','').split('_')[-1]
+        gt_config_path = os.path.join('/home/t-mojanj/logdir/nv_xformer_xl/prev_jobs/fear_stage_1', job_name, 'config.yaml')
+        if os.path.isfile(gt_config_path):
+          with open(gt_config_path, 'r') as file:
+            gt_config = yaml.load(file)
+          
+          config_dict = ['n_layer', 'n_head', 'd_model', 'd_head', 'd_inner', 'd_embed', 'div_val']
+          for k in config_dict:
+            for param in prev_config['search']['params']:
+              if param['name'] == k:
+                if gt_config[k] != param['values'][0]:
+                  print('mismatch found in {} inside config {}'.format(k, f))
+                break
+          print('{} and {} checked'.format(f, job_name))
+        else:
+          print('##### job {} previously did not run'.format(job_name))
+        
+        prev_config['search']['job_template']['name'] = 'train_xl_config_%s_{max_step}' % (f.replace('.yaml','').split('_')[-1])
+        prev_config['search']['max_trials'] = 8
+        prev_config['search']['job_template']['command'][3] = 'python -m torch.distributed.launch --nproc_per_node="%s" archai/nlp/nvidia_transformer_xl/train.py \
+                                        --config {config} --config_file wt103_base_FEAR.yaml \
+                                        --n_layer {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head} \
+                                        --d_inner {d_inner} --d_embed {d_embed} --div_val {div_val} --max_step {max_step}' % (str(n_gpus)) #--vocab_size {vocab_size} --attn_type 2 
+
+        already_has_max_step = False
+        for idx, param in enumerate(prev_config['search']['params']):  
+          if param['name'] == 'max_step':
+            prev_config['search']['params'][idx] = [{'name':'max_step',
+                                                    'spec':'discrete',
+                                                    'values': [5000*i for i in range(1,8)]}]
+            already_has_max_step = True
+            break
+        if not already_has_max_step:
+          prev_config['search']['params'].append({'name':'max_step',
+                                            'spec':'discrete',
+                                            'values': [5000*i for i in range(1,8)]})
+        with open(os.path.join(path_to_configs, f), 'w') as file:
+          yaml.dump(prev_config, file)
+
+    targets = ['itpeastusv100cl', 'itpeastusv100cl2', 'itpseasiav100cl', 'itpscusv100cl']
+    bash_idx = 0
+    while True:
+      bash_file = os.path.join(path_to_configs, 'amlt_run_fear_baseline_'+str(bash_idx)+'.sh')
+      if os.path.exists(bash_file):
+            os.remove(bash_file)
+          
+      with open(bash_file, 'a') as f:
+        for t in range(len(targets)):
+          for i in range(batch_configs):
+            job_idx = i + t * batch_configs + bash_idx * len(targets) * batch_configs
+            print(job_idx)
+            if job_idx >= n_configs:
+              break
+            
+            f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/{} fear_baseline -t {}\n'.format('nv_train_{}.yaml'.format(job_idx), targets[t]))          
+          if job_idx >= n_configs:
+              break      
+      if job_idx >= n_configs:
+              break
+
+      bash_idx += 1
