@@ -1,0 +1,59 @@
+description: map fear_stage2 on fear_stage_1
+
+jobs:
+- name: fear_stage2
+  command: 
+    - set -e -o xtrace
+    - bash scripts/apex_install.sh
+    - pip install --user -e .
+    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train_fear.py --config dgx1_4gpu_fp32 --config_file wt103_base_FEAR_stage2.yaml --n_unfreeze 2 --save_all
+  sku: G4
+
+- name: fear_stage2_unfreeze_3
+  command: 
+    - set -e -o xtrace
+    - bash scripts/apex_install.sh
+    - pip install --user -e .
+    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train_fear.py --config dgx1_4gpu_fp32 --config_file wt103_base_FEAR_stage2.yaml --n_unfreeze 3 --save_all
+  sku: G4
+
+# search:
+#   job_template:
+#     name: 'fear_stage2_{n_unfreeze}'
+#     sku: G4
+#     command:
+#       - set -e -o xtrace
+#       - bash scripts/apex_install.sh
+#       - pip install --user -e .
+#       - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train_fear.py --config dgx1_4gpu_fp32 --config_file wt103_base_FEAR_stage2.yaml --ppl_threshold 70 --n_unfreeze {n_unfreeze} --max_step 10505 --eval_interval 2101 --save_all
+#   type: grid
+#   max_trials: 4
+
+#   params:
+#     - name: n_unfreeze
+#       spec: discrete
+#       values: [1,2,3,4]
+
+target:
+  service: amlk8s
+  name: itpeastusv100cl # itplabrr1cl1 # ms-shared-v100, itpscusv100cl  itpseasiav100cl  itplabrr1cl1  itpscusv100cl itpwus2v100cl
+  vc: resrchvc
+
+environment:
+  image: pytorch/pytorch:1.6.0-cuda10.1-cudnn7-devel
+  setup:
+    - set -e -o xtrace
+    - sudo apt-get -y install git
+    - pip install --user tensorboard
+
+storage:
+  us_east:
+    storage_account_name: 'archaieast'
+    container_name: 'phillytools'
+
+code:
+  local_dir: ./ #d:\GitHubSrc\archai
+
+data:
+  storage_id: 'us_east'
+  remote_dir: dataroot
