@@ -1,41 +1,41 @@
 import yaml
-bruh
-# resnets = {}
-# count = 12
-# for l1 in [2,3,4]:
-#     for l2 in [2,3,4]:
-#         for l3 in [2,3,4]:
-#             for l4 in [2,3,4]:
-#                 layers = [l1,l2,l3,l4]
-#                 if layers == [2,2,2,2]:
-#                     continue
-#                 cur_resnet = {
-#                               "depth": sum(layers)*3+2,
-#                               "layers": layers,
-#                               "bottleneck": True,
-#                               "hidden_dim": 2048,
-#                               "out_features": 128,
-#                               "compress": False,
-#                               "width_per_group": 64,
-#                               "groups": 1
-#                 }
-#                 resnets["resnet_v{}".format(count)] = cur_resnet
-#                 count += 1
 
-# with open('confs/algos/simclr_resnets.yaml','a') as f:
-#     f.write("\n")
-#     for name, cur_resnet in resnets.items():
-#         depth, layers, bottleneck, hidden_dim, out_features, compress, width_per_group, groups = cur_resnet.values()
-#         f.write(f"\n{name}:\n")
-#         f.write(f"    depth: {depth}\n")
-#         f.write(f"    layers: [{layers[0]}, {layers[1]}, {layers[2]}, {layers[3]}]\n")
-#         f.write(f"    bottleneck: {bottleneck}\n")
-#         f.write(f"    hidden_dim: {hidden_dim}\n")
-#         f.write(f"    out_features: {out_features}\n")
-#         f.write(f"    compress: {compress}\n")
-#         f.write(f"    width_per_group: {width_per_group}\n")
-#         f.write(f"    groups: {groups}\n")
-#     # yaml.dump(resnets, f, sort_keys=False)
+resnets = {}
+count = 92
+for l1 in [5,6]:
+    for l2 in [5,6]:
+        for l3 in [2,3,4]:
+            for l4 in [2,3,4]:
+                layers = [l1,l2,l3,l4]
+                if layers == [2,2,2,2]:
+                    continue
+                cur_resnet = {
+                              "depth": sum(layers)*3+2,
+                              "layers": layers,
+                              "bottleneck": True,
+                              "hidden_dim": 2048,
+                              "out_features": 128,
+                              "compress": False,
+                              "width_per_group": 64,
+                              "groups": 1
+                }
+                resnets["resnet_v{}".format(count)] = cur_resnet
+                count += 1
+
+with open('confs/algos/simclr_resnets.yaml','a') as f:
+    f.write("\n")
+    for name, cur_resnet in resnets.items():
+        depth, layers, bottleneck, hidden_dim, out_features, compress, width_per_group, groups = cur_resnet.values()
+        f.write(f"\n{name}:\n")
+        f.write(f"    depth: {depth}\n")
+        f.write(f"    layers: [{layers[0]}, {layers[1]}, {layers[2]}, {layers[3]}]\n")
+        f.write(f"    bottleneck: {bottleneck}\n")
+        f.write(f"    hidden_dim: {hidden_dim}\n")
+        f.write(f"    out_features: {out_features}\n")
+        f.write(f"    compress: {compress}\n")
+        f.write(f"    width_per_group: {width_per_group}\n")
+        f.write(f"    groups: {groups}\n")
+    # yaml.dump(resnets, f, sort_keys=False)
 
 # cfgs: Dict[str, List[Union[str, int]]] = {
 #     'A': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'], #vgg11 v22
@@ -108,43 +108,43 @@ bruh
         #         channels = conf_models["channels"], dim_head = conf_models["dim_head"], dropout = conf_models["dropout"],
         #         emb_dropout = conf_models["emb_dropout"])
 
-vits = {}
-count = 1
-for patch_size in [16,32]:
-    for dim in [256, 512, 1024, 2048]:
-        for depth in [2, 4, 6, 8, 10]:
-            for heads in [4, 8, 16, 32]:
-                for mlp_dim in [256, 512, 1024, 2048]:
-                    for pool in ['cls','mean']:
-                        for dim_head in [32, 64, 128]:
-                            for dropout in [0.0, 0.1, 0.2]:
-                                    cur_vit = {
-                                                "patch_size": patch_size,
-                                                "dim": dim,
-                                                "depth": depth,
-                                                "heads": heads,
-                                                "mlp_dim": mlp_dim,
-                                                "pool": pool,
-                                                "dim_head": dim_head,
-                                                "dropout": dropout
-                                    }
-                                    name = f"vit_ps{patch_size}_dim{dim}_depth{depth}_heads{heads}_mlpdim{mlp_dim}_dimhead{dim_head}_dropout{dropout}_{pool}"
-                                    vits[name] = cur_vit
+# vits = {}
+# count = 1
+# for patch_size in [16,32]:
+#     for dim in [256, 512, 1024, 2048]:
+#         for depth in [2, 4, 6, 8, 10]:
+#             for heads in [4, 8, 16, 32]:
+#                 for mlp_dim in [256, 512, 1024, 2048]:
+#                     for pool in ['cls','mean']:
+#                         for dim_head in [32, 64, 128]:
+#                             for dropout in [0.0, 0.1, 0.2]:
+#                                     cur_vit = {
+#                                                 "patch_size": patch_size,
+#                                                 "dim": dim,
+#                                                 "depth": depth,
+#                                                 "heads": heads,
+#                                                 "mlp_dim": mlp_dim,
+#                                                 "pool": pool,
+#                                                 "dim_head": dim_head,
+#                                                 "dropout": dropout
+#                                     }
+#                                     name = f"vit_ps{patch_size}_dim{dim}_depth{depth}_heads{heads}_mlpdim{mlp_dim}_dimhead{dim_head}_dropout{dropout}_{pool}"
+#                                     vits[name] = cur_vit
 
-with open('confs/algos/simclr_vits.yaml','w') as f:
-    f.write("\n")
-    for name, cur_vit in vits.items():
-        patch_size, dim, depth, heads, mlp_dim, pool, dim_head, dropout = cur_vit.values()
-        f.write(f"\n{name}:\n")
-        f.write(f"    patch_size: {patch_size}\n")
-        f.write(f"    dim: {dim}\n")
-        f.write(f"    depth: {depth}\n")
-        f.write(f"    heads: {heads}\n")
-        f.write(f"    mlp_dim: {mlp_dim}\n")
-        f.write(f"    pool: '{pool}'\n")
-        f.write(f"    channels: 3\n")
-        f.write(f"    dim_head: {dim_head}\n")
-        f.write(f"    dropout: {dropout}\n")
-        f.write(f"    emb_dropout: {dropout}\n")
-        f.write(f"    hidden_dim: 2048\n")
-        f.write(f"    out_features: 128\n")
+# with open('confs/algos/simclr_vits.yaml','w') as f:
+#     f.write("\n")
+#     for name, cur_vit in vits.items():
+#         patch_size, dim, depth, heads, mlp_dim, pool, dim_head, dropout = cur_vit.values()
+#         f.write(f"\n{name}:\n")
+#         f.write(f"    patch_size: {patch_size}\n")
+#         f.write(f"    dim: {dim}\n")
+#         f.write(f"    depth: {depth}\n")
+#         f.write(f"    heads: {heads}\n")
+#         f.write(f"    mlp_dim: {mlp_dim}\n")
+#         f.write(f"    pool: '{pool}'\n")
+#         f.write(f"    channels: 3\n")
+#         f.write(f"    dim_head: {dim_head}\n")
+#         f.write(f"    dropout: {dropout}\n")
+#         f.write(f"    emb_dropout: {dropout}\n")
+#         f.write(f"    hidden_dim: 2048\n")
+#         f.write(f"    out_features: 128\n")

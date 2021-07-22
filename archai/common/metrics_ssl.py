@@ -95,7 +95,7 @@ class MetricsSimClr:
                         logger.info({'dist_epoch': self.reduce_mean(best_test.index),
                                     'dist_loss': self.reduce_mean(best_test.loss.avg)})
 
-    def pre_step(self):
+    def pre_step(self, xi: Tensor, xj: Tensor):
         self.run_metrics.cur_epoch().pre_step()
         self.global_step += 1
 
@@ -200,6 +200,15 @@ class MetricsSimClr:
         if not self._apex:
             return False
         return self._apex.is_dist()
+
+    def best_train_loss(self)->float:
+        return self.run_metrics.best_epoch()[0].loss.avg
+    def best_val_loss(self)->float:
+        val_epoch_metrics = self.run_metrics.best_epoch()[1]
+        return val_epoch_metrics.loss.avg if val_epoch_metrics is not None else math.nan
+    def best_test_loss(self)->float:
+        test_epoch_metrics = self.run_metrics.best_epoch()[2]
+        return test_epoch_metrics.loss.avg if test_epoch_metrics is not None else math.nan
 
 class Accumulator:
     # TODO: replace this with Metrics class

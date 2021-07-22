@@ -158,6 +158,7 @@ class ResNet(nn.Module):
         self.compress = compress
         self.dataset = dataset
         self.return_feats_layers = return_feats_layers
+        self.small_datasets = ['cifar10', 'cifar100', 'aircraft', 'mnist', 'fashion_mnist', 'food101', 'svhn']
 
         self.inplanes = 64
         self.dilation = 1
@@ -172,7 +173,7 @@ class ResNet(nn.Module):
         self.base_width = width_per_group
 
         block = Bottleneck if bottleneck else BasicBlock
-        if self.dataset.startswith('cifar'):
+        if self.dataset in self.small_datasets:
             if compress:
                 self.inplanes = 16
                 #logger.info(bottleneck)
@@ -180,6 +181,11 @@ class ResNet(nn.Module):
                     n = int((depth - 2) / 9)
                 else:
                     n = int((depth - 2) / 6)
+
+                if "mnist" in self.dataset:
+                    self.conv1 = nn.Conv2d(1, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False)
+                else:
+                    self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False)
 
                 self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False)
                 self.bn1 = norm_layer(self.inplanes)
@@ -190,8 +196,12 @@ class ResNet(nn.Module):
                 # self.avgpool = nn.AvgPool2d(8)
                 self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
             else:
-                self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=1,
-                                    bias=False)
+                if "mnist" in self.dataset:
+                    self.conv1 = nn.Conv2d(1, self.inplanes, kernel_size=3, stride=1, padding=1,
+                                        bias=False)
+                else:
+                    self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=1,
+                                        bias=False)
                 self.bn1 = norm_layer(self.inplanes)
                 self.relu = nn.ReLU(inplace=True)
                 self.layer1 = self._make_layer(block, 64, layers[0])
@@ -203,7 +213,7 @@ class ResNet(nn.Module):
                                             dilate=replace_stride_with_dilation[2])
                 self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
-        elif self.dataset == 'imagenet':
+        else:
             self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
                                 bias=False)
             self.bn1 = norm_layer(self.inplanes)
@@ -262,7 +272,7 @@ class ResNet(nn.Module):
 
     def _forward_impl(self, x: Tensor) -> Tensor:
         out = []
-        if self.dataset.startswith('cifar'):
+        if self.dataset in self.small_datasets:
             x = self.conv1(x)
             x = self.bn1(x)
             x = self.relu(x)
@@ -280,7 +290,7 @@ class ResNet(nn.Module):
             x = self.avgpool(x)
             x = x.view(x.size(0), -1)
 
-        elif self.dataset == 'imagenet':
+        else:
             x = self.conv1(x)
             x = self.bn1(x)
             x = self.relu(x)

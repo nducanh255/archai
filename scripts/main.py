@@ -7,6 +7,7 @@ from typing import Dict, Type
 from archai.common import utils
 from archai.nas.exp_runner import ExperimentRunner
 from archai.algos.darts.darts_exp_runner import DartsExperimentRunner
+from archai.algos.darts.darts_exp_runner_ssl import DartsExperimentRunnerSimClr
 from archai.algos.petridish.petridish_exp_runner import PetridishExperimentRunner
 from archai.algos.random.random_exp_runner import RandomExperimentRunner
 from archai.algos.manual.manual_exp_runner import ManualExperimentRunner
@@ -19,6 +20,7 @@ from archai.algos.didarts.didarts_exp_runner import DiDartsExperimentRunner
 def main():
     runner_types:Dict[str, Type[ExperimentRunner]] = {
         'darts': DartsExperimentRunner,
+        'darts_simclr': DartsExperimentRunnerSimClr,
         'petridish': PetridishExperimentRunner,
         'xnas': XnasExperimentRunner,
         'random': RandomExperimentRunner,
@@ -60,7 +62,6 @@ def main():
                                                else f'confs/algos/{algo}_toy.yaml'
             dataset_conf_filepath = f'confs/datasets/{dataset}.yaml'
             conf_filepaths = ';'.join((algo_conf_filepath, dataset_conf_filepath))
-
             runner = runner_type(conf_filepaths,
                                 base_name=f'{algo}_{dataset}_{args.exp_prefix}',
                                 # for toy and debug runs, clean exp dirs

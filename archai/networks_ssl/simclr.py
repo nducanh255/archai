@@ -33,9 +33,9 @@ class ModelSimCLRResNet(nn.Module):
         compress:bool, hidden_dim: int, out_features:int, **kwargs: Any):
         super(ModelSimCLRResNet, self).__init__()
         self.backbone = _resnet(dataset, depth, layers, bottleneck, compress, **kwargs)
-        if dataset.startswith('cifar'):
+        if dataset in self.backbone.small_datasets:
             input_dim = (64 if compress else 512)*(4 if bottleneck else 1)
-        elif dataset == 'imagenet':
+        else:
             input_dim = 512*(4 if bottleneck else 1)
         self.projection = Projection(input_dim, hidden_dim, out_features)
 

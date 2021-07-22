@@ -242,12 +242,55 @@ def parse_arg(key, commandline):
 
 ####################################################################################################################
 
-root = "../amlt/amlt/eval_linear-simclr_cifar_vit_models"
+# dataset_name = 'Food101'
+# dataset_name_lower = dataset_name.lower()
+# expname = f'eval_linear_{dataset_name_lower}-simclr_{dataset_name_lower}_resnet_gridsearch'
+# root = f"../amlt/amlt/{expname}"
+# jobs = os.listdir(root)
+# count = 0
+# full_list = []
+# order = []
+# model_name = 'resnet18'
+# if "resnet" in model_name:
+#     with open('confs/algos/simclr_resnets.yaml', 'r') as f:
+#         conf_models = yaml.load(f, Loader=yaml.Loader)
+# elif "vgg" in model_name:
+#     with open('confs/algos/simclr_vggnets.yaml', 'r') as f:
+#         conf_models = yaml.load(f, Loader=yaml.Loader)
+# elif "vit" in model_name:
+#     with open('confs/algos/simclr_vits.yaml', 'r') as f:
+#         conf_models = yaml.load(f, Loader=yaml.Loader)
+# # {experiment_name:s}_bs{batch_size}_bc{batch_chunks}_temp{temperature}_js{jitter_strength}_lr{lr}
+# for lr in [0.1, 5.0, 8.0]:
+#     for jitter_strength in [0.1, 0.5, 1.0]:
+#         for temperature in [0.1, 0.5, 1.0]:
+#             for batch_size in [256, 512, 1024]:
+#                 for batch_chunks in [1,2]:
+#                     jobname = f"{expname}_bs{batch_size}_bc{batch_chunks}_temp{temperature}_js{jitter_strength}_lr{lr}"
+#                     path = os.path.join(root, jobname, f'SimClr_{dataset_name}','log.yaml')
+#                     if not os.path.exists(path):
+#                         # print(lr, jitter_strength, temperature, batch_size, batch_chunks)
+#                         print('')
+#                         continue
+#                     with open(path,"r") as f:
+#                         results = yaml.load(f, Loader=yaml.Loader)
+#                     if "eval_train" not in results or "best_test" not in results['eval_train']:
+#                         # print(lr, jitter_strength, temperature, batch_size, batch_chunks)
+#                         print('')
+#                         continue
+#                     top1_acc = round(results['eval_train']['best_test']['top1']*100,2)
+
+#                     print(top1_acc) 
+
+dataset_name = 'Mnist'
+dataset_name_lower = dataset_name.lower()
+expname = f'eval_linear_{dataset_name_lower}-simclr_{dataset_name_lower}_resnet_models'
+root = f"../amlt/amlt/{expname}"
 jobs = os.listdir(root)
 count = 0
 full_list = []
 order = []
-model_name = 'vit'
+model_name = 'resnet18'
 if "resnet" in model_name:
     with open('confs/algos/simclr_resnets.yaml', 'r') as f:
         conf_models = yaml.load(f, Loader=yaml.Loader)
@@ -258,68 +301,92 @@ elif "vit" in model_name:
     with open('confs/algos/simclr_vits.yaml', 'r') as f:
         conf_models = yaml.load(f, Loader=yaml.Loader)
 
-# for i,(jobname, jobname_train) in enumerate(zip(jobs,jobs_train)):
-for i,jobname in enumerate(jobs):
-    sys.stdout.write(f'\r{i}/{len(jobs)}')
-    path = os.path.join(root, jobname,'SimClr_Cifar10','log.yaml')
-    if not os.path.exists(path):
-        continue
-    with open(path,"r") as f:
-        results = yaml.load(f, Loader=yaml.Loader)
-    if "eval_train" not in results:
-        continue
-    if "best_test" not in results['eval_train']:
-        continue
-    top1_acc = round(results['eval_train']['best_test']['top1']*100,2)
-    top1_acc_train = round(results['eval_train']['best_train']['top1']*100,2)
-
-    path = os.path.join(root, jobname,'SimClr_Cifar10','config_used.yaml')
-    with open(path,'r') as f:
-        conf = yaml.load(f, Loader=yaml.Loader)
-
-    model_name = conf['trainer']['model']
-
+model_names = ['resnet18', 'resnet34', 'resnet50']+[f'resnet_v{i}' for i in range(1,128)]
+# {experiment_name:s}_bs{batch_size}_bc{batch_chunks}_temp{temperature}_js{jitter_strength}_lr{lr}
+for model_name in model_names:
+    jobname = f'{expname}_{model_name}'
     conf_model = conf_models[model_name]
     if "resnet" in model_name:
-        model = ModelSimCLRResNet(conf['dataset']['name'], conf_model['depth'], conf_model['layers'], conf_model['bottleneck'],
+        model = ModelSimCLRResNet(dataset_name_lower, conf_model['depth'], conf_model['layers'], conf_model['bottleneck'],
             conf_model['compress'], conf_model['hidden_dim'], conf_model['out_features'], groups = conf_model['groups'],
             width_per_group=conf_model['width_per_group'])
         l1, l2, l3, l4 = conf_model['layers']
-    elif "vgg" in model_name:
-        model = ModelSimCLRVGGNet(conf['dataset']['name'], conf_model['layers'], conf_model['batch_norm'], conf_model['hidden_dim'], 
-            conf_model['out_features'], conf_model['out_features_vgg'], classifier_type = conf_model['classifier_type'], 
-            init_weights = True, drop_prob=conf_model['drop_prob'], hidden_features_vgg=conf_model['hidden_features_vgg'])
-        l1, l2, l3, l4, l5 = conf_model['layers']
-    elif "vit" in model_name:
-        model = ModelSimCLRViT(image_size = conf['loader']['dataset']["input_height"], patch_size = conf_model["patch_size"], dim = conf_model["dim"],
-                    depth = conf_model["depth"], heads = conf_model["heads"], mlp_dim = conf_model["mlp_dim"], pool = conf_model["pool"],
-                    channels = conf_model["channels"], dim_head = conf_model["dim_head"], dropout = conf_model["dropout"],
-                    emb_dropout = conf_model["emb_dropout"], hidden_dim = conf_model["hidden_dim"], out_features = conf_model["out_features"])
-    n_params = sum(p.numel() for p in model.backbone.parameters() if p.requires_grad)/1e6
-    # print(count+1,model_name, round(n_params,2), l1, l2, l3, l4, top1_acc)
-    # decay_val = float(jobname.split("_")[-1])#conf['trainer']['optimizer']['decay']
-    # full_list.append([conf_models[model_name]['classifier_type'], conf_models[model_name]['hidden_features_vgg'], \
-    #                   conf_models[model_name]['out_features_vgg'], conf_models[model_name]['drop_prob'], decay_val, n_params, top1_acc, top1_acc_train])
-    weight = conf_model["dim"]*(10**4)+conf_model["depth"]*(10**3)+conf_model["heads"]*(10**2)+conf_model["mlp_dim"]*(10**1)+conf_model["dim_head"]
-    order.append(weight)
-    out = [n_params, conf_model["dim"], conf_model["depth"], conf_model["heads"], conf_model["mlp_dim"], conf_model["dim_head"], top1_acc, top1_acc_train, weight]
-    full_list.append(out)
+        n_params = sum(p.numel() for p in model.backbone.parameters() if p.requires_grad)/1e6
+        # print(n_params, l1, l2, l3, l4)
+        print(n_params)
+        continue
+        # continue
+    jobname = f"{expname}_{model_name}"
+    path = os.path.join(root, jobname,f'SimClr_{dataset_name}','config_used.yaml')
+    if not os.path.exists(path):
+        # print(lr, jitter_strength, temperature, batch_size, batch_chunks)
+        # print(model_name, n_params, l1, l2, l3, l4)
+        print('')
+        continue
+    with open(path,'r') as f:
+        conf = yaml.load(f, Loader=yaml.Loader)
+    path = os.path.join(root, jobname,f'SimClr_{dataset_name}','log.yaml')
+    with open(path,"r") as f:
+        results = yaml.load(f, Loader=yaml.Loader)
+    if results is None or ("eval_train" not in results or "best_test" not in results['eval_train']):
+        # print(lr, jitter_strength, temperature, batch_size, batch_chunks)
+        # print(results["eval_train"])
+        # print(model_name, n_params, l1, l2, l3, l4)
+        print('')
+        continue
+    top1_acc = round(results['eval_train']['best_test']['top1']*100,2)
 
-    # full_list.append([model_name, n_params, l1, l2, l3, l4, top1_acc, top1_acc_train, loss_train])
-    # order.append(l1*(10**4)+l2*(10**3)+l3*(10**2)+l4*(10**1))
+    # print(model_name, n_params, l1, l2, l3, l4, top1_acc) 
+    print(top1_acc) 
 
-    # order.append(classifier_type_dict[conf_models[model_name]['classifier_type']]*(10**4)+\
-    #               features_dict[conf_models[model_name]['hidden_features_vgg']]*(10**3)+\
-    #               features_dict[conf_models[model_name]['out_features_vgg']]*(10**2)+\
-    #               drop_prob_dict[conf_models[model_name]['drop_prob']]*(10**1)+\
-    #               decay[decay_val]*1)
-    # print(top1_acc)
+# for i,(jobname, jobname_train) in enumerate(zip(jobs,jobs_train)):
+# for i,jobname in enumerate(jobs):
+#     sys.stdout.write(f'\r{i}/{len(jobs)}')
+#     path = os.path.join(root, jobname,'SimClr_Cifar10','log.yaml')
+#     if not os.path.exists(path):
+#         continue
+#     with open(path,"r") as f:
+#         results = yaml.load(f, Loader=yaml.Loader)
+#     if "eval_train" not in results:
+#         continue
+#     if "best_test" not in results['eval_train']:
+#         continue
+#     top1_acc = round(results['eval_train']['best_test']['top1']*100,2)
+#     top1_acc_train = round(results['eval_train']['best_train']['top1']*100,2)
 
-    count += 1
-sys.stdout.write('\r          ')
-sys.stdout.write('\r')
-idx = np.argsort(np.array(order))
-for i,id in enumerate(idx):
-    print(i,full_list[id][0],full_list[id][1],full_list[id][2],full_list[id][3],full_list[id][4],full_list[id][5],full_list[id][6],full_list[id][7])
+#     path = os.path.join(root, jobname,'SimClr_Cifar10','config_used.yaml')
+#     with open(path,'r') as f:
+#         conf = yaml.load(f, Loader=yaml.Loader)
+
+#     model_name = conf['trainer']['model']
+
+#     conf_model = conf_models[model_name]
+#     if "resnet" in model_name:
+#         model = ModelSimCLRResNet(conf['dataset']['name'], conf_model['depth'], conf_model['layers'], conf_model['bottleneck'],
+#             conf_model['compress'], conf_model['hidden_dim'], conf_model['out_features'], groups = conf_model['groups'],
+#             width_per_group=conf_model['width_per_group'])
+#         l1, l2, l3, l4 = conf_model['layers']
+#     elif "vgg" in model_name:
+#         model = ModelSimCLRVGGNet(conf['dataset']['name'], conf_model['layers'], conf_model['batch_norm'], conf_model['hidden_dim'], 
+#             conf_model['out_features'], conf_model['out_features_vgg'], classifier_type = conf_model['classifier_type'], 
+#             init_weights = True, drop_prob=conf_model['drop_prob'], hidden_features_vgg=conf_model['hidden_features_vgg'])
+#         l1, l2, l3, l4, l5 = conf_model['layers']
+#     elif "vit" in model_name:
+#         model = ModelSimCLRViT(image_size = conf['loader']['dataset']["input_height"], patch_size = conf_model["patch_size"], dim = conf_model["dim"],
+#                     depth = conf_model["depth"], heads = conf_model["heads"], mlp_dim = conf_model["mlp_dim"], pool = conf_model["pool"],
+#                     channels = conf_model["channels"], dim_head = conf_model["dim_head"], dropout = conf_model["dropout"],
+#                     emb_dropout = conf_model["emb_dropout"], hidden_dim = conf_model["hidden_dim"], out_features = conf_model["out_features"])
+#     n_params = sum(p.numel() for p in model.backbone.parameters() if p.requires_grad)/1e6
+#     weight = conf_model["dim"]*(10**4)+conf_model["depth"]*(10**3)+conf_model["heads"]*(10**2)+conf_model["mlp_dim"]*(10**1)+conf_model["dim_head"]
+#     order.append(weight)
+#     out = [n_params, conf_model["dim"], conf_model["depth"], conf_model["heads"], conf_model["mlp_dim"], conf_model["dim_head"], top1_acc, top1_acc_train, weight]
+#     full_list.append(out)
+
+#     count += 1
+# sys.stdout.write('\r          ')
+# sys.stdout.write('\r')
+# idx = np.argsort(np.array(order))
+# for i,id in enumerate(idx):
+#     print(i,full_list[id][0],full_list[id][1],full_list[id][2],full_list[id][3],full_list[id][4],full_list[id][5],full_list[id][6],full_list[id][7])
 
 ####################################################################################################################

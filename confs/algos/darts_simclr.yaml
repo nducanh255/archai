@@ -44,7 +44,11 @@ common:
   intermediatedir: ''
   save_delay: 30
 
-dataset: {} # default dataset settings comes from __include__ on the top
+dataset:  # default dataset settings comes from __include__ on the top
+  jitter_strength: 0.5
+  input_height: 32
+  gaussian_blur: False
+  normalize: True
 
 nas:
   eval:
@@ -83,7 +87,7 @@ nas:
       apex:
         _copy: '../../trainer/apex'
       aug: '' # additional augmentations to use, for ex, fa_reduced_cifar10, arsaug, autoaug_cifar10, autoaug_extend
-      cutout: 16 # cutout length, use cutout augmentation when > 0
+      cutout: 0 # cutout length, use cutout augmentation when > 0
       load_train: True # load train split of dataset
       train_batch: 96 # 96 is too aggressive for 1080Ti, better set it to 68
       train_workers: 4
@@ -107,14 +111,27 @@ nas:
       epochs: 600
       batch_chunks: 1 # split batch into these many chunks and accumulate gradients so we can support GPUs with lower RAM
       lossfn:
-        type: 'CrossEntropyLoss'
+        type: 'NTXentLoss'
+        temperature: 0.5
+        eps: 1.0e-6
       optimizer:
         type: 'sgd'
         lr: 0.025 # init learning rate
-        decay: 3.0e-4 # pytorch default is 0.0
-        momentum: 0.9 # pytorch default is 0.0
-        nesterov: False # pytorch default is False
+        decay: 3.0e-4
+        momentum: 0.9 # pytorch default is 0
+        nesterov: False
         decay_bn: .NaN # if NaN then same as decay otherwise apply different decay to BN layers
+        type: 'adam'
+        # lr: 1.0 # init learning rate
+        # decay: 1.0e-4 #s pytorch default is 0.0
+        # betas: [0.9,0.999] # pytorch default is 0.0
+        # decay_bn: .NaN # if NaN then same as decay otherwise apply different decay to BN layers
+        # type: 'lars'
+        # lr: 0.1 # init learning rate
+        # decay: 1.0e-6 # pytorch default is 0.0
+        # momentum: 0.9 # pytorch default is 0.0
+        # trust_coeff: 0.001
+        # decay_bn: .NaN # if NaN then same as decay otherwise apply different decay to BN layers
       lr_schedule:
         type: 'cosine'
         min_lr: 0.001 # min learning rate to se bet in eta_min param of scheduler
@@ -127,7 +144,7 @@ nas:
         logger_freq: 0
         freq: 1 # perform validation only every N epochs
         lossfn:
-          type: 'CrossEntropyLoss'
+          _copy: '../../lossfn'
 
   search:
     finalizer: 'default' # options are 'random' or 'default'
@@ -150,7 +167,12 @@ nas:
         _copy: '/nas/eval/loader'
         train_batch: 128
         val_ratio: 0.1 #split portion for test set, 0 to 1
+    projection:
+      hidden_dim: 2048
+      out_features: 128
     post_train:
+      projection:
+        _copy: '../../projection'
       trainer:
         _copy: '/nas/eval/trainer'
         title: 'post_train'
@@ -159,7 +181,7 @@ nas:
         drop_path_prob: 0.0
       loader:
         _copy: '/nas/eval/loader'
-        train_batch: 128
+        train_batch: 32
         val_ratio: 0.1 #split portion for test set, 0 to 1
     pareto:
       # default parameters are set so there is exactly one search iteration
@@ -193,7 +215,7 @@ nas:
       aug: '' # additional augmentations to use
       cutout: 0 # cutout length, use cutout augmentation when > 0
       load_train: True # load train split of dataset
-      train_batch: 64
+      train_batch: 32
       train_workers: 4 # if null then gpu_count*4
       test_workers: '_copy: ../train_workers' # if null then 4
       load_test: False # load test split of dataset
@@ -209,7 +231,7 @@ nas:
       aux_weight: '_copy: /nas/search/model_desc/aux_weight'
       drop_path_prob: 0.0 # probability that given edge will be dropped
       grad_clip: 5.0 # grads above this value is clipped
-      logger_freq: 10 # after every N updates dump loss and other metrics in logger
+      logger_freq: 1 # after every N updates dump loss and other metrics in logger
       title: 'arch_train'
       epochs: 50
       batch_chunks: 1 # split batch into these many chunks and accumulate gradients so we can support GPUs with lower RAM
@@ -217,7 +239,9 @@ nas:
       plotsdir: '' #empty string means no plots, other wise plots are generated for each epoch in this dir
       l1_alphas: 0.0   # weight to be applied to sum(abs(alphas)) to loss term
       lossfn:
-        type: 'CrossEntropyLoss'
+        type: 'NTXentLoss'
+        temperature: 0.5
+        eps: 1.0e-6
       optimizer:
         type: 'sgd'
         lr: 0.025 # init learning rate
@@ -225,6 +249,17 @@ nas:
         momentum: 0.9 # pytorch default is 0
         nesterov: False
         decay_bn: .NaN # if NaN then same as decay otherwise apply different decay to BN layers
+        # type: 'adam'
+        # lr: 1.0 # init learning rate
+        # decay: 1.0e-4 #s pytorch default is 0.0
+        # betas: [0.9,0.999] # pytorch default is 0.0
+        # decay_bn: .NaN # if NaN then same as decay otherwise apply different decay to BN layers
+        # type: 'lars'
+        # lr: 0.1 # init learning rate
+        # decay: 1.0e-6 # pytorch default is 0.0
+        # momentum: 0.9 # pytorch default is 0.0
+        # trust_coeff: 0.001
+        # decay_bn: .NaN # if NaN then same as decay otherwise apply different decay to BN layers
       alpha_optimizer:
         type: 'adam'
         lr: 3.0e-4
@@ -243,7 +278,7 @@ nas:
         batch_chunks: '_copy: ../../batch_chunks' # split batch into these many chunks and accumulate gradients so we can support GPUs with lower RAM
         freq: 1 # perform validation only every N epochs
         lossfn:
-          type: 'CrossEntropyLoss'
+          _copy: '../../lossfn'
 
 
 autoaug:
@@ -255,7 +290,7 @@ autoaug:
     apex:
       _copy: '/common/apex'
     aug: '' # additional augmentations to use
-    cutout: 16 # cutout length, use cutout augmentation when > 0
+    cutout: 0 # cutout length, use cutout augmentation when > 0
     epochs: 50
     load_train: True # load train split of dataset
     train_batch: 64

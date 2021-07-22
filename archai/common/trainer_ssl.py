@@ -224,8 +224,8 @@ class TrainerSimClr(EnforceOverrides):
             self.update_checkpoint(self._checkpoint)
             self._checkpoint.commit()
 
-    def pre_step(self)->None:
-        self._metrics.pre_step()
+    def pre_step(self, xi:Tensor, xj:Tensor)->None:
+        self._metrics.pre_step(xi,xj)
 
     def post_step(self, loss:Tensor, batch_size:int)->None:
         self._metrics.post_step(loss, batch_size)
@@ -284,7 +284,7 @@ class TrainerSimClr(EnforceOverrides):
             # TODO: please check that no algorithm is invalidated by swapping prestep with zero grad
             self._multi_optim.zero_grad()
 
-            self.pre_step()
+            self.pre_step(xi,xj)
 
             # divide batch in to chunks if needed so it fits in GPU RAM
             if self.batch_chunks > 1:

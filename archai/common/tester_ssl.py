@@ -51,7 +51,7 @@ class TesterSimClr(EnforceOverrides):
                 assert not self.model.training
                 logger.pushd(step)
 
-                self._pre_step(self._metrics)
+                self._pre_step(self._metrics, xi, xj)
 
                 # divide batch in to chunks if needed so it fits in GPU RAM
                 if self.batch_chunks > 1:
@@ -102,8 +102,8 @@ class TesterSimClr(EnforceOverrides):
     def _post_test(self)->None:
         self._metrics.post_run()
 
-    def _pre_step(self, metrics:MetricsSimClr)->None:
-        metrics.pre_step()
+    def _pre_step(self, metrics:MetricsSimClr, xi:Tensor, xj: Tensor)->None:
+        metrics.pre_step(xi, xj)
 
     def _post_step(self, loss:float, batch_size:int, metrics:MetricsSimClr)->None:
         metrics.post_step(loss, batch_size)

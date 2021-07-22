@@ -53,7 +53,7 @@ class Trainer(EnforceOverrides):
         self._lossfn = ml_utils.get_lossfn(conf_lossfn)
         # using separate apex for Tester is not possible because we must use
         # same distributed model as Trainer and hence they must share apex
-        self._tester = TesterLinear(conf_validation, model, self._apex) \
+        self._tester = Tester(conf_validation, model, self._apex) \
                         if conf_validation else None
         self._metrics:Optional[Metrics] = None
 
@@ -350,6 +350,8 @@ class TrainerLinear(Trainer):
     def __init__(self, conf_train:Config, model:nn.Module,
                  checkpoint:Optional[CheckPoint]=None)->None:
         super(TrainerLinear, self).__init__(conf_train, model, checkpoint)
+        self._tester = TesterLinear(conf_train['validation'], model, self._apex) \
+                        if conf_train['validation'] else None
 
     @overrides
     def _train_epoch(self, train_dl: DataLoader)->None:

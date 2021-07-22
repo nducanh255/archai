@@ -3,6 +3,10 @@
 common:
   detect_anomaly: False # if True, PyTorch code will run 6X slower
   resume: False
+  resumedir: ''
+  save_intermediate: False
+  intermediatedir: ''
+  save_delay: 30
 
 nas:
   search:

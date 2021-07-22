@@ -5,8 +5,10 @@
 # https://github.com/PyTorchLightning/lightning-bolts/blob/master/pl_bolts/models/self_supervised/simclr/transforms.py
 
 import cv2 
+import torch
 import numpy as np
 from torchvision.transforms import transforms
+from typing import List
 
 class SimCLRTrainDataTransform(object):
     """
@@ -31,7 +33,7 @@ class SimCLRTrainDataTransform(object):
     """
 
     def __init__(
-        self, input_height: int = 224, gaussian_blur: bool = True, jitter_strength: float = 1., normalize=None
+        self, input_height: int = 224, gaussian_blur: bool = True, jitter_strength: float = 1., normalize: bool = None, custom_transf: List[torch.nn.Module] = None
     ) -> None:
 
         self.jitter_strength = jitter_strength
@@ -44,12 +46,17 @@ class SimCLRTrainDataTransform(object):
             0.2 * self.jitter_strength
         )
 
-        data_transforms = [
-            transforms.RandomResizedCrop(size=self.input_height),
-            transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomApply([self.color_jitter], p=0.8),
-            transforms.RandomGrayscale(p=0.2)
-        ]
+        if custom_transf is not None:
+            data_transforms = custom_transf
+            data_transforms.append(transforms.RandomApply([self.color_jitter], p=0.8))
+            data_transforms.append(transforms.RandomGrayscale(p=0.2))
+        else:
+            data_transforms = [
+                transforms.RandomResizedCrop(size=self.input_height),
+                transforms.RandomHorizontalFlip(p=0.5),
+                transforms.RandomApply([self.color_jitter], p=0.8),
+                transforms.RandomGrayscale(p=0.2)
+            ]
 
         if self.gaussian_blur:
             kernel_size = int(0.1 * self.input_height)
@@ -102,13 +109,14 @@ class SimCLREvalDataTransform(SimCLRTrainDataTransform):
     """
 
     def __init__(
-        self, input_height: int = 224, gaussian_blur: bool = True, jitter_strength: float = 1., normalize=None
+        self, input_height: int = 224, gaussian_blur: bool = True, jitter_strength: float = 1., normalize=None, custom_transf: List[torch.nn.Module] = None
     ):
         super().__init__(
             normalize=normalize,
             input_height=input_height,
             gaussian_blur=gaussian_blur,
-            jitter_strength=jitter_strength
+            jitter_strength=jitter_strength,
+            custom_transf=custom_transf
         )
 
         # replace online transform with eval time transform

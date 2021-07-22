@@ -47,14 +47,14 @@ def train_test(conf:Config):
             conf_model['out_features'], conf_model['out_features_vgg'], classifier_type = conf_model['classifier_type'], 
             init_weights = True, drop_prob=conf_model['drop_prob'], hidden_features_vgg=conf_model['hidden_features_vgg'])
     elif "vit" in conf_trainer['model']:
-        model = ModelSimCLRViT(image_size = config_train['dataset']["input_height"], patch_size = conf_model["patch_size"], dim = conf_model["dim"],
+        model = ModelSimCLRViT(image_size = config_train['loader']['dataset']["input_height"], patch_size = conf_model["patch_size"], dim = conf_model["dim"],
                 depth = conf_model["depth"], heads = conf_model["heads"], mlp_dim = conf_model["mlp_dim"], pool = conf_model["pool"],
                 channels = conf_model["channels"], dim_head = conf_model["dim_head"], dropout = conf_model["dropout"],
                 emb_dropout = conf_model["emb_dropout"], hidden_dim = conf_model["hidden_dim"], out_features = conf_model["out_features"])
     model = model.to(torch.device('cuda', 0))
     ckpt = torch.load(conf['common']['load_checkpoint'])
     print(ckpt['trainer']['last_epoch']+1)
-    if ckpt['trainer']['last_epoch']+1 < 100:#ckpt['trainer']['last_epoch']+1 != config_train['trainer']['epochs']:
+    if ckpt['trainer']['last_epoch'] +1 != config_train['trainer']['epochs']:
         raise Exception("Model training not finished, exiting evaluation...")
     print("Loading model from epoch {}".format(ckpt['trainer']['last_epoch']+1))
     model_state_dict = ckpt['trainer']['model']
@@ -91,7 +91,7 @@ if __name__ == '__main__':
         conf = common_init(config_filepath='confs/algos/simclr_eval.yaml')
         print('Running main process')
     else:
-        conf = create_conf(config_filepath='confs/algos/simclr.yaml')
+        conf = create_conf(config_filepath='confs/algos/simclr_eval.yaml')
         Config.set_inst(conf)
         update_envvars(conf)
         commonstate = get_state()

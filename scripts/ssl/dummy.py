@@ -1,13 +1,42 @@
+import torchvision
 import argparse
+import numpy as np
+import pickle
 import shutil
 import os
+
+def unpickle(file):
+    with open(file, 'rb') as fo:
+        dict = pickle.load(fo)
+    return dict
+
+
+def load_databatch(data_folder, idx):
+    data_file = os.path.join(data_folder, 'train_data_batch_')
+
+    d = unpickle(data_file + str(idx))
+    x = d['data']
+    y = d['labels']
+    mean_image = d['mean']
+    return x,y
+    
+rootpath = '../dataroot/ImageNet32'
+data = []
+labels = []
+for i in range(1,11):
+    x,y = load_databatch(rootpath,i)
+    data.append(x)
+    labels.append(y)
+
+data = np.vstack(data).reshape(-1, 3, 32, 32)
+print(data.shape)
+exit()
 parser = argparse.ArgumentParser()
 parser.add_argument('-o', '--output_dir',
                     dest='output_dir',
                     help='Provide destination host. Defaults to localhost',
                     type=str
                     )
-
 args = parser.parse_args()
 args.output_dir = os.path.abspath(
                     os.path.expanduser(

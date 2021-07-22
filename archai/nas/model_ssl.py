@@ -20,8 +20,8 @@ from archai.common import utils, ml_utils
 from archai.nas.arch_module import ArchModule
 from archai.networks_ssl.simclr import Projection
 
-class Model(ArchModule):
-    def __init__(self, model_desc:ModelDesc, droppath:bool, affine:bool):
+class ModelSimClr(ArchModule):
+    def __init__(self, model_desc:ModelDesc, hidden_dim:int, out_features:int, droppath:bool, affine:bool):
         super().__init__()
 
         # some of these fields are public as finalizer needs access to them
@@ -45,6 +45,8 @@ class Model(ArchModule):
         # since ch_p records last cell's output channels
         # it indicates the input channel number
         self.logits_op = Op.create(model_desc.logits_op, affine=affine)
+        input_dim = model_desc.logits_op.params['conv'].ch_out
+        self.projection = Projection(input_dim, hidden_dim, out_features)
 
         # for i,cell in enumerate(self.cells):
         #     print(i, ml_utils.param_size(cell))
@@ -100,11 +102,12 @@ class Model(ArchModule):
         # s1 is now the last cell's output
         out = self.pool_op(s1)
         logits = self.logits_op(out) # flatten
+        logits = logits.view(logits.size(0),-1)
 
         #print(-1, 'out', out.shape)
         #print(-1, 'logits', logits.shape)
 
-        return logits, logits_aux
+        return self.projection(logits)
 
     def device_type(self)->str:
         return next(self.parameters()).device.type

@@ -30,7 +30,6 @@ class ExperimentRunner(ABC, EnforceOverrides):
         model_desc_builder = self.model_desc_builder()
         trainer_class = self.trainer_class()
         finalizers = self.finalizers()
-
         search = self.searcher()
         return search.search(conf_search, model_desc_builder, trainer_class, finalizers)
 

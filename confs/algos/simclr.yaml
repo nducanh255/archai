@@ -62,7 +62,7 @@ loader:
   train_workers: 4
   test_workers: '_copy: ../train_workers' # if null then 4
   load_test: True # load test split of dataset
-  test_batch: 1024
+  test_batch: 512
   val_ratio: 0.0 #split portion for test set, 0 to 1
   val_fold: 0 #Fold number to use (0 to 4)
   cv_num: 5 # total number of folds available
