@@ -31,10 +31,9 @@ def get_parameter_breakdown(model, layerType=None):
     params_decoder = {}
     idx = 0
     for l in layers:
-        l_name = l.__class__.__name__
+        l_name = l.__class__.__name__+ '_' + str(idx)
+        idx += 1
         if isinstance(l, DecoderLayer):
-            l_name = l.__class__.__name__ + '_' + str(idx)
-            idx += 1
             decoder_layers = get_list_of_layers(model, layerType=[MultiHeadAttn, PositionwiseFF])
             for sub_l in decoder_layers:
                 params_decoder['Decoder_'+str(idx)+'_'+sub_l.__class__.__name__] = sum(p.nelement() for p in sub_l.parameters())
