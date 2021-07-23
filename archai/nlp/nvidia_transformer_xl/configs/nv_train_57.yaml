@@ -19,8 +19,54 @@ search:
     - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
       {config} --config_file wt103_base_FEAR.yaml                                         --n_layer
       {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
-      {d_inner} --d_embed {d_embed} --div_val {div_val} --max_step {max_step}
-    name: train_xl_config_57_{max_step}
+      {d_inner} --d_embed {d_embed} --div_val {div_val}                                         --max_step
+      500 --seed 1111 --experiment_name config_57_seed_1111
+    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
+      {config} --config_file wt103_base_FEAR.yaml                                         --n_layer
+      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
+      {d_inner} --d_embed {d_embed} --div_val {div_val}                                         --max_step
+      500 --seed 1009 --experiment_name config_57_seed_1009
+    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
+      {config} --config_file wt103_base_FEAR.yaml                                         --n_layer
+      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
+      {d_inner} --d_embed {d_embed} --div_val {div_val}                                         --max_step
+      500 --seed 1200 --experiment_name config_57_seed_1200
+    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
+      {config} --config_file wt103_base_FEAR.yaml                                         --n_layer
+      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
+      {d_inner} --d_embed {d_embed} --div_val {div_val}                                         --max_step
+      500 --seed 1234 --experiment_name config_57_seed_1234
+    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
+      {config} --config_file wt103_base_FEAR.yaml                                         --n_layer
+      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
+      {d_inner} --d_embed {d_embed} --div_val {div_val}                                         --max_step
+      500 --seed 1302 --experiment_name config_57_seed_1302
+    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
+      {config} --config_file wt103_base_FEAR.yaml                                         --n_layer
+      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
+      {d_inner} --d_embed {d_embed} --div_val {div_val}                                         --max_step
+      500 --seed 1562 --experiment_name config_57_seed_1562
+    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
+      {config} --config_file wt103_base_FEAR.yaml                                         --n_layer
+      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
+      {d_inner} --d_embed {d_embed} --div_val {div_val}                                         --max_step
+      500 --seed 2222 --experiment_name config_57_seed_2222
+    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
+      {config} --config_file wt103_base_FEAR.yaml                                         --n_layer
+      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
+      {d_inner} --d_embed {d_embed} --div_val {div_val}                                         --max_step
+      500 --seed 3334 --experiment_name config_57_seed_3334
+    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
+      {config} --config_file wt103_base_FEAR.yaml                                         --n_layer
+      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
+      {d_inner} --d_embed {d_embed} --div_val {div_val}                                         --max_step
+      500 --seed 3425 --experiment_name config_57_seed_3425
+    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
+      {config} --config_file wt103_base_FEAR.yaml                                         --n_layer
+      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
+      {d_inner} --d_embed {d_embed} --div_val {div_val}                                         --max_step
+      500 --seed 4567 --experiment_name config_57_seed_4567
+    name: train_xl_config_57_500
     sku: G4
   max_trials: 8
   params:
@@ -56,16 +102,6 @@ search:
     spec: discrete
     values:
     - 1656
-  - name: max_step
-    spec: discrete
-    values:
-    - 5000
-    - 10000
-    - 15000
-    - 20000
-    - 25000
-    - 30000
-    - 35000
   type: grid
 storage:
   us_east:

@@ -6,6 +6,7 @@ import math
 import pprint
 import random
 import collections
+import re
 
 
 _mapping_tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
@@ -20,9 +21,11 @@ def meta_constructor_sequence(loader, node):
 
 yaml.add_constructor(u'tag:yaml.org,2002:python/object/apply:numpy.core.multiarray.scalar', meta_constructor_sequence)
 yaml.add_constructor(u'tag:yaml.org,2002:python/object/apply:numpy.dtype', meta_constructor_mapping)
-		
+
 fear_stage = 3   #3: baseline
 n_unfreeze = 3
+different_seeds = [1111,1009,1200,1234,1302,1562,2222,3334,3425,4567]
+max_step = 500
 
 gpu_config = ['dgx1_4gpu_fp32'] # dgx1_8gpu_fp16, dgx1_1gpu_fp16, toy, default, dgx1_4gpu_fp16
 n_gpus = 4
@@ -42,6 +45,22 @@ div_vals = [1, 2, 4]
 d_heads = [32, 128]
 d_inners = [512, 2048]
 
+def get_run_command(max_step, config_num, seed=None):
+  if seed:
+    assert config_num
+    command = 'python -m torch.distributed.launch --nproc_per_node="%s" archai/nlp/nvidia_transformer_xl/train.py \
+                                        --config {config} --config_file wt103_base_FEAR.yaml \
+                                        --n_layer {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head} \
+                                        --d_inner {d_inner} --d_embed {d_embed} --div_val {div_val} \
+                                        --max_step %d --seed %d --experiment_name config_%s_seed_%d' % (str(n_gpus), max_step, seed, config_num, seed)
+  else:
+	  command = 'python -m torch.distributed.launch --nproc_per_node="%s" archai/nlp/nvidia_transformer_xl/train.py \
+                                        --config {config} --config_file wt103_base_FEAR.yaml \
+                                        --n_layer {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head} \
+                                        --d_inner {d_inner} --d_embed {d_embed} --div_val {div_val} \
+                                        --max_step %d --experiment_name config_%s_%d' % (str(n_gpus), max_step, config_num, max_step)
+
+  return command
 
 def encode(config):
   # [n_layers, n_heads, d_models, d_heads, d_inners, d_embeds, div_vals]
@@ -208,7 +227,7 @@ if __name__ == '__main__':
   else:
     files = os.listdir(path_to_configs)
     for f in files:
-      if '.yaml' in f:
+      if re.search('(nv_train_[0-9]+.yaml)', f):
         with open(os.path.join(path_to_configs, f), 'r') as file:
           prev_config = yaml.load(file)
 
@@ -229,25 +248,42 @@ if __name__ == '__main__':
         else:
           print('##### job {} previously did not run'.format(job_name))
         
-        prev_config['search']['job_template']['name'] = 'train_xl_config_%s_{max_step}' % (f.replace('.yaml','').split('_')[-1])
-        prev_config['search']['max_trials'] = 8
-        prev_config['search']['job_template']['command'][3] = 'python -m torch.distributed.launch --nproc_per_node="%s" archai/nlp/nvidia_transformer_xl/train.py \
-                                        --config {config} --config_file wt103_base_FEAR.yaml \
-                                        --n_layer {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head} \
-                                        --d_inner {d_inner} --d_embed {d_embed} --div_val {div_val} --max_step {max_step}' % (str(n_gpus)) #--vocab_size {vocab_size} --attn_type 2 
+        config_num = f.replace('.yaml','').split('_')[-1]
 
-        already_has_max_step = False
+        if different_seeds:
+          prev_config['search']['job_template']['name'] = 'train_xl_config_%s_%d' % (config_num, max_step)
+        else:
+          prev_config['search']['job_template']['name'] = 'train_xl_config_%s_500-5000' % (config_num)
+        prev_config['search']['max_trials'] = 8
+        prev_config['search']['job_template']['command'] = ['set -e -o xtrace', 'bash scripts/apex_install.sh', 'pip install --user -e .']
+        if different_seeds:
+          prev_config['search']['job_template']['command'] += [get_run_command(max_step, config_num, s) for s in different_seeds]
+        else:
+          prev_config['search']['job_template']['command'] += [get_run_command(i, config_num) for i in range(500, 5000, 500)]
+        
         for idx, param in enumerate(prev_config['search']['params']):  
           if param['name'] == 'max_step':
-            prev_config['search']['params'][idx] = [{'name':'max_step',
-                                                    'spec':'discrete',
-                                                    'values': [5000*i for i in range(1,8)]}]
-            already_has_max_step = True
-            break
-        if not already_has_max_step:
-          prev_config['search']['params'].append({'name':'max_step',
-                                            'spec':'discrete',
-                                            'values': [5000*i for i in range(1,8)]})
+            del prev_config['search']['params'][idx]
+        
+        # prev_config['search']['job_template']['name'] = 'train_xl_config_%s_{max_step}' % (f.replace('.yaml','').split('_')[-1])
+        # prev_config['search']['max_trials'] = 8
+        # prev_config['search']['job_template']['command'][3] = 'python -m torch.distributed.launch --nproc_per_node="%s" archai/nlp/nvidia_transformer_xl/train.py \
+        #                                 --config {config} --config_file wt103_base_FEAR.yaml \
+        #                                 --n_layer {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head} \
+        #                                 --d_inner {d_inner} --d_embed {d_embed} --div_val {div_val} --max_step {max_step}' % (str(n_gpus)) #--vocab_size {vocab_size} --attn_type 2 
+
+        # already_has_max_step = False
+        # for idx, param in enumerate(prev_config['search']['params']):  
+        #   if param['name'] == 'max_step':
+        #     prev_config['search']['params'][idx] = [{'name':'max_step',
+        #                                             'spec':'discrete',
+        #                                             'values': [5000*i for i in range(1,8)]}]
+        #     already_has_max_step = True
+        #     break
+        # if not already_has_max_step:
+        #   prev_config['search']['params'].append({'name':'max_step',
+        #                                     'spec':'discrete',
+        #                                     'values': [5000*i for i in range(1,8)]})
         with open(os.path.join(path_to_configs, f), 'w') as file:
           yaml.dump(prev_config, file)
 
@@ -265,8 +301,10 @@ if __name__ == '__main__':
             print(job_idx)
             if job_idx >= n_configs:
               break
-            
-            f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/{} fear_baseline -t {}\n'.format('nv_train_{}.yaml'.format(job_idx), targets[t]))          
+            if different_seeds:
+              f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/{} fear_baseline_{}_step -t {}\n'.format('nv_train_{}.yaml'.format(job_idx), max_step, targets[t]))
+            else:
+              f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/{} fear_baseline -t {}\n'.format('nv_train_{}.yaml'.format(job_idx), targets[t]))          
           if job_idx >= n_configs:
               break      
       if job_idx >= n_configs:
