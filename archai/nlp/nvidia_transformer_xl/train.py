@@ -259,7 +259,8 @@ def parse_args():
 
     parser.set_defaults(**config)
     args, _ = parser.parse_known_args()
-    args.ppl_threshold = np.sort(args.ppl_threshold)[::-1].tolist()
+    if args.ppl_threshold:
+        args.ppl_threshold = np.sort(args.ppl_threshold)[::-1].tolist()
 
     args.tied = not args.not_tied
 
@@ -760,7 +761,10 @@ def main():
     pt_data_dir, pt_output_dir = common.pt_dirs()
     args.data = args.data or pt_data_dir or common.default_dataroot()
     args.data = utils.full_path(os.path.join(args.data,'textpred', exp_utils.dataset_dir_name(args.dataset)))
-    args.work_dir =  utils.full_path(pt_output_dir or os.path.join(args.work_dir, args.experiment_name), create=True)
+    if pt_output_dir:
+        args.work_dir =  utils.full_path(os.path.join(pt_output_dir, args.experiment_name), create=True)
+    else:
+        args.work_dir =  utils.full_path(os.path.join(args.work_dir, args.experiment_name), create=True)
 
     with nv_distributed.sync_workers() as rank:
         if rank == 0:
@@ -959,8 +963,7 @@ def main():
         else:
             max_step = args.max_step
 
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, max_step - args.warmup_step, eta_min=args.eta_min)
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, max_step - args.warmup_step, eta_min=args.eta_min)
         if args.sample_softmax > 0 and optimizer_sparse is not None:
             scheduler_sparse = optim.lr_scheduler.CosineAnnealingLR(
                 optimizer_sparse, max_step - args.warmup_step,
@@ -997,8 +1000,10 @@ def main():
         else:
             scheduler_sparse = None
     elif args.scheduler == 'constant':
+        scheduler = None
+        scheduler_sparse = None
         pass
-
+    
     logging.info('=' * 100)
     for k, v in args.__dict__.items():
         logging.info('    - {} : {}'.format(k, v))
