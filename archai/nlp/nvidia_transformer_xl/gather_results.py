@@ -276,7 +276,7 @@ if args.analyze:
   with open(yaml_file, 'r') as f:
     results['fear_stage_1'] = collections.OrderedDict(yaml.safe_load(f))
 
-  for n_unfreeze in [2,3]:
+  for n_unfreeze in [3]:#[2,3]:
     for i, exp_name in enumerate(args.exp_name):
       path_to_results = os.path.join(args.results_dir, exp_name)
       assert 'stage_2' in exp_name
@@ -324,7 +324,6 @@ if args.analyze:
   plt.figure()
   for k in common_ratios.keys():
     plt.plot(topk_list, common_ratios[k], label=k, marker='.', markersize=10)
-  
   plt.ylabel('Common ratio')
   plt.xlabel('Topk (%)')
   plt.xticks(topk_list)
@@ -347,7 +346,7 @@ if args.analyze:
   plt.savefig('spearman_topk.png', bbox_inches="tight")
 
 
-if args.cross_seeds:
+elif args.cross_seeds:
   results = {}
   common_ratios = {}
   spr_ranks = {}
@@ -375,60 +374,48 @@ if args.cross_seeds:
       with open(yaml_file, 'r') as f:
         results[exp_name] = collections.OrderedDict(yaml.safe_load(f))
 
-      pprint.pprint(results[exp_name])
-      exit()
-
       structured_results = {}
       for k in results[exp_name].keys():
         config_name = re.search('(config_[0-9]+)', k).group(1)
         seed = re.search('(seed_[0-9]+)', k).group(1)
         try:
-          structured_results[config_name][seed] = results[exp_name][k]
+          structured_results[seed][config_name] = results[exp_name][k]
         except:
-          structured_results[config_name] = {}
-          structured_results[config_name][seed] = results[exp_name][k]
-      
-      print(structured_results)
-      exit()
+          structured_results[seed] = {}
+          structured_results[seed][config_name] = results[exp_name][k]
 
-      common_configs = np.intersect1d(list(results['fear_stage_1'].keys()), list(structured_results.keys()))
-      print('analyzing {} architectures'.format(len(common_configs)))
-      
-      # fear_stage_1 results:
-      val_ppl_list_stage1 = []
-      for k in common_configs:
-        val_ppl_list_stage1.append(results['fear_stage_1'][k]['valid_perplexity'])
-      sorted_ground_truth = np.argsort(val_ppl_list_stage1)
-
-      # target results:
+      # gather results:
+      common_configs = {}
       val_ppl_list_target = {}
-      for k in common_configs:
-        print('{} has {} seeds'.format(k, len(structured_results[k].keys())))
-        for seed in structured_results[k].keys():
-          try:
-            val_ppl_list_target[seed].append(structured_results[k][seed]['valid_perplexity'])
-          except:
-            val_ppl_list_target[seed] = [structured_results[k][seed]['valid_perplexity']]
+      val_ppl_list_gt = {}
+      
+      for seed in structured_results.keys():
+        common_configs[seed] = np.intersect1d(list(results['fear_stage_1'].keys()), list(structured_results[seed].keys()))
+        print('{} has {} configs'.format(seed, len(common_configs[seed])))
+        
+        val_ppl_list_target[seed] = []
+        val_ppl_list_gt[seed] = []
+        for conf in common_configs[seed]:
+          val_ppl_list_target[seed].append(structured_results[seed][conf]['valid_perplexity'])
+          val_ppl_list_gt[seed].append(results['fear_stage_1'][conf]['valid_perplexity'])
+        
+      
       sorted_target = {}
       for seed in val_ppl_list_target.keys():
         sorted_target[seed] = np.argsort(val_ppl_list_target[seed])
-
-      for s in val_ppl_list_target.keys():
-        print(val_ppl_list_target[s][0:6])
-        sorted_target[seed][0:6]
-      
-      exit()
       
       # extract common ratio and spearmanrank
+      topk_list = range(10,101,10)
       for seed in val_ppl_list_target.keys():
         print('--------------- ', seed)
+        sorted_ground_truth = np.argsort(val_ppl_list_gt[seed])
+        sorted_target = np.argsort(val_ppl_list_target[seed])
+
         common_ratios[seed] = []
         spr_ranks[seed] = []
-
-        topk_list = range(10,101,10)
         for topk in topk_list:
-          common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth, sorted_target=sorted_target[seed], \
-                                                val_ppl_list_gt=val_ppl_list_stage1, val_ppl_list_target=val_ppl_list_target[seed])
+          common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth, sorted_target=sorted_target, \
+                                                val_ppl_list_gt=val_ppl_list_gt[seed], val_ppl_list_target=val_ppl_list_target[seed])
           common_ratios[seed].append(common_ratio)
           spr_ranks[seed].append(spr_rank)
 
@@ -438,7 +425,7 @@ if args.cross_seeds:
   plt.ylabel('Common ratio')
   plt.xlabel('Topk (%)')
   plt.xticks(topk_list)
-  plt.legend(loc='lower right')
+  plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
   plt.grid(axis='y')
   plt.savefig('common_ratio_topk_seeds.png', bbox_inches="tight")
 
@@ -452,7 +439,7 @@ if args.cross_seeds:
   plt.xticks(topk_list)
   plt.ylim(top=1)
   plt.grid(axis='y')
-  plt.legend(loc='lower right')
+  plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
   plt.savefig('spearman_topk_seeds.png', bbox_inches="tight")
   
 
