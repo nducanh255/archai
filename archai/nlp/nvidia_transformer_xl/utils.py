@@ -39,9 +39,9 @@ def get_parameter_breakdown(model, layerType=None):
                 params_decoder['Decoder_'+str(idx)+'_'+sub_l.__class__.__name__] = sum(p.nelement() for p in sub_l.parameters())
         
         all_params[l_name] = sum([p.nelement() for p in l.parameters()])
-    
-    print('Per-layer Parameters:', all_params)
-    print('Decoder Parameters:', params_decoder)
+        
+    # print('Per-layer Parameters:', all_params)
+    # print('Decoder Parameters:', params_decoder)
 
     # p_sum = 0
     # for k, p in all_params.items():

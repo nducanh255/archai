@@ -7,18 +7,27 @@ import collections
 import argparse
 import json
 import re
-import pprint
+import types
+from functools import partial
 from scipy.stats import spearmanr
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 18})
 
-import tensorwatch as tw
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
+from archai.common import utils, common
+from archai.nlp.nvidia_transformer_xl.data_utils import get_lm_corpus
+from archai.nlp.nvidia_transformer_xl.nvidia_utils import exp_utils
 from archai.nlp.nvidia_transformer_xl.mem_transformer import MemTransformerLM
 from archai.nlp.nvidia_transformer_xl.mem_transformer import PositionwiseFF, MultiHeadAttn, RelMultiHeadAttn, \
                                                             RelPartialLearnableMultiHeadAttn, RelLearnableMultiHeadAttn, DecoderLayer, \
                                                             RelLearnableDecoderLayer, RelPartialLearnableDecoderLayer, AdaptiveEmbedding, ProjectedAdaptiveLogSoftmax
+from archai.nlp.nvidia_transformer_xl.nvidia_utils.log_uniform_sampler import sample_logits
 from archai.nlp.nvidia_transformer_xl.utils import get_parameter_breakdown, get_list_of_layers
+
+from profiler import get_model_profile
 
 def meta_constructor_mapping(loader, node):
     value = loader.construct_mapping(node)
@@ -30,6 +39,59 @@ def meta_constructor_sequence(loader, node):
 
 yaml.add_constructor(u'tag:yaml.org,2002:python/object/apply:numpy.core.multiarray.scalar', meta_constructor_sequence)
 yaml.add_constructor(u'tag:yaml.org,2002:python/object/apply:numpy.dtype', meta_constructor_mapping)
+
+
+def forward_with_output_memtransformer(self, data, target, mems):
+    # nn.DataParallel does not allow size(0) tensors to be broadcasted.
+    # So, have to initialize size(0) mems inside the model forward.
+    # Moreover, have to return new_mems to allow nn.DataParallel to piece
+    # them together.
+    if mems is None:
+        mems = self.init_mems()
+
+    tgt_len = target.size(0)
+    hidden, new_mems = self._forward(data, mems=mems)
+
+    pred_hid = hidden[-tgt_len:]
+    logits = None
+    if self.sample_softmax > 0 and self.training:
+        assert self.tie_weight
+        logit = sample_logits(self.word_emb, self.out_layer.bias, target,
+                                pred_hid, self.sampler)
+        loss = -F.log_softmax(logit, -1)[:, :, 0]
+    else:
+        out, loss = self.crit(pred_hid.view(-1, pred_hid.size(-1)), target.view(-1))
+
+
+def get_flops(config, model):
+  #TODO: add flops measurement for adaptive softmax layer
+
+  path_to_data = common.default_dataroot()
+  path_to_data = utils.full_path(os.path.join(path_to_data,'textpred', exp_utils.dataset_dir_name(config['dataset'])))
+  corpus = get_lm_corpus(path_to_data, config['dataset'], config['vocab'], max_size=config['vocab_size'])
+  train_iter = corpus.get_iterator('train', 1, config['tgt_len'],
+                                device='cuda', ext_len=config['ext_len'])
+
+  def input_constructor(train_iter):
+    for batch, (data, target, seq_len, _) in enumerate(train_iter, start=1):
+      return data, target, None
+
+  with torch.cuda.device(0):
+    macs, params = get_model_profile(model, input_constructor=partial(input_constructor, train_iter=train_iter), print_profile=False, print_aggregated_profile=False,)
+    print("{:<30}  {:<8}".format("Number of MACs: ", macs))
+    print("{:<30}  {:<8}".format("Number of parameters: ", params))
+
+  # with torch.profiler.profile(
+  #                           # activities=[torch.profiler.ProfilerActivity.CUDA,],
+  #                           schedule=torch.profiler.schedule(wait=1, warmup=0, active=2)) as p:
+  #   for batch, (data, target, seq_len, _) in enumerate(train_iter, start=1):
+  #     print(batch)
+  #     _ = model(data, target, None)
+  #     p.step()
+  #     if batch >= 2:
+  #       break
+
+  return macs, params
 
 
 def get_metrics(topk, sorted_ground_truth, sorted_target, val_ppl_list_gt, val_ppl_list_target, common_configs=None):
@@ -236,62 +298,761 @@ def recurse_dir(args, exp_name, path_to_dir, read_log_file=False):
   
   return results
 
-parser = argparse.ArgumentParser(description='Results Analysis.')
-parser.add_argument('--results_dir', type=str, default='/home/t-mojanj/logdir/nv_xformer_xl/prev_jobs/',
-                    help='path where amulet results are downloaded')
-parser.add_argument('--exp_name', type=lambda s: [item for item in s.split(',')], required=True,
-                    help='name of maulet experiment')
-parser.add_argument('--step', type=lambda s: [int(item) for item in s.split(',')], default=[],
-                    help='training step to extract the log from')
-parser.add_argument('--cross_step', action='store_true',
-                    help='analyze metrics across different steps of fear stage 2')     
-parser.add_argument('--log_type', type=str, default=None,
-                    help='type of ppl log to extract, select from [test, valid, train]')
-parser.add_argument('--n_unfreeze', type=int, default=None,
-                    help='number of unforzen layers for fear_stage_2')
-parser.add_argument('--analyze', action='store_true',
-                    help='analyze yaml results and generate metrics versus topk')
-parser.add_argument('--read_jsons', action='store_true',
-                    help='read json results and summarize in a yaml file')
-parser.add_argument('--generate_plots', action='store_true',
-                    help='generate spearman correlation and common ratio plots with baseline included')
-parser.add_argument('--analyze_params', action='store_true',
-                    help='analyze model parameter size')     
-parser.add_argument('--param_ranking', action='store_true',
-                    help='generate metrics w.r.t parameter size')    
-parser.add_argument('--cross_seeds', action='store_true',
-                    help='generate metrics across various seeds')                   
+def get_parser():
+  parser = argparse.ArgumentParser(description='Results Analysis.')
+  parser.add_argument('--results_dir', type=str, default='/home/t-mojanj/logdir/nv_xformer_xl/prev_jobs/',
+                      help='path where amulet results are downloaded')
+  parser.add_argument('--exp_name', type=lambda s: [item for item in s.split(',')], required=True,
+                      help='name of maulet experiment')
+  parser.add_argument('--step', type=lambda s: [int(item) for item in s.split(',')], default=[],
+                      help='training step to extract the log from')
+  parser.add_argument('--cross_step', action='store_true',
+                      help='analyze metrics across different steps of fear stage 2')     
+  parser.add_argument('--log_type', type=str, default=None,
+                      help='type of ppl log to extract, select from [test, valid, train]')
+  parser.add_argument('--n_unfreeze', type=int, default=None,
+                      help='number of unforzen layers for fear_stage_2')
+  parser.add_argument('--analyze', action='store_true',
+                      help='analyze yaml results and generate metrics versus topk')
+  parser.add_argument('--read_jsons', action='store_true',
+                      help='read json results and summarize in a yaml file')
+  parser.add_argument('--generate_plots', action='store_true',
+                      help='generate spearman correlation and common ratio plots with baseline included')
+  parser.add_argument('--analyze_params', action='store_true',
+                      help='analyze model parameter size')     
+  parser.add_argument('--param_ranking', action='store_true',
+                      help='generate metrics w.r.t parameter size')    
+  parser.add_argument('--flops_ranking', action='store_true',
+                      help='generate metrics w.r.t flops count')   
+  parser.add_argument('--cross_seeds', action='store_true',
+                      help='generate metrics across various seeds')        
+  parser.add_argument('--animation', action='store_true',
+                      help='create animation of models training')               
 
-args = parser.parse_args()
-# step = [] if args.step==[] else [int(args.step)]
+  args = parser.parse_args()
+  return args
 
-if args.analyze:
-  results = {}
-  common_ratios = {}
-  spr_ranks = {}
-  
-  fname = 'result_summary.yaml'
-  yaml_file = os.path.join(os.path.join(args.results_dir, 'fear_stage_1'), fname)
-  assert os.path.exists(yaml_file), 'no result summary for the ground-truth job'
-  with open(yaml_file, 'r') as f:
-    results['fear_stage_1'] = collections.OrderedDict(yaml.safe_load(f))
+def main():
+  args = get_parser()
+  if args.analyze:
+    results = {}
+    common_ratios = {}
+    spr_ranks = {}
+    
+    fname = 'result_summary.yaml'
+    yaml_file = os.path.join(os.path.join(args.results_dir, 'fear_stage_1'), fname)
+    assert os.path.exists(yaml_file), 'no result summary for the ground-truth job'
+    with open(yaml_file, 'r') as f:
+      results['fear_stage_1'] = collections.OrderedDict(yaml.safe_load(f))
 
-  for n_unfreeze in [3]:#[2,3]:
-    for i, exp_name in enumerate(args.exp_name):
+    for n_unfreeze in [3]:#[2,3]:
+      for i, exp_name in enumerate(args.exp_name):
+        path_to_results = os.path.join(args.results_dir, exp_name)
+        assert 'stage_2' in exp_name
+        fname = 'result_summary_unfreeze_{}.yaml'.format(n_unfreeze) #'2' if args.n_unfreeze is None else args.n_unfreeze)
+        ppl_threshold = 70 if 'ppl' not in exp_name else re.search('ppl_([0-9]+)', exp_name).group(1)
+        exp_name = 'fear_stage_2'
+
+        yaml_file = os.path.join(path_to_results, fname)
+        if not os.path.exists(yaml_file):
+          print('#### no yaml summary found for {} with n_unfreeze={}'.format(args.exp_name[i], n_unfreeze))
+          continue
+        
+        with open(yaml_file, 'r') as f:
+          results[exp_name] = collections.OrderedDict(yaml.safe_load(f))
+
+        common_configs = np.intersect1d(list(results['fear_stage_1'].keys()), list(results['fear_stage_2'].keys()))
+        print('analyzing {} architectures'.format(len(common_configs)))
+        
+        # fear_stage_1 results:
+        val_ppl_list_stage1 = []
+        for k in common_configs:
+          val_ppl_list_stage1.append(results['fear_stage_1'][k]['valid_perplexity'])
+        sorted_ground_truth = np.argsort(val_ppl_list_stage1)
+
+        # fear_stage_2 results:
+        val_ppl_list_stage2 = []
+        for k in common_configs:
+          val_ppl_list_stage2.append(results['fear_stage_2'][k]['valid_perplexity'])
+
+        sorted_fear = np.argsort(val_ppl_list_stage2)
+        
+        # extract common ratio and spearmanrank
+        key = 'n_unfreeze_{}_ppl_{}'.format(n_unfreeze, ppl_threshold)
+        print('--------------- ', key)
+        common_ratios[key] = []
+        spr_ranks[key] = []
+
+        topk_list = range(10,101,10)
+        for topk in topk_list:
+          common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth, sorted_target=sorted_fear, \
+                                                val_ppl_list_gt=val_ppl_list_stage1, val_ppl_list_target=val_ppl_list_stage2)
+          common_ratios[key].append(common_ratio)
+          spr_ranks[key].append(spr_rank)
+
+    plt.figure()
+    for k in common_ratios.keys():
+      plt.plot(topk_list, common_ratios[k], label=k, marker='.', markersize=10)
+    plt.ylabel('Common ratio')
+    plt.xlabel('Topk (%)')
+    plt.xticks(topk_list)
+    plt.legend(loc='lower right')
+    plt.grid(axis='y')
+    plt.savefig('common_ratio_topk.png', bbox_inches="tight")
+
+    plt.figure()
+    for k in spr_ranks.keys():
+      plt.plot(topk_list, spr_ranks[k], label=k, marker='.', markersize=10)
+      # for i, label in enumerate(spr_ranks[k]):
+      #   plt.text(topk_list[i], spr_ranks[k][i]-0.07, '%.2f'%label)
+
+    plt.ylabel('Spearman\'s Correlation')
+    plt.xlabel('Topk (%)')
+    plt.xticks(topk_list)
+    plt.ylim(top=1)
+    plt.grid(axis='y')
+    plt.legend(loc='lower right')
+    plt.savefig('spearman_topk.png', bbox_inches="tight")
+
+
+  elif args.cross_seeds:
+    results = {}
+    common_ratios = {}
+    spr_ranks = {}
+    
+    fname = 'result_summary.yaml'
+    yaml_file = os.path.join(os.path.join(args.results_dir, 'fear_stage_1'), fname)
+    assert os.path.exists(yaml_file), 'no result summary for the ground-truth job'
+    with open(yaml_file, 'r') as f:
+      results['fear_stage_1'] = collections.OrderedDict(yaml.safe_load(f))
+
+    for n_unfreeze in [2,3]:
+      for i, exp_name in enumerate(args.exp_name):
+        path_to_results = os.path.join(args.results_dir, exp_name)
+        if 'stage_2' in exp_name:
+          fname = 'result_summary_unfreeze_{}.yaml'.format(n_unfreeze) #'2' if args.n_unfreeze is None else args.n_unfreeze)
+          ppl_threshold = 70 if 'ppl' not in exp_name else re.search('ppl_([0-9]+)', exp_name).group(1)
+          exp_name = 'fear_stage_2'
+        else:
+          fname = 'result_summary.yaml'
+
+        yaml_file = os.path.join(path_to_results, fname)
+        if not os.path.exists(yaml_file):
+          print('#### no yaml summary found for {} with n_unfreeze={}'.format(args.exp_name[i], n_unfreeze))
+          continue
+        with open(yaml_file, 'r') as f:
+          results[exp_name] = collections.OrderedDict(yaml.safe_load(f))
+
+        structured_results = {}
+        for k in results[exp_name].keys():
+          config_name = re.search('(config_[0-9]+)', k).group(1)
+          seed = re.search('(seed_[0-9]+)', k).group(1)
+          try:
+            structured_results[seed][config_name] = results[exp_name][k]
+          except:
+            structured_results[seed] = {}
+            structured_results[seed][config_name] = results[exp_name][k]
+
+        # gather results:
+        common_configs = {}
+        val_ppl_list_target = {}
+        val_ppl_list_gt = {}
+        
+        for seed in structured_results.keys():
+          common_configs[seed] = np.intersect1d(list(results['fear_stage_1'].keys()), list(structured_results[seed].keys()))
+          print('{} has {} configs'.format(seed, len(common_configs[seed])))
+          
+          val_ppl_list_target[seed] = []
+          val_ppl_list_gt[seed] = []
+          for conf in common_configs[seed]:
+            val_ppl_list_target[seed].append(structured_results[seed][conf]['valid_perplexity'])
+            val_ppl_list_gt[seed].append(results['fear_stage_1'][conf]['valid_perplexity'])
+          
+        
+        sorted_target = {}
+        for seed in val_ppl_list_target.keys():
+          sorted_target[seed] = np.argsort(val_ppl_list_target[seed])
+        
+        # extract common ratio and spearmanrank
+        topk_list = range(10,101,10)
+        for seed in val_ppl_list_target.keys():
+          print('--------------- ', seed)
+          sorted_ground_truth = np.argsort(val_ppl_list_gt[seed])
+          sorted_target = np.argsort(val_ppl_list_target[seed])
+
+          common_ratios[seed] = []
+          spr_ranks[seed] = []
+          for topk in topk_list:
+            common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth, sorted_target=sorted_target, \
+                                                  val_ppl_list_gt=val_ppl_list_gt[seed], val_ppl_list_target=val_ppl_list_target[seed])
+            common_ratios[seed].append(common_ratio)
+            spr_ranks[seed].append(spr_rank)
+
+    plt.figure()
+    for k in common_ratios.keys():
+      plt.plot(topk_list, common_ratios[k], label=k, marker='.', markersize=10)
+    plt.ylabel('Common ratio')
+    plt.xlabel('Topk (%)')
+    plt.xticks(topk_list)
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    plt.grid(axis='y')
+    plt.savefig('common_ratio_topk_seeds.png', bbox_inches="tight")
+
+    plt.figure()
+    for k in spr_ranks.keys():
+      plt.plot(topk_list, spr_ranks[k], label=k, marker='.', markersize=10)
+      # for i, label in enumerate(spr_ranks[k]):
+      #   plt.text(topk_list[i], spr_ranks[k][i]-0.07, '%.2f'%label)
+    plt.ylabel('Spearman\'s Correlation')
+    plt.xlabel('Topk (%)')
+    plt.xticks(topk_list)
+    plt.ylim(top=1)
+    plt.grid(axis='y')
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    plt.savefig('spearman_topk_seeds.png', bbox_inches="tight")
+    
+
+  elif args.read_jsons:
+    for exp_name in args.exp_name:
       path_to_results = os.path.join(args.results_dir, exp_name)
-      assert 'stage_2' in exp_name
-      fname = 'result_summary_unfreeze_{}.yaml'.format(n_unfreeze) #'2' if args.n_unfreeze is None else args.n_unfreeze)
-      ppl_threshold = 70 if 'ppl' not in exp_name else re.search('ppl_([0-9]+)', exp_name).group(1)
-      exp_name = 'fear_stage_2'
+
+      results = {}
+      results = recurse_dir(args, exp_name, path_to_results, read_log_file=False)
+        
+      print('found %d configurations'%len(results.keys()))
+      if 'stage_2' in exp_name:
+        fname = 'result_summary_unfreeze_{}.yaml'.format('2' if args.n_unfreeze is None else args.n_unfreeze)
+      else:
+        fname = 'result_summary.yaml'
+      yaml_file = os.path.join(path_to_results, fname)
+      with open(yaml_file, 'w') as f:
+        yaml.dump(results, f)
+        print('saved results summary to', fname)
+
+
+  elif args.generate_plots:
+    results = {}
+    results_structured = {}
+    common_ratios = {}
+    spr_ranks = {}
+    times = {}
+    topk_list = [10,20,30,40,50,100]
+    
+    # load groundtruth results 
+    path_to_results = os.path.join(args.results_dir, 'fear_stage_1')
+    yaml_file = os.path.join(path_to_results, 'result_summary.yaml')
+    with open(yaml_file, 'r') as f:
+      results['fear_stage_1'] = collections.OrderedDict(yaml.safe_load(f))
+
+    scores = None
+    yaml_file = os.path.join(path_to_results, 'synflow_scores.yaml')
+    if os.path.exists(yaml_file):
+      with open(yaml_file, 'r') as f:
+        scores = yaml.safe_load(f)
+      
+      common_configs = np.intersect1d(list(results['fear_stage_1'].keys()), list(scores.keys()))
+      print('analyzing {} architectures'.format(len(common_configs)))
+
+      # fear_stage_1 results:
+      val_ppl_list_gt = []
+      for k in common_configs:
+        val_ppl_list_gt.append(results['fear_stage_1'][k]['valid_perplexity'])
+      sorted_ground_truth = np.argsort(val_ppl_list_gt)
+
+      # zero-cost score results:
+      target_scores = []
+      for k in common_configs:
+        target_scores.append(-scores[k])   # the higher the score, the better the architecture (reversely correlated with ppl)
+      sorted_target = np.argsort(target_scores)
+
+      common_ratios_synflow = {}
+      spr_ranks_synflow = {}
+      # extract common ratio and spearmanrank
+      for topk in topk_list:
+        common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth, sorted_target=sorted_target, \
+                                              val_ppl_list_gt=val_ppl_list_gt, val_ppl_list_target=target_scores)
+        common_ratios_synflow[topk] = common_ratio
+        spr_ranks_synflow[topk] = spr_rank
+
+    for exp_name in args.exp_name:
+      path_to_results = os.path.join(args.results_dir, exp_name)
+
+      if 'stage_2' in exp_name:
+        fname = 'result_summary_unfreeze_{}.yaml'.format(args.n_unfreeze) #'2' if args.n_unfreeze is None else args.n_unfreeze)
+        target_ppl = 70 if 'ppl' not in exp_name else int(re.search('ppl_([0-9]+)', exp_name).group(1))
+        legend_key = 'fear, ppl:{}'.format(target_ppl)
+      else:
+        fname = 'result_summary.yaml'
+        legend_key = exp_name.replace('_', ' ')
+        if 'baseline' in legend_key:
+          legend_key = legend_key.replace('fear', '')
 
       yaml_file = os.path.join(path_to_results, fname)
-      if not os.path.exists(yaml_file):
-        print('#### no yaml summary found for {} with n_unfreeze={}'.format(args.exp_name[i], n_unfreeze))
-        continue
-      
       with open(yaml_file, 'r') as f:
         results[exp_name] = collections.OrderedDict(yaml.safe_load(f))
 
+      common_ratios[legend_key] = {}
+      spr_ranks[legend_key] = {}
+      times[legend_key] = {}
+      # common_ratios[legend_key+'_bottom'] = {}
+      # spr_ranks[legend_key+'_bottom'] = {}
+      # times[legend_key+'_bottom'] = {}
+
+      if 'fear_baseline' in exp_name:
+        for k, v in results[exp_name].items():
+          max_step = k.split('_')[-1]
+          config_name = re.search('(config_[0-9]+)_', k).group(1)
+          if max_step not in results_structured.keys():
+            results_structured[max_step] = {}
+          results_structured[max_step][config_name] = v  
+
+        # parse fear_baseline results:
+        val_ppl_list_gt = {}
+        val_ppl_list_baseline = {}
+        timing_baseline = {}
+        common_configs = {}
+        
+        for max_step, v in results_structured.items():
+          val_ppl_list_baseline[max_step] = []
+          timing_baseline[max_step] = []
+          val_ppl_list_gt[max_step] = []
+          
+          common_configs[max_step] = np.intersect1d(list(results['fear_stage_1'].keys()), list(results_structured[max_step].keys()))
+          for k in common_configs[max_step]:
+            val_ppl_list_baseline[max_step].append(results_structured[max_step][k]['valid_perplexity'])
+            timing_baseline[max_step].append(results_structured[max_step][k]['train_elapsed'])
+            val_ppl_list_gt[max_step].append(results['fear_stage_1'][k]['valid_perplexity'])
+
+        for topk in topk_list:
+          common_ratios[legend_key][topk] = []
+          spr_ranks[legend_key][topk] = []
+          times[legend_key][topk] = []
+          # common_ratios[legend_key+'_bottom'][topk] = []
+          # spr_ranks[legend_key+'_bottom'][topk] = []
+          # times[legend_key+'_bottom'][topk] = []
+          for max_step in val_ppl_list_baseline.keys():
+            # if int(max_step) >= 5000:
+            #   continue
+            print('------------ {} total number of configs with steps={}'.format(len(val_ppl_list_gt[max_step]), max_step))
+            sorted_ground_truth = np.argsort(val_ppl_list_gt[max_step])
+            sorted_baseline = np.argsort(val_ppl_list_baseline[max_step])
+            common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth, sorted_target=sorted_baseline, \
+                                                    val_ppl_list_gt=val_ppl_list_gt[max_step], val_ppl_list_target=val_ppl_list_baseline[max_step], 
+                                                    common_configs=common_configs[max_step])
+
+            # common_ratio_bottom, spr_rank_bottom = get_metrics(topk, sorted_ground_truth=sorted_ground_truth[::-1], sorted_target=sorted_baseline[::-1], \
+            #                                         val_ppl_list_gt=val_ppl_list_gt[max_step], val_ppl_list_target=val_ppl_list_baseline[max_step], 
+            #                                         common_configs=common_configs[max_step])
+            
+            common_ratios[legend_key][topk].append(common_ratio)
+            spr_ranks[legend_key][topk].append(spr_rank)
+            times[legend_key][topk].append(np.average(timing_baseline[max_step]))
+
+            # common_ratios[legend_key+'_bottom'][topk].append(common_ratio_bottom)
+            # spr_ranks[legend_key+'_bottom'][topk].append(spr_rank_bottom)
+            # times[legend_key+'_bottom'][topk].append(np.average(timing_baseline[max_step]))
+      
+      elif 'fear_stage_2' in exp_name:
+        common_configs_stage2 = np.intersect1d(list(results['fear_stage_1'].keys()), list(results[exp_name].keys()))
+        
+        # parse fear_stage_1 results:
+        val_ppl_list_gt_for_fear = []
+        for k in common_configs_stage2:
+          val_ppl_list_gt_for_fear.append(results['fear_stage_1'][k]['valid_perplexity'])
+        sorted_ground_truth_for_fear = np.argsort(val_ppl_list_gt_for_fear)
+        
+        # parse fear_stage_2 results:
+        val_ppl_list_stage2 = []
+        timing_stage2 = []
+        for k in common_configs_stage2:
+          val_ppl_list_stage2.append(results[exp_name][k]['valid_perplexity'])
+          timing_stage2.append(results[exp_name][k]['train_elapsed'] + results['fear_stage_1'][k][target_ppl]['time'])
+        sorted_fear = np.argsort(val_ppl_list_stage2)
+        
+        # extract common ratio and spearmanrank
+        for topk in topk_list:
+          common_ratio_fear, spr_rank_fear = get_metrics(topk, sorted_ground_truth=sorted_ground_truth_for_fear, sorted_target=sorted_fear, \
+                                                  val_ppl_list_gt=val_ppl_list_gt_for_fear, val_ppl_list_target=val_ppl_list_stage2, common_configs=common_configs_stage2)
+              
+          common_ratios[legend_key][topk] = common_ratio_fear
+          spr_ranks[legend_key][topk] = spr_rank_fear
+          times[legend_key][topk] = np.average(timing_stage2)
+
+    markers = ['.', '*', 'v', 'd', 'X', 's']
+    for topk in topk_list:
+      plt.figure()
+      for i, k in enumerate(common_ratios.keys()):
+        plt.scatter(times[k][topk], common_ratios[k][topk], label=k, marker=markers[i], s=150)
+      if scores:
+        plt.scatter(0, common_ratios_synflow[topk], label='synflow', marker=markers[i+1], s=80)
+      plt.ylabel('Common ratio')
+      plt.xlabel('Time (s)')
+      plt.title('Topk = %d %%' % topk)
+      plt.grid(axis='y')
+      plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+      plt.savefig('common_ratio_topk_{}.png'.format(topk), bbox_inches="tight")
+
+      plt.figure()
+      for i, k in enumerate(spr_ranks.keys()):
+        plt.scatter(times[k][topk], spr_ranks[k][topk], label=k, marker=markers[i], s=150)
+      if scores:
+        plt.scatter(0, spr_ranks_synflow[topk], label='synflow', marker=markers[i+1], s=80)
+      plt.ylabel('Spearman\'s Correlation')
+      plt.xlabel('Time (s)')
+      plt.title('Topk = %d %%' % topk)
+      plt.ylim(top=1)
+      plt.grid(axis='y')
+      plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+      plt.savefig('spearman_topk_{}.png'.format(topk), bbox_inches="tight")
+
+    # results = {}
+    # results_structured = {}
+    # common_ratios = {}
+    # spr_ranks = {}
+
+    # for exp_name in args.exp_name:
+    #   path_to_results = os.path.join(args.results_dir, exp_name)
+
+    #   if 'stage_2' in exp_name:
+    #     fname = 'result_summary_unfreeze_{}.yaml'.format(args.n_unfreeze) #'2' if args.n_unfreeze is None else args.n_unfreeze)
+    #     target_ppl = 70 if 'ppl' not in exp_name else int(re.search('ppl_([0-9]+)', exp_name).group(1))
+    #     print(target_ppl)
+    #     exp_name = 'fear_stage_2'
+    #   else:
+    #     fname = 'result_summary.yaml'
+
+    #   yaml_file = os.path.join(path_to_results, fname)
+    #   with open(yaml_file, 'r') as f:
+    #     results[exp_name] = collections.OrderedDict(yaml.safe_load(f))
+
+    # for k, v in results['fear_baseline'].items():
+    #   max_step = k.split('_')[-1]
+    #   config_name = re.search('(config_[0-9]+)_', k).group(1)
+    #   if max_step not in results_structured.keys():
+    #     results_structured[max_step] = {}
+    #   results_structured[max_step][config_name] = v  
+    
+    # if 'fear_stage_2' in results.keys():
+    #   common_configs_stage2 = np.intersect1d(list(results['fear_stage_1'].keys()), list(results['fear_stage_2'].keys()))
+    #   # fear_stage_1 results:
+    #   val_ppl_list_gt_for_fear = []
+    #   for k in common_configs_stage2:
+    #     val_ppl_list_gt_for_fear.append(results['fear_stage_1'][k]['valid_perplexity'])
+    #   sorted_ground_truth_for_fear = np.argsort(val_ppl_list_gt_for_fear)
+      
+    #   # fear_stage_2 results:
+    #   val_ppl_list_stage2 = []
+    #   timing_stage2 = []
+    #   for k in common_configs_stage2:
+    #     val_ppl_list_stage2.append(results['fear_stage_2'][k]['valid_perplexity'])
+    #     timing_stage2.append(results['fear_stage_2'][k]['train_elapsed'] + results['fear_stage_1'][k][target_ppl]['time'])
+    #   sorted_fear = np.argsort(val_ppl_list_stage2)
+
+    # # fear_baseline results:
+    # val_ppl_list_gt = {}
+
+    # val_ppl_list_baseline = {}
+    # timing_baseline = {}
+    # common_configs = {}
+
+    # for max_step, v in results_structured.items():
+    #   val_ppl_list_baseline[max_step] = []
+    #   timing_baseline[max_step] = []
+    #   val_ppl_list_gt[max_step] = []
+      
+    #   common_configs[max_step] = np.intersect1d(list(results['fear_stage_1'].keys()), list(results_structured[max_step].keys()))
+    #   for k in common_configs[max_step]:
+    #     val_ppl_list_baseline[max_step].append(results_structured[max_step][k]['valid_perplexity'])
+    #     timing_baseline[max_step].append(results_structured[max_step][k]['train_elapsed'])
+      
+    #     val_ppl_list_gt[max_step].append(results['fear_stage_1'][k]['valid_perplexity'])
+
+    # # extract common ratio and spearmanrank
+    # topk_list = [10,20,30,40,50,100]
+    # for topk in topk_list:
+    #   if 'fear_stage_2' in results.keys():
+    #     common_ratio_fear, spr_rank_fear = get_metrics(topk, sorted_ground_truth=sorted_ground_truth_for_fear, sorted_target=sorted_fear, \
+    #                                             val_ppl_list_gt=val_ppl_list_gt_for_fear, val_ppl_list_target=val_ppl_list_stage2, common_configs=common_configs_stage2)
+          
+    #   common_ratios = []
+    #   spr_ranks = []
+    #   times = []
+      
+    #   for max_step in val_ppl_list_baseline.keys():
+    #     print('------------ {} total number of configs with steps={}'.format(len(val_ppl_list_gt[max_step]), max_step))
+    #     sorted_ground_truth = np.argsort(val_ppl_list_gt[max_step])
+    #     sorted_baseline = np.argsort(val_ppl_list_baseline[max_step])
+
+    #     common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth, sorted_target=sorted_baseline, \
+    #                                             val_ppl_list_gt=val_ppl_list_gt[max_step], val_ppl_list_target=val_ppl_list_baseline[max_step], 
+    #                                             common_configs=common_configs[max_step])
+    #     common_ratios.append(common_ratio)
+    #     spr_ranks.append(spr_rank)
+        
+    #     times.append(np.average(timing_baseline[max_step]))
+
+    #   plt.figure()
+    #   plt.scatter(times, common_ratios, label='baseline')
+    #   if 'fear_stage_2' in results.keys():
+    #     plt.scatter(np.average(timing_stage2), common_ratio_fear, label='fear stage 2')
+    #   plt.ylabel('Common ratio')
+    #   plt.xlabel('Time (s)')
+    #   plt.title('Topk = %d %%' % topk)
+    #   plt.grid(axis='y')
+    #   plt.legend(loc='lower right')
+    #   plt.savefig('common_ratio_topk_{}.png'.format(topk), bbox_inches="tight")
+
+    #   plt.figure()
+    #   plt.scatter(times, spr_ranks, label='baseline')
+    #   if 'fear_stage_2' in results.keys():
+    #     plt.scatter(np.average(timing_stage2), spr_rank_fear, label='fear stage 2')
+    #   plt.ylabel('Spearman\'s Correlation')
+    #   plt.xlabel('Time (s)')
+    #   plt.title('Topk = %d %%' % topk)
+    #   plt.ylim(top=1)
+    #   plt.grid(axis='y')
+    #   plt.legend(loc='lower right')
+    #   plt.savefig('spearman_topk_{}.png'.format(topk), bbox_inches="tight")
+
+
+  elif args.analyze_params:
+    model_config_keys = ['n_token', 'n_layer','n_head','d_model','d_head','d_inner','dropout','dropatt', \
+                        'd_embed','div_val','pre_lnorm','tgt_len','ext_len','mem_len', \
+                        'same_length','attn_type','clamp_len','sample_softmax']
+
+    for exp_name in args.exp_name:
+      path_to_results = os.path.join(args.results_dir, exp_name)
+      jobs = os.listdir(path_to_results)
+
+      params_adaptive_embedding_list = []
+      params_adaptive_softmax_list = []
+      params_attention_list = []
+      params_ff_list = []
+      
+      n_all_params = {}
+      n_all_flops = {}
+      for j in jobs:
+        if args.n_unfreeze is not None and 'unfreeze_{}'.format(args.n_unfreeze) not in j:
+          continue
+        j_path = os.path.join(path_to_results, j)
+        if os.path.isdir(j_path):
+          for fname in os.listdir(j_path):
+            if 'config.yaml' in fname:
+              with open(os.path.join(j_path, fname), 'r') as f:
+                config = yaml.load(f)
+                model_config = {k: config[k] for k in model_config_keys}
+                
+                cutoffs, tie_projs = [], [False]
+                if config['adaptive']:
+                    assert config['dataset'] in ['wt103', 'wt2', 'lm1b']
+                    if config['dataset'] in ['wt103', 'wt2']:
+                        cutoffs = [19997, 39997, 199997]
+                        tie_projs += [True] * len(cutoffs)
+                    elif config['dataset'] == 'lm1b':
+                        cutoffs = [59997, 99997, 639997]
+                        tie_projs += [False] * len(cutoffs)
+                model_config['cutoffs'] = cutoffs
+                model_config['tie_projs'] = tie_projs
+                model_config['tie_weight'] = config['tied']
+                model_config['dtype'] = None
+
+                model = MemTransformerLM(**model_config)
+                model = model.to(device='cuda')
+                
+                curr_n_all_param, params_adaptive_embedding, params_adaptive_softmax, params_attention, params_ff = process_parameters(model)
+                params_adaptive_embedding_list.append(params_adaptive_embedding)
+                params_adaptive_softmax_list.append(params_adaptive_softmax)
+                params_attention_list.append(params_attention)
+                params_ff_list.append(params_ff)
+
+                config_name = re.search('(config_[0-9]+)', j).group(1)
+                n_all_params[config_name] = int(curr_n_all_param)
+
+                # replace ProjectedAdaptiveLogSoftmax with pytorch version
+                # model.forward = types.MethodType(forward_with_output_memtransformer, model)
+                # model.crit = nn.AdaptiveLogSoftmaxWithLoss(in_features=model.crit.d_proj,
+                #                                             n_classes=model.crit.n_token,
+                #                                             cutoffs=cutoffs,
+                #                                             div_value=model.crit.div_val).to(device='cuda')
+                macs, params = get_flops(config, model)
+                n_all_flops[config_name] = 2 * macs
+                exit()
+                
+      
+      yaml_file = os.path.join(path_to_results, 'params_summary.yaml')
+      with open(yaml_file, 'w') as f:
+          yaml.dump(n_all_params, f)
+
+      yaml_file = os.path.join(path_to_results, 'flops_summary.yaml')
+      with open(yaml_file, 'w') as f:
+          yaml.dump(n_all_flops, f)
+
+      fig, ax = plt.subplots()
+      data = [params_adaptive_embedding_list, params_adaptive_softmax_list, params_attention_list, params_ff_list]
+      bp = ax.boxplot(data, sym='k+', showmeans=True)
+      # , label=)
+      # plt.boxplot(, label=)
+      # plt.boxplot(, label=)
+      # plt.boxplot(, label=)
+      # plt.legend()
+      m = [np.mean(d, axis=0) for d in data]
+      for i, line in enumerate(bp['medians']):
+          x, y = line.get_xydata()[1]
+          text = ' μ={:.2f}'.format(m[i])
+          if i>0:
+            ax.annotate(text, xy=(x-0.2, y+20))
+          else:
+            ax.annotate(text, xy=(x, y))
+
+      ax.grid(axis='y')
+      plt.xticks(range(1, 5), ['AdaEmb', 'Sftmax', 'Attn', 'FFN'])
+      plt.savefig('parameter_breakdown.png', bbox_inches="tight")
+  
+
+  elif args.param_ranking:
+    exp_name = args.exp_name[0]
+    path_to_results = os.path.join(args.results_dir, exp_name)
+
+    if 'stage_2' in exp_name:
+      fname = 'result_summary_unfreeze_{}.yaml'.format(n_unfreeze) #'2' if args.n_unfreeze is None else args.n_unfreeze)
+      exp_name = 'fear_stage_2'
+    else:
+      fname = 'result_summary.yaml'
+
+    results = {}
+    yaml_file = os.path.join(path_to_results, fname)
+    with open(yaml_file, 'r') as f:
+      results[exp_name] = collections.OrderedDict(yaml.safe_load(f))
+
+    yaml_file = os.path.join(path_to_results, 'params_summary.yaml')
+    with open(yaml_file, 'r') as f:
+        n_all_params = yaml.safe_load(f)
+
+    common_configs = np.intersect1d(list(results['fear_stage_1'].keys()), list(n_all_params.keys()))
+    print('analyzing {} architectures'.format(len(common_configs)))
+
+    # fear_stage_1 results:
+    val_ppl_list_stage1 = []
+    for k in common_configs:
+      val_ppl_list_stage1.append(results['fear_stage_1'][k]['valid_perplexity'])
+    sorted_ground_truth = np.argsort(val_ppl_list_stage1)
+
+    # n_param results:
+    n_params = []
+    for k in common_configs:
+      n_params.append(n_all_params[k])
+    sorted_fear = np.argsort(n_params)
+
+    common_ratios = []
+    spr_ranks = []
+    # extract common ratio and spearmanrank
+    topk_list = range(10,101,10)
+    for topk in topk_list:
+      common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth, sorted_target=sorted_fear, \
+                                            val_ppl_list_gt=val_ppl_list_stage1, val_ppl_list_target=n_params)
+      common_ratios.append(common_ratio)
+      spr_ranks.append(spr_rank)
+
+    plt.figure()
+    plt.scatter(topk_list, common_ratios)
+    plt.ylabel('Common ratio')
+    plt.xlabel('Topk (%)')
+    plt.xticks(topk_list)
+    plt.title('ranking based on number of parameters')
+    plt.grid(axis='y')
+    plt.savefig('common_ratio_topk_nparams.png', bbox_inches="tight")
+
+    plt.figure()
+    plt.scatter(topk_list, spr_ranks)
+    plt.ylabel('Spearman\'s Correlation')
+    plt.xlabel('Topk (%)')
+    plt.xticks(topk_list)
+    plt.ylim(top=1)
+    plt.grid(axis='y')
+    plt.title('ranking based on number of parameters')
+    plt.savefig('spearman_topk_nparams.png', bbox_inches="tight")
+
+
+  elif args.flops_ranking:
+    path_to_results = os.path.join(args.results_dir, 'fear_stage_1')
+    fname = 'result_summary.yaml'
+    yaml_file = os.path.join(path_to_results, fname)
+    with open(yaml_file, 'r') as f:
+      results = collections.OrderedDict(yaml.safe_load(f))
+
+    yaml_file = os.path.join(path_to_results, 'flops_summary.yaml')
+    with open(yaml_file, 'r') as f:
+        n_all_flops = yaml.safe_load(f)
+
+    common_configs = np.intersect1d(list(results.keys()), list(n_all_flops.keys()))
+    print('analyzing {} architectures'.format(len(common_configs)))
+
+    # fear_stage_1 results:
+    val_ppl_list_stage1 = []
+    for k in common_configs:
+      val_ppl_list_stage1.append(results[k]['valid_perplexity'])
+    sorted_ground_truth = np.argsort(val_ppl_list_stage1)
+
+    # n_param results:
+    n_flops = []
+    for k in common_configs:
+      n_flops.append(n_all_flops[k])
+    sorted_flops = np.argsort(n_flops)
+
+    common_ratios = []
+    spr_ranks = []
+    # extract common ratio and spearmanrank
+    topk_list = range(10,101,10)
+    for topk in topk_list:
+      common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth, sorted_target=sorted_flops, \
+                                            val_ppl_list_gt=val_ppl_list_stage1, val_ppl_list_target=n_flops)
+      common_ratios.append(common_ratio)
+      spr_ranks.append(spr_rank)
+
+    plt.figure()
+    plt.scatter(topk_list, common_ratios)
+    plt.ylabel('Common ratio')
+    plt.xlabel('Topk (%)')
+    plt.xticks(topk_list)
+    plt.title('ranking based on number of FLOPs')
+    plt.grid(axis='y')
+    plt.savefig('common_ratio_topk_nflops.png', bbox_inches="tight")
+
+    plt.figure()
+    plt.scatter(topk_list, spr_ranks)
+    plt.ylabel('Spearman\'s Correlation')
+    plt.xlabel('Topk (%)')
+    plt.xticks(topk_list)
+    plt.ylim(top=1)
+    plt.grid(axis='y')
+    plt.title('ranking based on number of FLOPs')
+    plt.savefig('spearman_topk_nflops.png', bbox_inches="tight")
+
+
+  elif args.cross_step:
+    results = {}
+
+    # get baseline
+    fname = 'result_summary.yaml'
+    yaml_file = os.path.join(os.path.join(args.results_dir, 'fear_stage_1'), fname)
+    assert os.path.exists(yaml_file), 'no result summary for the ground-truth job'
+    with open(yaml_file, 'r') as f:
+      results['fear_stage_1'] = collections.OrderedDict(yaml.safe_load(f))
+
+    # get other experiments
+    for exp_name in args.exp_name:
+      path_to_results = os.path.join(args.results_dir, exp_name)
+      if 'stage_2' in exp_name:
+        fname = 'result_summary_unfreeze_{}.yaml'.format(args.n_unfreeze) #'2' if args.n_unfreeze is None else args.n_unfreeze)
+        ppl_threshold = 70 if 'ppl' not in exp_name else re.search('ppl_([0-9]+)', exp_name).group(1)
+        exp_name = 'fear_stage_2'
+      else:
+        fname = 'result_summary.yaml'
+
+      yaml_file = os.path.join(path_to_results, fname)
+      with open(yaml_file, 'r') as f:
+        results[exp_name] = collections.OrderedDict(yaml.safe_load(f))
+    
       common_configs = np.intersect1d(list(results['fear_stage_1'].keys()), list(results['fear_stage_2'].keys()))
       print('analyzing {} architectures'.format(len(common_configs)))
       
@@ -302,682 +1063,193 @@ if args.analyze:
       sorted_ground_truth = np.argsort(val_ppl_list_stage1)
 
       # fear_stage_2 results:
-      val_ppl_list_stage2 = []
-      for k in common_configs:
-        val_ppl_list_stage2.append(results['fear_stage_2'][k]['valid_perplexity'])
+      common_ratios = {}
+      spr_ranks = {}
 
-      sorted_fear = np.argsort(val_ppl_list_stage2)
-      
-      # extract common ratio and spearmanrank
-      key = 'n_unfreeze_{}_ppl_{}'.format(n_unfreeze, ppl_threshold)
-      print('--------------- ', key)
-      common_ratios[key] = []
-      spr_ranks[key] = []
+      for step in args.step:
+        val_ppl_list_stage2 = []
+        for k in common_configs:
+          val_ppl_list_stage2.append(results['fear_stage_2'][k][step]['valid_perplexity'])
+        sorted_fear = np.argsort(val_ppl_list_stage2)
+        
+        # extract common ratio and spearmanrank
+        key = 'step_{}'.format(step)
+        print('--------------- ', key)
+        common_ratios[key] = []
+        spr_ranks[key] = []
 
-      topk_list = range(10,101,10)
-      for topk in topk_list:
-        common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth, sorted_target=sorted_fear, \
-                                              val_ppl_list_gt=val_ppl_list_stage1, val_ppl_list_target=val_ppl_list_stage2)
-        common_ratios[key].append(common_ratio)
-        spr_ranks[key].append(spr_rank)
+        topk_list = range(10,101,10)
+        for topk in topk_list:
+          common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth, sorted_target=sorted_fear, \
+                                                val_ppl_list_gt=val_ppl_list_stage1, val_ppl_list_target=val_ppl_list_stage2)
+          common_ratios[key].append(common_ratio)
+          spr_ranks[key].append(spr_rank)
 
-  plt.figure()
-  for k in common_ratios.keys():
-    plt.plot(topk_list, common_ratios[k], label=k, marker='.', markersize=10)
-  plt.ylabel('Common ratio')
-  plt.xlabel('Topk (%)')
-  plt.xticks(topk_list)
-  plt.legend(loc='lower right')
-  plt.grid(axis='y')
-  plt.savefig('common_ratio_topk.png', bbox_inches="tight")
+    plt.figure()
+    for k in common_ratios.keys():
+      plt.plot(topk_list, common_ratios[k], label=k, marker='.', markersize=10)
 
-  plt.figure()
-  for k in spr_ranks.keys():
-    plt.plot(topk_list, spr_ranks[k], label=k, marker='.', markersize=10)
-    # for i, label in enumerate(spr_ranks[k]):
-    #   plt.text(topk_list[i], spr_ranks[k][i]-0.07, '%.2f'%label)
+    plt.ylabel('Common ratio')
+    plt.xlabel('Topk (%)')
+    plt.xticks(topk_list)
+    plt.legend(loc='lower right')
+    plt.title('n_unfreeze:{}, ppl:{}'.format(args.n_unfreeze, ppl_threshold))
+    plt.grid(axis='y')
+    plt.savefig('common_ratio_topk_steps.png', bbox_inches="tight")
 
-  plt.ylabel('Spearman\'s Correlation')
-  plt.xlabel('Topk (%)')
-  plt.xticks(topk_list)
-  plt.ylim(top=1)
-  plt.grid(axis='y')
-  plt.legend(loc='lower right')
-  plt.savefig('spearman_topk.png', bbox_inches="tight")
+    plt.figure()
+    for k in spr_ranks.keys():
+      plt.plot(topk_list, spr_ranks[k], label=k, marker='.', markersize=10)
+      # for i, label in enumerate(spr_ranks[k]):
+      #   plt.text(topk_list[i], spr_ranks[k][i]-0.07, '%.2f'%label)
+
+    plt.ylabel('Spearman\'s Correlation')
+    plt.xlabel('Topk (%)')
+    plt.xticks(topk_list)
+    plt.ylim(top=1)
+    plt.legend(loc='lower right')
+    plt.grid(axis='y')
+    plt.title('n_unfreeze:{}, ppl:{}'.format(args.n_unfreeze, ppl_threshold))
+    plt.savefig('spearman_topk_steps.png', bbox_inches="tight")
 
 
-elif args.cross_seeds:
-  results = {}
-  common_ratios = {}
-  spr_ranks = {}
-  
-  fname = 'result_summary.yaml'
-  yaml_file = os.path.join(os.path.join(args.results_dir, 'fear_stage_1'), fname)
-  assert os.path.exists(yaml_file), 'no result summary for the ground-truth job'
-  with open(yaml_file, 'r') as f:
-    results['fear_stage_1'] = collections.OrderedDict(yaml.safe_load(f))
+  elif args.animation:
+    # groud-truth ranking
+    path_to_results = os.path.join(args.results_dir, 'fear_stage_1')
+    yaml_file = os.path.join(path_to_results, 'result_summary.yaml')
+    with open(yaml_file, 'r') as f:
+      results_gt = collections.OrderedDict(yaml.safe_load(f))
 
-  for n_unfreeze in [2,3]:
-    for i, exp_name in enumerate(args.exp_name):
+    config_names = np.asarray(list(results_gt.keys()))
+    val_ppl_list_gt = []
+    for k in config_names:
+      val_ppl_list_gt.append(results_gt[k]['valid_perplexity'])
+    sorted_gt_idx = np.argsort(val_ppl_list_gt)
+    sorted_gt = config_names[sorted_gt_idx]
+
+    output_yaml = os.path.join(path_to_results, 'timing_vs_ppl.yaml')
+    if os.path.exists(output_yaml):
+      with open(output_yaml, 'r') as f:
+        results = yaml.safe_load(f)
+    else:
+      results = {}
+      for job in os.listdir(path_to_results):
+        path_to_job = os.path.join(path_to_results, job)
+        if not os.path.isdir(path_to_job):
+          continue
+        
+        config_name = get_config_name(job)
+        
+        for file in os.listdir(path_to_job):
+          if 'json' in file:
+            results[config_name] = {}
+            results[config_name]['train_perplexity'] = []
+            results[config_name]['valid_perplexity'] = []
+            results[config_name]['train_elapsedtime'] = []
+            results[config_name]['val_elapsedtime'] = []
+            
+            with open(os.path.join(path_to_job, file), 'r') as f:
+              lines = f.readlines()
+              for l in lines:
+                dicts = re.search('DLLL (\{.+?\}\})', l).group(1)
+                result = json.loads(dicts)
+                if 'valid_perplexity' in result['data'].keys():
+                  results[config_name]['valid_perplexity'].append(result['data']['valid_perplexity'])
+                  results[config_name]['val_elapsedtime'].append(float(result['elapsedtime']))
+                elif 'train_perplexity' in result['data'].keys():
+                  if result['data']['train_perplexity'] < 100:
+                    results[config_name]['train_perplexity'].append(result['data']['train_perplexity'])
+                    results[config_name]['train_elapsedtime'].append(float(result['elapsedtime']))
+        print(config_name)
+      with open(output_yaml, 'w') as f:
+        yaml.dump(results, f)
+    
+    # ppl_threshold = 50
+    # for config_name in results.keys():
+    #   idx = min(range(len(results[config_name]['valid_perplexity'])), key=lambda i:abs(int(results[config_name]['valid_perplexity'][i]-ppl_threshold)))
+    #   print(config_name, results[config_name]['valid_perplexity'])
+    #   print(config_name, results[config_name]['valid_perplexity'][idx], results[config_name]['elapsedtime'][idx])
+
+    #   break
+    
+    plt.figure()
+    for idx in range(0, len(sorted_gt), 10): #range(0, 50, 5):
+      config_name = sorted_gt[idx]
+      # print('--------------', str(idx))
+      # print(results[config_name]['valid_perplexity'])
+      # print(results[config_name]['val_elapsedtime'])
+      plt.plot(results[config_name]['val_elapsedtime'], results[config_name]['valid_perplexity'], label='rank {}'.format(str(idx+1)))
+    plt.ylabel('validation ppl')
+    plt.xlabel('time (s)')
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    plt.savefig('rank_vs_time_val.png', bbox_inches="tight")
+
+    plt.figure()
+    for idx in range(0, len(sorted_gt), 10): #range(0, 50, 5):
+      config_name = sorted_gt[idx]
+      # print('--------------', str(idx))
+      # print(results[config_name]['train_perplexity'])
+      # print(results[config_name]['train_elapsedtime'])
+      plt.plot(results[config_name]['train_elapsedtime'][::100], results[config_name]['train_perplexity'][::100], label='rank {}'.format(str(idx+1)))
+    plt.ylabel('Training ppl')
+    plt.xlabel('time (s)')
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    plt.savefig('rank_vs_time_train.png', bbox_inches="tight")
+                
+
+  else:
+    for exp_name in args.exp_name:
       path_to_results = os.path.join(args.results_dir, exp_name)
+
+      results = recurse_dir(args, exp_name, path_to_results, read_log_file=True)
+      
       if 'stage_2' in exp_name:
-        fname = 'result_summary_unfreeze_{}.yaml'.format(n_unfreeze) #'2' if args.n_unfreeze is None else args.n_unfreeze)
-        ppl_threshold = 70 if 'ppl' not in exp_name else re.search('ppl_([0-9]+)', exp_name).group(1)
-        exp_name = 'fear_stage_2'
+        fname = 'result_summary_unfreeze_{}.yaml'.format('2' if args.n_unfreeze is None else args.n_unfreeze)
       else:
         fname = 'result_summary.yaml'
-
       yaml_file = os.path.join(path_to_results, fname)
-      if not os.path.exists(yaml_file):
-        print('#### no yaml summary found for {} with n_unfreeze={}'.format(args.exp_name[i], n_unfreeze))
-        continue
-      with open(yaml_file, 'r') as f:
-        results[exp_name] = collections.OrderedDict(yaml.safe_load(f))
+      with open(yaml_file, 'w') as f:
+        yaml.dump(results, f)
 
-      structured_results = {}
-      for k in results[exp_name].keys():
-        config_name = re.search('(config_[0-9]+)', k).group(1)
-        seed = re.search('(seed_[0-9]+)', k).group(1)
+      target_ppl = 70 if 'ppl' not in exp_name else re.search('ppl_([0-9]+)', exp_name).group(1)
+      all_val_ppls = []  
+      all_times = []
+      all_steps = []
+      for k, v in results.items():
         try:
-          structured_results[seed][config_name] = results[exp_name][k]
+          all_val_ppls.append(v['valid_perplexity'])
         except:
-          structured_results[seed] = {}
-          structured_results[seed][config_name] = results[exp_name][k]
+          continue
 
-      # gather results:
-      common_configs = {}
-      val_ppl_list_target = {}
-      val_ppl_list_gt = {}
+        if 'stage_1' in exp_name:
+          all_times.append(v[target_ppl]['time'])
+          all_steps.append(v[target_ppl]['step'])
       
-      for seed in structured_results.keys():
-        common_configs[seed] = np.intersect1d(list(results['fear_stage_1'].keys()), list(structured_results[seed].keys()))
-        print('{} has {} configs'.format(seed, len(common_configs[seed])))
+      n_params_best = []
+      for k, v in results.items():
+        try:
+          if v['valid_perplexity'] == min(all_val_ppls):
+            n_params_best.append(v['n_params'])
+        except:
+          continue
+
+      print('best achieved ppl: {:.2f} with n_params: {}'.format(min(all_val_ppls), n_params_best))
+      
+      plt.hist(all_val_ppls, bins=50)
+      plt.xlabel('validation perplexity')
+      plt.ylabel('# archs')
+      plt.title(exp_name+'_unfreeze_{}'.format('2' if args.n_unfreeze is None else args.n_unfreeze))
+      plt.savefig('valid_ppl_'+exp_name+'_unfreeze_{}.png'.format('2' if args.n_unfreeze is None else args.n_unfreeze), bbox_inches="tight")
         
-        val_ppl_list_target[seed] = []
-        val_ppl_list_gt[seed] = []
-        for conf in common_configs[seed]:
-          val_ppl_list_target[seed].append(structured_results[seed][conf]['valid_perplexity'])
-          val_ppl_list_gt[seed].append(results['fear_stage_1'][conf]['valid_perplexity'])
-        
-      
-      sorted_target = {}
-      for seed in val_ppl_list_target.keys():
-        sorted_target[seed] = np.argsort(val_ppl_list_target[seed])
-      
-      # extract common ratio and spearmanrank
-      topk_list = range(10,101,10)
-      for seed in val_ppl_list_target.keys():
-        print('--------------- ', seed)
-        sorted_ground_truth = np.argsort(val_ppl_list_gt[seed])
-        sorted_target = np.argsort(val_ppl_list_target[seed])
-
-        common_ratios[seed] = []
-        spr_ranks[seed] = []
-        for topk in topk_list:
-          common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth, sorted_target=sorted_target, \
-                                                val_ppl_list_gt=val_ppl_list_gt[seed], val_ppl_list_target=val_ppl_list_target[seed])
-          common_ratios[seed].append(common_ratio)
-          spr_ranks[seed].append(spr_rank)
-
-  plt.figure()
-  for k in common_ratios.keys():
-    plt.plot(topk_list, common_ratios[k], label=k, marker='.', markersize=10)
-  plt.ylabel('Common ratio')
-  plt.xlabel('Topk (%)')
-  plt.xticks(topk_list)
-  plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-  plt.grid(axis='y')
-  plt.savefig('common_ratio_topk_seeds.png', bbox_inches="tight")
-
-  plt.figure()
-  for k in spr_ranks.keys():
-    plt.plot(topk_list, spr_ranks[k], label=k, marker='.', markersize=10)
-    # for i, label in enumerate(spr_ranks[k]):
-    #   plt.text(topk_list[i], spr_ranks[k][i]-0.07, '%.2f'%label)
-  plt.ylabel('Spearman\'s Correlation')
-  plt.xlabel('Topk (%)')
-  plt.xticks(topk_list)
-  plt.ylim(top=1)
-  plt.grid(axis='y')
-  plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-  plt.savefig('spearman_topk_seeds.png', bbox_inches="tight")
-  
-
-elif args.read_jsons:
-  for exp_name in args.exp_name:
-    path_to_results = os.path.join(args.results_dir, exp_name)
-
-    results = {}
-    results = recurse_dir(args, exp_name, path_to_results, read_log_file=False)
-      
-    print('found %d configurations'%len(results.keys()))
-    if 'stage_2' in exp_name:
-      fname = 'result_summary_unfreeze_{}.yaml'.format('2' if args.n_unfreeze is None else args.n_unfreeze)
-    else:
-      fname = 'result_summary.yaml'
-    yaml_file = os.path.join(path_to_results, fname)
-    with open(yaml_file, 'w') as f:
-      yaml.dump(results, f)
-      print('saved results summary to', fname)
-
-
-elif args.generate_plots:
-  results = {}
-  results_structured = {}
-  common_ratios = {}
-  spr_ranks = {}
-  times = {}
-  topk_list = [10,20,30,40,50,100]
-  
-  # load groundtruth results 
-  path_to_results = os.path.join(args.results_dir, 'fear_stage_1')
-  yaml_file = os.path.join(path_to_results, 'result_summary.yaml')
-  with open(yaml_file, 'r') as f:
-    results['fear_stage_1'] = collections.OrderedDict(yaml.safe_load(f))
-
-  for exp_name in args.exp_name:
-    path_to_results = os.path.join(args.results_dir, exp_name)
-
-    if 'stage_2' in exp_name:
-      fname = 'result_summary_unfreeze_{}.yaml'.format(args.n_unfreeze) #'2' if args.n_unfreeze is None else args.n_unfreeze)
-      target_ppl = 70 if 'ppl' not in exp_name else int(re.search('ppl_([0-9]+)', exp_name).group(1))
-      legend_key = 'fear, ppl:{}'.format(target_ppl)
-    else:
-      fname = 'result_summary.yaml'
-      legend_key = exp_name.replace('_', ' ')
-      if 'baseline' in exp_name:
-        legend_key.replace('fear', '')
-
-    yaml_file = os.path.join(path_to_results, fname)
-    with open(yaml_file, 'r') as f:
-      results[exp_name] = collections.OrderedDict(yaml.safe_load(f))
-
-    common_ratios[legend_key] = {}
-    spr_ranks[legend_key] = {}
-    times[legend_key] = {}
-
-    if 'fear_baseline' in exp_name:
-      for k, v in results['fear_baseline'].items():
-        max_step = k.split('_')[-1]
-        config_name = re.search('(config_[0-9]+)_', k).group(1)
-        if max_step not in results_structured.keys():
-          results_structured[max_step] = {}
-        results_structured[max_step][config_name] = v  
-
-      # parse fear_baseline results:
-      val_ppl_list_gt = {}
-      val_ppl_list_baseline = {}
-      timing_baseline = {}
-      common_configs = {}
-      
-      for max_step, v in results_structured.items():
-        val_ppl_list_baseline[max_step] = []
-        timing_baseline[max_step] = []
-        val_ppl_list_gt[max_step] = []
-        
-        common_configs[max_step] = np.intersect1d(list(results['fear_stage_1'].keys()), list(results_structured[max_step].keys()))
-        for k in common_configs[max_step]:
-          val_ppl_list_baseline[max_step].append(results_structured[max_step][k]['valid_perplexity'])
-          timing_baseline[max_step].append(results_structured[max_step][k]['train_elapsed'])
-          val_ppl_list_gt[max_step].append(results['fear_stage_1'][k]['valid_perplexity'])
-
-      for topk in topk_list:
-        common_ratios[legend_key][topk] = []
-        spr_ranks[legend_key][topk] = []
-        times[legend_key][topk] = []
-        for max_step in val_ppl_list_baseline.keys():
-          print('------------ {} total number of configs with steps={}'.format(len(val_ppl_list_gt[max_step]), max_step))
-          sorted_ground_truth = np.argsort(val_ppl_list_gt[max_step])
-          sorted_baseline = np.argsort(val_ppl_list_baseline[max_step])
-          common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth, sorted_target=sorted_baseline, \
-                                                  val_ppl_list_gt=val_ppl_list_gt[max_step], val_ppl_list_target=val_ppl_list_baseline[max_step], 
-                                                  common_configs=common_configs[max_step])
-          
-          common_ratios[legend_key][topk].append(common_ratio)
-          spr_ranks[legend_key][topk].append(spr_rank)
-          times[legend_key][topk].append(np.average(timing_baseline[max_step]))
-    
-    elif 'fear_stage_2' in exp_name:
-      common_configs_stage2 = np.intersect1d(list(results['fear_stage_1'].keys()), list(results[exp_name].keys()))
-      
-      # parse fear_stage_1 results:
-      val_ppl_list_gt_for_fear = []
-      for k in common_configs_stage2:
-        val_ppl_list_gt_for_fear.append(results['fear_stage_1'][k]['valid_perplexity'])
-      sorted_ground_truth_for_fear = np.argsort(val_ppl_list_gt_for_fear)
-      
-      # parse fear_stage_2 results:
-      val_ppl_list_stage2 = []
-      timing_stage2 = []
-      for k in common_configs_stage2:
-        val_ppl_list_stage2.append(results[exp_name][k]['valid_perplexity'])
-        timing_stage2.append(results[exp_name][k]['train_elapsed'] + results['fear_stage_1'][k][target_ppl]['time'])
-      sorted_fear = np.argsort(val_ppl_list_stage2)
-      
-      # extract common ratio and spearmanrank
-      for topk in topk_list:
-        common_ratio_fear, spr_rank_fear = get_metrics(topk, sorted_ground_truth=sorted_ground_truth_for_fear, sorted_target=sorted_fear, \
-                                                val_ppl_list_gt=val_ppl_list_gt_for_fear, val_ppl_list_target=val_ppl_list_stage2, common_configs=common_configs_stage2)
-            
-        common_ratios[legend_key][topk] = common_ratio_fear
-        spr_ranks[legend_key][topk] = spr_rank_fear
-        times[legend_key][topk] = np.average(timing_stage2)
-
-  markers = ['.', 'v', '*', 'd', 'X', 's']
-  for topk in topk_list:
-    plt.figure()
-    for i, k in enumerate(common_ratios.keys()):
-      plt.scatter(times[k][topk], common_ratios[k][topk], label=k, marker=markers[i], s=150)
-    plt.ylabel('Common ratio')
-    plt.xlabel('Time (s)')
-    plt.title('Topk = %d %%' % topk)
-    plt.grid(axis='y')
-    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    plt.savefig('common_ratio_topk_{}.png'.format(topk), bbox_inches="tight")
-
-    plt.figure()
-    for i, k in enumerate(spr_ranks.keys()):
-      plt.scatter(times[k][topk], spr_ranks[k][topk], label=k, marker=markers[i], s=150)
-    plt.ylabel('Spearman\'s Correlation')
-    plt.xlabel('Time (s)')
-    plt.title('Topk = %d %%' % topk)
-    plt.ylim(top=1)
-    plt.grid(axis='y')
-    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    plt.savefig('spearman_topk_{}.png'.format(topk), bbox_inches="tight")
-
-  # results = {}
-  # results_structured = {}
-  # common_ratios = {}
-  # spr_ranks = {}
-
-  # for exp_name in args.exp_name:
-  #   path_to_results = os.path.join(args.results_dir, exp_name)
-
-  #   if 'stage_2' in exp_name:
-  #     fname = 'result_summary_unfreeze_{}.yaml'.format(args.n_unfreeze) #'2' if args.n_unfreeze is None else args.n_unfreeze)
-  #     target_ppl = 70 if 'ppl' not in exp_name else int(re.search('ppl_([0-9]+)', exp_name).group(1))
-  #     print(target_ppl)
-  #     exp_name = 'fear_stage_2'
-  #   else:
-  #     fname = 'result_summary.yaml'
-
-  #   yaml_file = os.path.join(path_to_results, fname)
-  #   with open(yaml_file, 'r') as f:
-  #     results[exp_name] = collections.OrderedDict(yaml.safe_load(f))
-
-  # for k, v in results['fear_baseline'].items():
-  #   max_step = k.split('_')[-1]
-  #   config_name = re.search('(config_[0-9]+)_', k).group(1)
-  #   if max_step not in results_structured.keys():
-  #     results_structured[max_step] = {}
-  #   results_structured[max_step][config_name] = v  
-  
-  # if 'fear_stage_2' in results.keys():
-  #   common_configs_stage2 = np.intersect1d(list(results['fear_stage_1'].keys()), list(results['fear_stage_2'].keys()))
-  #   # fear_stage_1 results:
-  #   val_ppl_list_gt_for_fear = []
-  #   for k in common_configs_stage2:
-  #     val_ppl_list_gt_for_fear.append(results['fear_stage_1'][k]['valid_perplexity'])
-  #   sorted_ground_truth_for_fear = np.argsort(val_ppl_list_gt_for_fear)
-    
-  #   # fear_stage_2 results:
-  #   val_ppl_list_stage2 = []
-  #   timing_stage2 = []
-  #   for k in common_configs_stage2:
-  #     val_ppl_list_stage2.append(results['fear_stage_2'][k]['valid_perplexity'])
-  #     timing_stage2.append(results['fear_stage_2'][k]['train_elapsed'] + results['fear_stage_1'][k][target_ppl]['time'])
-  #   sorted_fear = np.argsort(val_ppl_list_stage2)
-
-  # # fear_baseline results:
-  # val_ppl_list_gt = {}
-
-  # val_ppl_list_baseline = {}
-  # timing_baseline = {}
-  # common_configs = {}
-
-  # for max_step, v in results_structured.items():
-  #   val_ppl_list_baseline[max_step] = []
-  #   timing_baseline[max_step] = []
-  #   val_ppl_list_gt[max_step] = []
-    
-  #   common_configs[max_step] = np.intersect1d(list(results['fear_stage_1'].keys()), list(results_structured[max_step].keys()))
-  #   for k in common_configs[max_step]:
-  #     val_ppl_list_baseline[max_step].append(results_structured[max_step][k]['valid_perplexity'])
-  #     timing_baseline[max_step].append(results_structured[max_step][k]['train_elapsed'])
-    
-  #     val_ppl_list_gt[max_step].append(results['fear_stage_1'][k]['valid_perplexity'])
-
-  # # extract common ratio and spearmanrank
-  # topk_list = [10,20,30,40,50,100]
-  # for topk in topk_list:
-  #   if 'fear_stage_2' in results.keys():
-  #     common_ratio_fear, spr_rank_fear = get_metrics(topk, sorted_ground_truth=sorted_ground_truth_for_fear, sorted_target=sorted_fear, \
-  #                                             val_ppl_list_gt=val_ppl_list_gt_for_fear, val_ppl_list_target=val_ppl_list_stage2, common_configs=common_configs_stage2)
-        
-  #   common_ratios = []
-  #   spr_ranks = []
-  #   times = []
-    
-  #   for max_step in val_ppl_list_baseline.keys():
-  #     print('------------ {} total number of configs with steps={}'.format(len(val_ppl_list_gt[max_step]), max_step))
-  #     sorted_ground_truth = np.argsort(val_ppl_list_gt[max_step])
-  #     sorted_baseline = np.argsort(val_ppl_list_baseline[max_step])
-
-  #     common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth, sorted_target=sorted_baseline, \
-  #                                             val_ppl_list_gt=val_ppl_list_gt[max_step], val_ppl_list_target=val_ppl_list_baseline[max_step], 
-  #                                             common_configs=common_configs[max_step])
-  #     common_ratios.append(common_ratio)
-  #     spr_ranks.append(spr_rank)
-      
-  #     times.append(np.average(timing_baseline[max_step]))
-
-  #   plt.figure()
-  #   plt.scatter(times, common_ratios, label='baseline')
-  #   if 'fear_stage_2' in results.keys():
-  #     plt.scatter(np.average(timing_stage2), common_ratio_fear, label='fear stage 2')
-  #   plt.ylabel('Common ratio')
-  #   plt.xlabel('Time (s)')
-  #   plt.title('Topk = %d %%' % topk)
-  #   plt.grid(axis='y')
-  #   plt.legend(loc='lower right')
-  #   plt.savefig('common_ratio_topk_{}.png'.format(topk), bbox_inches="tight")
-
-  #   plt.figure()
-  #   plt.scatter(times, spr_ranks, label='baseline')
-  #   if 'fear_stage_2' in results.keys():
-  #     plt.scatter(np.average(timing_stage2), spr_rank_fear, label='fear stage 2')
-  #   plt.ylabel('Spearman\'s Correlation')
-  #   plt.xlabel('Time (s)')
-  #   plt.title('Topk = %d %%' % topk)
-  #   plt.ylim(top=1)
-  #   plt.grid(axis='y')
-  #   plt.legend(loc='lower right')
-  #   plt.savefig('spearman_topk_{}.png'.format(topk), bbox_inches="tight")
-
-
-elif args.analyze_params:
-  model_config_keys = ['n_token', 'n_layer','n_head','d_model','d_head','d_inner','dropout','dropatt', \
-                      'd_embed','div_val','pre_lnorm','tgt_len','ext_len','mem_len', \
-                      'same_length','attn_type','clamp_len','sample_softmax']
-
-  for exp_name in args.exp_name:
-    path_to_results = os.path.join(args.results_dir, exp_name)
-    jobs = os.listdir(path_to_results)
-
-    params_adaptive_embedding_list = []
-    params_adaptive_softmax_list = []
-    params_attention_list = []
-    params_ff_list = []
-    
-    n_all_params = {}
-    for j in jobs:
-      if args.n_unfreeze is not None and 'unfreeze_{}'.format(args.n_unfreeze) not in j:
-        continue
-      j_path = os.path.join(path_to_results, j)
-      if os.path.isdir(j_path):
-        for fname in os.listdir(j_path):
-          if 'config.yaml' in fname:
-            with open(os.path.join(j_path, fname), 'r') as f:
-              config = yaml.load(f)
-              model_config = {k: config[k] for k in model_config_keys}
-              
-              cutoffs, tie_projs = [], [False]
-              if config['adaptive']:
-                  assert config['dataset'] in ['wt103', 'wt2', 'lm1b']
-                  if config['dataset'] in ['wt103', 'wt2']:
-                      cutoffs = [19997, 39997, 199997]
-                      tie_projs += [True] * len(cutoffs)
-                  elif config['dataset'] == 'lm1b':
-                      cutoffs = [59997, 99997, 639997]
-                      tie_projs += [False] * len(cutoffs)
-              model_config['cutoffs'] = cutoffs
-              model_config['tie_projs'] = tie_projs
-              model_config['tie_weight'] = config['tied']
-              model_config['dtype'] = None
-
-              model = MemTransformerLM(**model_config)
-              
-              curr_n_all_param, params_adaptive_embedding, params_adaptive_softmax, params_attention, params_ff = process_parameters(model)
-              params_adaptive_embedding_list.append(params_adaptive_embedding)
-              params_adaptive_softmax_list.append(params_adaptive_softmax)
-              params_attention_list.append(params_attention)
-              params_ff_list.append(params_ff)
-
-              config_name = re.search('(config_[0-9]+)', j).group(1)
-              n_all_params[config_name] = int(curr_n_all_param)
-              
-              # stats = tw.ModelStats(model, input_shape=[192,1])
-              # print(stats)
-              exit()
-
-    print(n_all_params)
-    
-    yaml_file = os.path.join(path_to_results, 'params_summary.yaml')
-    with open(yaml_file, 'w') as f:
-        yaml.dump(n_all_params, f)
-
-    fig, ax = plt.subplots()
-    data = [params_adaptive_embedding_list, params_adaptive_softmax_list, params_attention_list, params_ff_list]
-    bp = ax.boxplot(data, sym='k+', showmeans=True)
-    # , label=)
-    # plt.boxplot(, label=)
-    # plt.boxplot(, label=)
-    # plt.boxplot(, label=)
-    # plt.legend()
-    m = [np.mean(d, axis=0) for d in data]
-    for i, line in enumerate(bp['medians']):
-        x, y = line.get_xydata()[1]
-        text = ' μ={:.2f}'.format(m[i])
-        if i>0:
-          ax.annotate(text, xy=(x-0.2, y+20))
-        else:
-          ax.annotate(text, xy=(x, y))
-
-    ax.grid(axis='y')
-    plt.xticks(range(1, 5), ['AdaEmb', 'Sftmax', 'Attn', 'FFN'])
-    plt.savefig('parameter_breakdown.png', bbox_inches="tight")
- 
-
-elif args.param_ranking:
-  exp_name = args.exp_name[0]
-  path_to_results = os.path.join(args.results_dir, exp_name)
-
-  if 'stage_2' in exp_name:
-    fname = 'result_summary_unfreeze_{}.yaml'.format(n_unfreeze) #'2' if args.n_unfreeze is None else args.n_unfreeze)
-    exp_name = 'fear_stage_2'
-  else:
-    fname = 'result_summary.yaml'
-
-  results = {}
-  yaml_file = os.path.join(path_to_results, fname)
-  with open(yaml_file, 'r') as f:
-    results[exp_name] = collections.OrderedDict(yaml.safe_load(f))
-
-  yaml_file = os.path.join(path_to_results, 'params_summary.yaml')
-  with open(yaml_file, 'r') as f:
-      n_all_params = yaml.safe_load(f)
-
-  common_configs = np.intersect1d(list(results['fear_stage_1'].keys()), list(n_all_params.keys()))
-  print('analyzing {} architectures'.format(len(common_configs)))
-
-  # fear_stage_1 results:
-  val_ppl_list_stage1 = []
-  for k in common_configs:
-    val_ppl_list_stage1.append(results['fear_stage_1'][k]['valid_perplexity'])
-  sorted_ground_truth = np.argsort(val_ppl_list_stage1)
-
-  # n_param results:
-  n_params = []
-  for k in common_configs:
-    n_params.append(n_all_params[k])
-  sorted_fear = np.argsort(n_params)
-
-  common_ratios = []
-  spr_ranks = []
-  # extract common ratio and spearmanrank
-  topk_list = range(10,101,10)
-  for topk in topk_list:
-    common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth, sorted_target=sorted_fear, \
-                                          val_ppl_list_gt=val_ppl_list_stage1, val_ppl_list_target=n_params)
-    common_ratios.append(common_ratio)
-    spr_ranks.append(spr_rank)
-
-  plt.figure()
-  plt.scatter(topk_list, common_ratios)
-  plt.ylabel('Common ratio')
-  plt.xlabel('Topk (%)')
-  plt.xticks(topk_list)
-  plt.title('ranking based on number of parameters')
-  plt.grid(axis='y')
-  plt.savefig('common_ratio_topk_nparams.png', bbox_inches="tight")
-
-  plt.figure()
-  plt.scatter(topk_list, spr_ranks)
-  plt.ylabel('Spearman\'s Correlation')
-  plt.xlabel('Topk (%)')
-  plt.xticks(topk_list)
-  plt.ylim(top=1)
-  plt.grid(axis='y')
-  plt.title('ranking based on number of parameters')
-  plt.savefig('spearman_topk_nparams.png', bbox_inches="tight")
-
-
-elif args.cross_step:
-  results = {}
-
-  # get baseline
-  fname = 'result_summary.yaml'
-  yaml_file = os.path.join(os.path.join(args.results_dir, 'fear_stage_1'), fname)
-  assert os.path.exists(yaml_file), 'no result summary for the ground-truth job'
-  with open(yaml_file, 'r') as f:
-    results['fear_stage_1'] = collections.OrderedDict(yaml.safe_load(f))
-
-  # get other experiments
-  for exp_name in args.exp_name:
-    path_to_results = os.path.join(args.results_dir, exp_name)
-    if 'stage_2' in exp_name:
-      fname = 'result_summary_unfreeze_{}.yaml'.format(args.n_unfreeze) #'2' if args.n_unfreeze is None else args.n_unfreeze)
-      ppl_threshold = 70 if 'ppl' not in exp_name else re.search('ppl_([0-9]+)', exp_name).group(1)
-      exp_name = 'fear_stage_2'
-    else:
-      fname = 'result_summary.yaml'
-
-    yaml_file = os.path.join(path_to_results, fname)
-    with open(yaml_file, 'r') as f:
-      results[exp_name] = collections.OrderedDict(yaml.safe_load(f))
-  
-    common_configs = np.intersect1d(list(results['fear_stage_1'].keys()), list(results['fear_stage_2'].keys()))
-    print('analyzing {} architectures'.format(len(common_configs)))
-    
-    # fear_stage_1 results:
-    val_ppl_list_stage1 = []
-    for k in common_configs:
-      val_ppl_list_stage1.append(results['fear_stage_1'][k]['valid_perplexity'])
-    sorted_ground_truth = np.argsort(val_ppl_list_stage1)
-
-    # fear_stage_2 results:
-    common_ratios = {}
-    spr_ranks = {}
-
-    for step in args.step:
-      val_ppl_list_stage2 = []
-      for k in common_configs:
-        val_ppl_list_stage2.append(results['fear_stage_2'][k][step]['valid_perplexity'])
-      sorted_fear = np.argsort(val_ppl_list_stage2)
-      
-      # extract common ratio and spearmanrank
-      key = 'step_{}'.format(step)
-      print('--------------- ', key)
-      common_ratios[key] = []
-      spr_ranks[key] = []
-
-      topk_list = range(10,101,10)
-      for topk in topk_list:
-        common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth, sorted_target=sorted_fear, \
-                                              val_ppl_list_gt=val_ppl_list_stage1, val_ppl_list_target=val_ppl_list_stage2)
-        common_ratios[key].append(common_ratio)
-        spr_ranks[key].append(spr_rank)
-
-  plt.figure()
-  for k in common_ratios.keys():
-    plt.plot(topk_list, common_ratios[k], label=k, marker='.', markersize=10)
-
-  plt.ylabel('Common ratio')
-  plt.xlabel('Topk (%)')
-  plt.xticks(topk_list)
-  plt.legend(loc='lower right')
-  plt.title('n_unfreeze:{}, ppl:{}'.format(args.n_unfreeze, ppl_threshold))
-  plt.grid(axis='y')
-  plt.savefig('common_ratio_topk_steps.png', bbox_inches="tight")
-
-  plt.figure()
-  for k in spr_ranks.keys():
-    plt.plot(topk_list, spr_ranks[k], label=k, marker='.', markersize=10)
-    # for i, label in enumerate(spr_ranks[k]):
-    #   plt.text(topk_list[i], spr_ranks[k][i]-0.07, '%.2f'%label)
-
-  plt.ylabel('Spearman\'s Correlation')
-  plt.xlabel('Topk (%)')
-  plt.xticks(topk_list)
-  plt.ylim(top=1)
-  plt.legend(loc='lower right')
-  plt.grid(axis='y')
-  plt.title('n_unfreeze:{}, ppl:{}'.format(args.n_unfreeze, ppl_threshold))
-  plt.savefig('spearman_topk_steps.png', bbox_inches="tight")
-
-
-else:
-  for exp_name in args.exp_name:
-    path_to_results = os.path.join(args.results_dir, exp_name)
-
-    results = recurse_dir(args, exp_name, path_to_results, read_log_file=True)
-    
-    if 'stage_2' in exp_name:
-      fname = 'result_summary_unfreeze_{}.yaml'.format('2' if args.n_unfreeze is None else args.n_unfreeze)
-    else:
-      fname = 'result_summary.yaml'
-    yaml_file = os.path.join(path_to_results, fname)
-    with open(yaml_file, 'w') as f:
-      yaml.dump(results, f)
-
-    target_ppl = 70 if 'ppl' not in exp_name else re.search('ppl_([0-9]+)', exp_name).group(1)
-    all_val_ppls = []  
-    all_times = []
-    all_steps = []
-    for k, v in results.items():
-      try:
-        all_val_ppls.append(v['valid_perplexity'])
-      except:
-        continue
-
       if 'stage_1' in exp_name:
-        all_times.append(v[target_ppl]['time'])
-        all_steps.append(v[target_ppl]['step'])
-    
-    n_params_best = []
-    for k, v in results.items():
-      try:
-        if v['valid_perplexity'] == min(all_val_ppls):
-          n_params_best.append(v['n_params'])
-      except:
-        continue
+        plt.figure()
+        plt.scatter(all_times, all_val_ppls)
+        plt.ylabel('Final validation perplexity')
+        plt.xlabel('Time to reach threshold val ppl (s)')
+        plt.savefig('val_ppl_vs_time_'+exp_name+'.png', bbox_inches="tight")
 
-    print('best achieved ppl: {:.2f} with n_params: {}'.format(min(all_val_ppls), n_params_best))
-    
-    plt.hist(all_val_ppls, bins=50)
-    plt.xlabel('validation perplexity')
-    plt.ylabel('# archs')
-    plt.title(exp_name+'_unfreeze_{}'.format('2' if args.n_unfreeze is None else args.n_unfreeze))
-    plt.savefig('valid_ppl_'+exp_name+'_unfreeze_{}.png'.format('2' if args.n_unfreeze is None else args.n_unfreeze), bbox_inches="tight")
-      
-    if 'stage_1' in exp_name:
-      plt.figure()
-      plt.scatter(all_times, all_val_ppls)
-      plt.ylabel('Final validation perplexity')
-      plt.xlabel('Time to reach threshold val ppl (s)')
-      plt.savefig('val_ppl_vs_time_'+exp_name+'.png', bbox_inches="tight")
+        ratio_good = np.sum(np.asarray(all_times)<3750)*100./len(all_times)
+        print('ratio of good architectures:', ratio_good)
 
-      ratio_good = np.sum(np.asarray(all_times)<3750)*100./len(all_times)
-      print('ratio of good architectures:', ratio_good)
-
+if __name__ == "__main__":
+    main()
