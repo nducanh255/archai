@@ -24,7 +24,7 @@ yaml.add_constructor(u'tag:yaml.org,2002:python/object/apply:numpy.dtype', meta_
 
 fear_stage = 3   #3: baseline
 n_unfreeze = 3
-different_seeds = [1111,1009,1200,1234,1302,1562,2222,3334,3425,4567]
+different_seeds = None #[1111,1009,1200,1234,1302,1562,2222,3334,3425,4567]
 max_step = 500
 
 gpu_config = ['dgx1_4gpu_fp32'] # dgx1_8gpu_fp16, dgx1_1gpu_fp16, toy, default, dgx1_4gpu_fp16
@@ -55,10 +55,10 @@ def get_run_command(max_step, config_num, seed=None):
                                         --max_step %d --seed %d --experiment_name config_%s_seed_%d' % (str(n_gpus), max_step, seed, config_num, seed)
   else:
 	  command = 'python -m torch.distributed.launch --nproc_per_node="%s" archai/nlp/nvidia_transformer_xl/train.py \
-                                        --config {config} --config_file wt103_base_FEAR.yaml \
+                                        --config {config} --config_file wt103_base.yaml \
                                         --n_layer {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head} \
                                         --d_inner {d_inner} --d_embed {d_embed} --div_val {div_val} \
-                                        --max_step %d --experiment_name config_%s_%d' % (str(n_gpus), max_step, config_num, max_step)
+                                        --max_step %d --experiment_name config_%s_%d --scheduler constant' % (str(n_gpus), max_step, config_num, max_step)
 
   return command
 
@@ -304,7 +304,7 @@ if __name__ == '__main__':
             if different_seeds:
               f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/{} fear_baseline_{}_step -t {}\n'.format('nv_train_{}.yaml'.format(job_idx), max_step, targets[t]))
             else:
-              f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/{} fear_baseline -t {}\n'.format('nv_train_{}.yaml'.format(job_idx), targets[t]))          
+              f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/{} fear_baseline_constLR -t {}\n'.format('nv_train_{}.yaml'.format(job_idx), targets[t]))          
           if job_idx >= n_configs:
               break      
       if job_idx >= n_configs:

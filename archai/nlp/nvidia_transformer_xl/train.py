@@ -316,7 +316,7 @@ def save_checkpoint(args, model, model_config, optimizer, scheduler, scaler,
         'model_config': model_config,
         'model_state': model.state_dict(),
         'optimizer_state': optimizer.state_dict(),
-        'scheduler_state': scheduler.state_dict(),
+        # 'scheduler_state': scheduler.state_dict(),
         'vocab': vocab,
         'amp_state': amp_state,
         'epoch': epoch,
@@ -325,6 +325,8 @@ def save_checkpoint(args, model, model_config, optimizer, scheduler, scaler,
         'train_step': train_step,
         'best_val_loss': best_val_loss,
         }
+    if scheduler:
+        state['scheduler_state'] = scheduler.state_dict()
 
     # Saving intermediate checkpoint for FEAR step 1
     if is_fear:
