@@ -134,7 +134,7 @@ class SearcherSimClr(EnforceOverrides):
         conf_loader = conf_search['loader']
         conf_projection = conf_search['projection']
 
-        model = ModelSimClr(model_desc, conf_projection['hidden_dim'], conf_projection['out_features'], droppath=False, affine=False)
+        model = ModelSimClr(model_desc, conf_projection['hidden_dim'], conf_projection['out_features'], droppath=False, affine=False, finalizers=finalizers)
 
         # get data
         data_loaders = self.get_data(conf_loader)

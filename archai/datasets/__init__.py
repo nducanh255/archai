@@ -13,6 +13,7 @@ from .providers.sport8_provider import Sport8Provider
 from .providers.flower102_provider import Flower102Provider
 from .providers.aircraft_provider import AircraftProvider
 from .providers.aircraft_bing_provider import AircraftBingProvider
+from .providers.imagenet_downsampled_provider import ImageNet32, ImageNet64
 from .providers.simclr_cifar100provider import SimClrCifar100Provider
 from .providers.simclr_cifar10provider import SimClrCifar10Provider
 from .providers.simclr_flower102provider import SimClrFlower102Provider
@@ -24,4 +25,6 @@ from .providers.simclr_mit67provider import SimClrMit67Provider
 from .providers.simclr_sport8provider import SimClrSport8Provider
 from .providers.simclr_svhnprovider import SimClrSvhnProvider
 from .providers.simclr_imagenetprovider import SimClrImageNetProvider
+from .providers.simclr_imagenet_downsampledprovider import SimClrImageNet32Provider, SimClrImageNet64Provider
+
 

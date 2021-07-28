@@ -264,7 +264,7 @@ class TrainerSimClr(EnforceOverrides):
         cur_val_loss = self._metrics.run_metrics.cur_epoch().val_metrics.loss.avg \
                     if self._metrics.run_metrics.cur_epoch().val_metrics is not None else -1
         best_train_loss = self._metrics.run_metrics.best_train.loss.avg if self._metrics.run_metrics.best_train is not None else -1
-        best_val_loss = self._metrics.run_metrics.best_val.loss.avg if self._metrics.run_metrics.best_val is not None else -1
+        best_val_loss = self._metrics.run_metrics.best_val.val_metrics.loss.avg if self._metrics.run_metrics.best_val and self._metrics.run_metrics.best_val.val_metrics else -1
         if cur_train_loss == best_train_loss:
             self._checkpoint['trainer_best_train'] = state
         if cur_val_loss == best_val_loss:

@@ -79,13 +79,13 @@ class MetricsSimClr:
                     logger.info({'dist_epoch': self.reduce_mean(best_train.index),
                                 'dist_loss': self.reduce_mean(best_train.loss.avg)})
 
-            if best_val:
+            if best_val and best_val.val_metrics:
                 with logger.pushd('best_val'):
                     logger.info({'epoch': best_val.index,
-                                'loss': best_val.loss.avg})
+                                'loss': best_val.val_metrics.loss.avg})
                     if self.is_dist():
                         logger.info({'dist_epoch': self.reduce_mean(best_val.index),
-                                    'dist_loss': self.reduce_mean(best_val.loss.avg)})
+                                    'dist_loss': self.reduce_mean(best_val.val_metrics.loss.avg)})
 
             if best_test:
                 with logger.pushd('best_test'):
@@ -128,8 +128,9 @@ class MetricsSimClr:
     def post_epoch(self, lr:float=math.nan, val_metrics:Optional['MetricsSimClr']=None):
         epoch = self.run_metrics.cur_epoch()
         epoch.post_epoch(lr, val_metrics)
-        if val_metrics:
-            self.run_metrics.best_train, self.run_metrics.best_val, self.run_metrics.best_test = self.run_metrics.best_epoch()
+        self.run_metrics.best_train, self.run_metrics.best_val, self.run_metrics.best_test = self.run_metrics.best_epoch()
+        # if val_metrics:
+        #     self.run_metrics.best_train, self.run_metrics.best_val, self.run_metrics.best_test = self.run_metrics.best_epoch()
 
         val_epoch_metrics = None
         if val_metrics:
@@ -205,7 +206,7 @@ class MetricsSimClr:
         return self.run_metrics.best_epoch()[0].loss.avg
     def best_val_loss(self)->float:
         val_epoch_metrics = self.run_metrics.best_epoch()[1]
-        return val_epoch_metrics.loss.avg if val_epoch_metrics is not None else math.nan
+        return val_epoch_metrics.val_metrics.loss.avg if val_epoch_metrics.val_metrics is not None else math.nan
     def best_test_loss(self)->float:
         test_epoch_metrics = self.run_metrics.best_epoch()[2]
         return test_epoch_metrics.loss.avg if test_epoch_metrics is not None else math.nan
@@ -317,9 +318,12 @@ class RunMetricsSimClr:
                                 Optional[EpochMetricsSimClr]]: # [train, val, test]
         best_train = min(self.epochs_metrics, key=lambda e:e.loss.avg)
 
-        best_val = min(self.epochs_metrics,
-            key=lambda e:e.val_metrics.loss.avg if e.val_metrics else float('inf'))
-        best_val = best_val.val_metrics if best_val.val_metrics else None
+        if any([e.val_metrics is not None for e in self.epochs_metrics]):
+            best_val = min(self.epochs_metrics,
+                key=lambda e:e.val_metrics.loss.avg if e.val_metrics else float('inf'))
+        else:
+            best_val = None
+        # best_val = best_val.val_metrics if best_val.val_metrics else None
 
         best_test = self.test_metrics.run_metrics.epochs_metrics[-1] \
                     if self.test_metrics else None

@@ -50,7 +50,7 @@ class ExperimentRunner(ABC, EnforceOverrides):
         if eval:
             conf = self.get_conf(False)
             common.clean_ensure_expdir(conf, clean_dir=self.clean_expdir, ensure_dir=True)
-            if search:
+            if search or True:
                 # first copy search result to eval, otherwise we expect eval config to point to results
                 self.copy_search_to_eval()
 

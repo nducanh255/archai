@@ -3,6 +3,7 @@
 
 from typing import Mapping, Optional, Union
 import copy
+import os
 
 import torch
 from torch.utils.data import DataLoader
@@ -16,17 +17,19 @@ from overrides import overrides
 from archai.common.config import Config
 from archai.nas.arch_trainer_ssl import ArchTrainerSimClr
 from archai.common import utils, ml_utils
-from archai.nas.model import Model
+from archai.nas.model_ssl import ModelSimClr
 from archai.common.checkpoint import CheckPoint
 from archai.datasets import data
 from archai.common.common import logger
 from archai.algos.darts.bilevel_optimizer_ssl import BilevelOptimizerSimClr
 
 class BilevelArchTrainerSimClr(ArchTrainerSimClr):
-    def __init__(self, conf_train: Config, model: Model,
+    def __init__(self, conf_train: Config, model: ModelSimClr,
                  checkpoint:Optional[CheckPoint]) -> None:
         super().__init__(conf_train, model, checkpoint)
 
+        self._model = model
+        self.epoch_model_desc = conf_train['epoch_model_desc']
         self._conf_w_optim = conf_train['optimizer']
         self._conf_w_lossfn = conf_train['lossfn']
         self._conf_alpha_optim = conf_train['alpha_optimizer']
@@ -44,7 +47,7 @@ class BilevelArchTrainerSimClr(ArchTrainerSimClr):
 
         self._bilevel_optim = BilevelOptimizerSimClr(self._conf_alpha_optim, w_momentum,
                                                 w_decay, self.model, lossfn,
-                                                self.get_device(), self.batch_chunks)
+                                                self.get_device(), self.batch_chunks, self._apex)
 
     @overrides
     def post_fit(self, data_loaders:data.DataLoaders)->None:
@@ -66,6 +69,16 @@ class BilevelArchTrainerSimClr(ArchTrainerSimClr):
         del self._val_dl
         del self._valid_iter # clean up
         super().post_epoch(data_loaders, epoch)
+        if self.epoch_model_desc['freq']>0 and (epoch+1)%self.epoch_model_desc['freq']==0 and utils.is_main_process():
+            if self._apex.is_dist():
+                model_desc = self.model.module.finalizers.finalize_model(self.model.module)
+            else:
+                model_desc = self.model.finalizers.finalize_model(self.model)
+            filename, savedir = self.epoch_model_desc['filename'], utils.full_path(self.epoch_model_desc['savedir'])
+            os.makedirs(savedir,exist_ok=True)
+            desc_filename = os.path.join(savedir,f'{filename}_{epoch+1}.yaml')
+            model_desc.save(desc_filename)
+        
 
     @overrides
     def pre_step(self, xi: Tensor, xj: Tensor) -> None:

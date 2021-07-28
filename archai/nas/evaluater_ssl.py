@@ -22,7 +22,7 @@ from archai.nas.model_desc_builder import ModelDescBuilder
 from archai.nas import nas_utils
 from archai.common import ml_utils, utils
 from archai.common.metrics import EpochMetrics, Metrics
-from archai.nas.model import Model
+from archai.nas.model_ssl import ModelSimClr
 from archai.common.checkpoint import CheckPoint
 
 
@@ -114,6 +114,7 @@ class EvaluaterSimClr(EnforceOverrides):
             final_desc_filename = conf_eval['final_desc_filename']
             full_desc_filename = conf_eval['full_desc_filename']
         conf_model_desc   = conf_eval['model_desc']
+        conf_projection  = conf_eval['projection']
         # endregion
 
         # load model desc file to get template model
@@ -124,7 +125,7 @@ class EvaluaterSimClr(EnforceOverrides):
         # save desc for reference
         model_desc.save(full_desc_filename)
 
-        model = self.model_from_desc(model_desc)
+        model = self.model_from_desc(conf_projection, model_desc)
 
         logger.info({'model_factory':False,
                     'cells_len':len(model.desc.cell_descs()),
@@ -135,5 +136,6 @@ class EvaluaterSimClr(EnforceOverrides):
 
         return model
 
-    def model_from_desc(self, model_desc)->Model:
-        return Model(model_desc, droppath=True, affine=True)
+        # model = ModelSimClr(model_desc, conf_projection['hidden_dim'], conf_projection['out_features'], droppath=False, affine=False, finalizers=finalizers)
+    def model_from_desc(self, conf_projection:Config, model_desc)->ModelSimClr:
+        return ModelSimClr(model_desc, conf_projection['hidden_dim'], conf_projection['out_features'], droppath=True, affine=True)

@@ -8,19 +8,22 @@ import os
 def unpickle(file):
     with open(file, 'rb') as fo:
         dict = pickle.load(fo)
+        # dict = pickle.load(fo, encoding='latin1')
     return dict
 
 
 def load_databatch(data_folder, idx):
     data_file = os.path.join(data_folder, 'train_data_batch_')
+    # data_file = os.path.join(data_folder, 'data_batch_')
 
     d = unpickle(data_file + str(idx))
     x = d['data']
     y = d['labels']
-    mean_image = d['mean']
+    # mean_image = d['mean']
     return x,y
     
-rootpath = '../dataroot/ImageNet32'
+rootpath = '/var/tmp/dataroot/ImageNet64'
+# rootpath = '../dataroot/cifar-10-batches-py'
 data = []
 labels = []
 for i in range(1,11):
@@ -28,8 +31,8 @@ for i in range(1,11):
     data.append(x)
     labels.append(y)
 
-data = np.vstack(data).reshape(-1, 3, 32, 32)
-print(data.shape)
+data = np.vstack(data).reshape(-1, 3, 64, 64)
+print(np.mean(data,axis=(0,2,3))/255,np.std(data,axis=(0,2,3))/255)
 exit()
 parser = argparse.ArgumentParser()
 parser.add_argument('-o', '--output_dir',

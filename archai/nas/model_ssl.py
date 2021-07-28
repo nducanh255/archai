@@ -17,11 +17,12 @@ from archai.nas.operations import Op, DropPath_
 from archai.nas.model_desc import ModelDesc, AuxTowerDesc, CellDesc
 from archai.common.common import logger
 from archai.common import utils, ml_utils
+from archai.nas.finalizers import Finalizers
 from archai.nas.arch_module import ArchModule
 from archai.networks_ssl.simclr import Projection
 
 class ModelSimClr(ArchModule):
-    def __init__(self, model_desc:ModelDesc, hidden_dim:int, out_features:int, droppath:bool, affine:bool):
+    def __init__(self, model_desc:ModelDesc, hidden_dim:int, out_features:int, droppath:bool, affine:bool, finalizers:Finalizers = None):
         super().__init__()
 
         # some of these fields are public as finalizer needs access to them
@@ -47,6 +48,7 @@ class ModelSimClr(ArchModule):
         self.logits_op = Op.create(model_desc.logits_op, affine=affine)
         input_dim = model_desc.logits_op.params['conv'].ch_out
         self.projection = Projection(input_dim, hidden_dim, out_features)
+        self.finalizers = finalizers
 
         # for i,cell in enumerate(self.cells):
         #     print(i, ml_utils.param_size(cell))

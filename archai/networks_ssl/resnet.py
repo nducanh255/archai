@@ -158,7 +158,7 @@ class ResNet(nn.Module):
         self.compress = compress
         self.dataset = dataset
         self.return_feats_layers = return_feats_layers
-        self.small_datasets = ['cifar10', 'cifar100', 'aircraft', 'mnist', 'fashion_mnist', 'food101', 'svhn']
+        self.small_datasets = ['cifar10', 'cifar100', 'aircraft', 'mnist', 'fashion_mnist', 'food101', 'svhn', 'imagenet32', 'imagenet64']
 
         self.inplanes = 64
         self.dilation = 1

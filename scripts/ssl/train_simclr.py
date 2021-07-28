@@ -7,7 +7,7 @@ import yaml
 import time
 import torch
 import shutil
-from archai.networks_ssl.simclr import ModelSimCLRResNet, ModelSimCLRVGGNet, ModelSimCLRViT
+from archai.networks_ssl.simclr import ModelSimCLRResNet, ModelSimCLRVGGNet, ModelSimCLRViT, ModelSimCLRDenseNet
 from archai.common import utils
 from archai.common.trainer_ssl import TrainerSimClr
 from archai.common.config import Config
@@ -30,6 +30,10 @@ def train_test(conf_main:Config):
     elif "vit" in conf_trainer['model']:
         with open('confs/algos/simclr_vits.yaml', 'r') as f:
             conf_models = yaml.load(f, Loader=yaml.Loader)
+            conf_models = yaml.load(f, Loader=yaml.Loader)
+    elif "densenet" in conf_trainer['model']:
+        with open('confs/algos/simclr_densenets.yaml', 'r') as f:
+            conf_models = yaml.load(f, Loader=yaml.Loader)
     else:
         raise Exception(f"Not implemented SimCLR for model {conf_trainer['model']}")
         
@@ -48,6 +52,10 @@ def train_test(conf_main:Config):
                 depth = conf_model["depth"], heads = conf_model["heads"], mlp_dim = conf_model["mlp_dim"], pool = conf_model["pool"],
                 channels = conf_model["channels"], dim_head = conf_model["dim_head"], dropout = conf_model["dropout"],
                 emb_dropout = conf_model["emb_dropout"], hidden_dim = conf_model["hidden_dim"], out_features = conf_model["out_features"])
+    elif "densenet" in conf_trainer['model']:
+        model = ModelSimCLRDenseNet(conf_dataset['name'], growth_rate = conf_model['growth_rate'], block_config=conf_model['block_config'],
+                num_init_features = conf_model['num_init_features'], hidden_dim = conf_model["hidden_dim"], 
+                out_features = conf_model["out_features"])
     model = model.to(torch.device('cuda', 0))
     print('Number of trainable params: {:.2f}M'
           .format(sum(p.numel() for p in model.backbone.parameters() if p.requires_grad)/1e6))

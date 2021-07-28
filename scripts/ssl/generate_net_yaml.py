@@ -1,41 +1,40 @@
 import yaml
 
-resnets = {}
-count = 92
-for l1 in [5,6]:
-    for l2 in [5,6]:
-        for l3 in [2,3,4]:
-            for l4 in [2,3,4]:
-                layers = [l1,l2,l3,l4]
-                if layers == [2,2,2,2]:
-                    continue
-                cur_resnet = {
-                              "depth": sum(layers)*3+2,
-                              "layers": layers,
-                              "bottleneck": True,
-                              "hidden_dim": 2048,
-                              "out_features": 128,
-                              "compress": False,
-                              "width_per_group": 64,
-                              "groups": 1
-                }
-                resnets["resnet_v{}".format(count)] = cur_resnet
-                count += 1
+# resnets = {}
+# count = 92
+# for l1 in [5,6]:
+#     for l2 in [5,6]:
+#         for l3 in [2,3,4]:
+#             for l4 in [2,3,4]:
+#                 layers = [l1,l2,l3,l4]
+#                 if layers == [2,2,2,2]:
+#                     continue
+#                 cur_resnet = {
+#                               "depth": sum(layers)*3+2,
+#                               "layers": layers,
+#                               "bottleneck": True,
+#                               "hidden_dim": 2048,
+#                               "out_features": 128,
+#                               "compress": False,
+#                               "width_per_group": 64,
+#                               "groups": 1
+#                 }
+#                 resnets["resnet_v{}".format(count)] = cur_resnet
+#                 count += 1
 
-with open('confs/algos/simclr_resnets.yaml','a') as f:
-    f.write("\n")
-    for name, cur_resnet in resnets.items():
-        depth, layers, bottleneck, hidden_dim, out_features, compress, width_per_group, groups = cur_resnet.values()
-        f.write(f"\n{name}:\n")
-        f.write(f"    depth: {depth}\n")
-        f.write(f"    layers: [{layers[0]}, {layers[1]}, {layers[2]}, {layers[3]}]\n")
-        f.write(f"    bottleneck: {bottleneck}\n")
-        f.write(f"    hidden_dim: {hidden_dim}\n")
-        f.write(f"    out_features: {out_features}\n")
-        f.write(f"    compress: {compress}\n")
-        f.write(f"    width_per_group: {width_per_group}\n")
-        f.write(f"    groups: {groups}\n")
-    # yaml.dump(resnets, f, sort_keys=False)
+# with open('confs/algos/simclr_resnets.yaml','a') as f:
+#     f.write("\n")
+#     for name, cur_resnet in resnets.items():
+#         depth, layers, bottleneck, hidden_dim, out_features, compress, width_per_group, groups = cur_resnet.values()
+#         f.write(f"\n{name}:\n")
+#         f.write(f"    depth: {depth}\n")
+#         f.write(f"    layers: [{layers[0]}, {layers[1]}, {layers[2]}, {layers[3]}]\n")
+#         f.write(f"    bottleneck: {bottleneck}\n")
+#         f.write(f"    hidden_dim: {hidden_dim}\n")
+#         f.write(f"    out_features: {out_features}\n")
+#         f.write(f"    compress: {compress}\n")
+#         f.write(f"    width_per_group: {width_per_group}\n")
+#         f.write(f"    groups: {groups}\n")
 
 # cfgs: Dict[str, List[Union[str, int]]] = {
 #     'A': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'], #vgg11 v22
@@ -148,3 +147,33 @@ with open('confs/algos/simclr_resnets.yaml','a') as f:
 #         f.write(f"    emb_dropout: {dropout}\n")
 #         f.write(f"    hidden_dim: 2048\n")
 #         f.write(f"    out_features: 128\n")
+
+densenets = {}
+count = 1
+for l1 in [2,4,6]:
+    for l2 in [8,10,12]:
+        for l3 in [24, 32, 36, 48]:
+            for l4 in [16, 24, 32]:
+                for growth_rate in [16, 32, 48]:
+                    for num_init_features in [32, 64, 96]:
+                        block_config = [l1,l2,l3,l4]
+                        cur_densenet = {
+                                    "layers": block_config,
+                                    "growth_rate": growth_rate,
+                                    "num_init_features": num_init_features,
+                                    "hidden_dim": 2048,
+                                    "out_features": 128,
+                        }
+                        densenets["densenet_v{}".format(count)] = cur_densenet
+                        count += 1
+
+with open('confs/algos/simclr_densenets.yaml','a') as f:
+    f.write("\n")
+    for name, cur_densenet in densenets.items():
+        block_config, growth_rate, num_init_features, hidden_dim, out_features = cur_densenet.values()
+        f.write(f"\n{name}:\n")
+        f.write(f"    block_config: [{block_config[0]}, {block_config[1]}, {block_config[2]}, {block_config[3]}]\n")
+        f.write(f"    growth_rate: {growth_rate}\n")
+        f.write(f"    num_init_features: {num_init_features}\n")
+        f.write(f"    hidden_dim: {hidden_dim}\n")
+        f.write(f"    out_features: {out_features}\n")

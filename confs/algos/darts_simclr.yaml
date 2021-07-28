@@ -1,4 +1,4 @@
-__include__: "../datasets/cifar10.yaml" # default dataset settings are for cifar
+# __include__: "../datasets/cifar10.yaml" # default dataset settings are for cifar
 
 common:
   experiment_name: 'throwaway' # you should supply from command line
@@ -11,9 +11,6 @@ common:
   seed: 2.0
   tb_enable: False # if True then TensorBoard logging is enabled (may impact perf)
   tb_dir: '$expdir/tb' # path where tensorboard logs would be stored
-  checkpoint:
-    filename: '$expdir/checkpoint.pth'
-    freq: 1
 
   # reddis address of Ray cluster. Use None for single node run
   # otherwise it should something like host:6379. Make sure to run on head node:
@@ -22,7 +19,7 @@ common:
   apex: # this is overriden in search and eval individually
     enabled: False # global switch to disable everything apex
     distributed_enabled: True # enable/disable distributed mode
-    mixed_prec_enabled: True # switch to disable amp mixed precision
+    mixed_prec_enabled: False # switch to disable amp mixed precision
     gpus: '' # use GPU IDs specified here (comma separated), if '' then use all GPUs
     opt_level: 'O2' # optimization level for mixed precision
     bn_fp32: True # keep BN in fp32
@@ -43,10 +40,18 @@ common:
   save_intermediate: False
   intermediatedir: ''
   save_delay: 30
+  checkpoint:
+    filename: '$expdir/checkpoint.pth'
+    freq: 1
+    experiment_name: '_copy: /common/experiment_name'
+    resume: '_copy: /common/resume'
+    resumedir: '_copy: /common/resumedir'
+    save_intermediate: '_copy: /common/save_intermediate'
+    intermediatedir: '_copy: /common/intermediatedir'
 
 dataset:  # default dataset settings comes from __include__ on the top
   jitter_strength: 0.5
-  input_height: 32
+  input_height: 64
   gaussian_blur: False
   normalize: True
 
@@ -66,6 +71,8 @@ nas:
     checkpoint:
       _copy: '/common/checkpoint'
     resume: '_copy: /common/resume'
+    projection:
+      _copy: '/nas/search/projection'
     model_desc:
       n_reductions: 2 # number of reductions to be applied
       n_cells: 20 # number of cells
@@ -89,16 +96,17 @@ nas:
       aug: '' # additional augmentations to use, for ex, fa_reduced_cifar10, arsaug, autoaug_cifar10, autoaug_extend
       cutout: 0 # cutout length, use cutout augmentation when > 0
       load_train: True # load train split of dataset
-      train_batch: 96 # 96 is too aggressive for 1080Ti, better set it to 68
+      train_batch: 128 # 96 is too aggressive for 1080Ti, better set it to 68
       train_workers: 4
       test_workers: '_copy: ../train_workers' # if null then 4
       load_test: True # load test split of dataset
-      test_batch: 1024
+      test_batch: 128
       val_ratio: 0.0 #split portion for test set, 0 to 1
       val_fold: 0 #Fold number to use (0 to 4)
       cv_num: 5 # total number of folds available
       dataset:
         _copy: '/dataset'
+        # max_batches: 100 #REMOVE
     trainer:
       apex:
         _copy: '/common/apex'
@@ -106,10 +114,10 @@ nas:
       drop_path_prob: 0.2 # probability that given edge will be dropped
       grad_clip: 5.0 # grads above this value is clipped
       l1_alphas: 0.0   # weight to be applied to sum(abs(alphas)) to loss term
-      logger_freq: 1000 # after every N updates dump loss and other metrics in logger
+      logger_freq: 1000 # after every N updates dump loss and other metrics in logger 
       title: 'eval_train'
-      epochs: 600
-      batch_chunks: 1 # split batch into these many chunks and accumulate gradients so we can support GPUs with lower RAM
+      epochs: 100 #600 
+      batch_chunks: 3 # split batch into these many chunks and accumulate gradients so we can support GPUs with lower RAM 
       lossfn:
         type: 'NTXentLoss'
         temperature: 0.5
@@ -121,7 +129,7 @@ nas:
         momentum: 0.9 # pytorch default is 0
         nesterov: False
         decay_bn: .NaN # if NaN then same as decay otherwise apply different decay to BN layers
-        type: 'adam'
+        # type: 'adam'
         # lr: 1.0 # init learning rate
         # decay: 1.0e-4 #s pytorch default is 0.0
         # betas: [0.9,0.999] # pytorch default is 0.0
@@ -155,6 +163,10 @@ nas:
     search_iters: 1
     full_desc_filename: '$expdir/full_model_desc.yaml' # arch before it was finalized
     final_desc_filename: '$expdir/final_model_desc.yaml' # final arch is saved in this file
+    epoch_model_desc: # whether to save model desc during search epochs
+      freq: -1 # epoch frequency for saving, -1 or 0 is for no saving
+      savedir: '$expdir/epoch_model_desc' # root dir for dumping all epoch model descs
+      filename: 'model_desc' # not adding full filename with yaml extension as name changes by appending epoch number to it
     metrics_dir: '$expdir/models/{reductions}/{cells}/{nodes}/{search_iter}' # where metrics and model stats would be saved from each pareto iteration
     seed_train:
       trainer:
@@ -192,7 +204,7 @@ nas:
       summary_filename: '$expdir/perito.tsv' # for each iteration of macro, we fave model and perf summary
     model_desc:
       n_reductions: 2 # number of reductions to be applied
-      n_cells: 8 # number of cells
+      n_cells: 6 #8 # number of cells #REDUCED
       # we avoid copying from eval node because dataset settings
       # may override eval.model_desc with different stems, pool etc
       dataset:
@@ -215,26 +227,29 @@ nas:
       aug: '' # additional augmentations to use
       cutout: 0 # cutout length, use cutout augmentation when > 0
       load_train: True # load train split of dataset
-      train_batch: 32
+      train_batch: 64
       train_workers: 4 # if null then gpu_count*4
       test_workers: '_copy: ../train_workers' # if null then 4
       load_test: False # load test split of dataset
-      test_batch: 1024
+      test_batch: 64
       val_ratio: 0.5 #split portion for test set, 0 to 1
       val_fold: 0 #Fold number to use (0 to 4)
       cv_num: 5 # total number of folds available
       dataset:
         _copy: '/dataset'
+        # max_batches: 320 #REMOVE
     trainer:
+      epoch_model_desc:
+        _copy: '/nas/search/epoch_model_desc'
       apex:
         _copy: '/common/apex'
       aux_weight: '_copy: /nas/search/model_desc/aux_weight'
       drop_path_prob: 0.0 # probability that given edge will be dropped
       grad_clip: 5.0 # grads above this value is clipped
-      logger_freq: 1 # after every N updates dump loss and other metrics in logger
+      logger_freq: 100 # after every N updates dump loss and other metrics in logger
       title: 'arch_train'
-      epochs: 50
-      batch_chunks: 1 # split batch into these many chunks and accumulate gradients so we can support GPUs with lower RAM
+      epochs: 20 #50 
+      batch_chunks: 3 # split batch into these many chunks and accumulate gradients so we can support GPUs with lower RAM
       # additional vals for the derived class
       plotsdir: '' #empty string means no plots, other wise plots are generated for each epoch in this dir
       l1_alphas: 0.0   # weight to be applied to sum(abs(alphas)) to loss term
@@ -274,7 +289,7 @@ nas:
         warmup: null
       validation:
         title: 'search_val'
-        logger_freq: 0
+        logger_freq: '_copy: ../../logger_freq'
         batch_chunks: '_copy: ../../batch_chunks' # split batch into these many chunks and accumulate gradients so we can support GPUs with lower RAM
         freq: 1 # perform validation only every N epochs
         lossfn:

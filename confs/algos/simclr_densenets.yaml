@@ -1,0 +1,6832 @@
+
+densenet121:
+    block_config: [6, 12, 24, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+    
+densenet161:
+    block_config: [6, 12, 36, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet169:
+    block_config: [6, 12, 32, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+    
+densenet201:
+    block_config: [6, 12, 48, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v1:
+    block_config: [2, 8, 24, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v2:
+    block_config: [2, 8, 24, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v3:
+    block_config: [2, 8, 24, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v4:
+    block_config: [2, 8, 24, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v5:
+    block_config: [2, 8, 24, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v6:
+    block_config: [2, 8, 24, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v7:
+    block_config: [2, 8, 24, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v8:
+    block_config: [2, 8, 24, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v9:
+    block_config: [2, 8, 24, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v10:
+    block_config: [2, 8, 24, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v11:
+    block_config: [2, 8, 24, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v12:
+    block_config: [2, 8, 24, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v13:
+    block_config: [2, 8, 24, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v14:
+    block_config: [2, 8, 24, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v15:
+    block_config: [2, 8, 24, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v16:
+    block_config: [2, 8, 24, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v17:
+    block_config: [2, 8, 24, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v18:
+    block_config: [2, 8, 24, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v19:
+    block_config: [2, 8, 24, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v20:
+    block_config: [2, 8, 24, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v21:
+    block_config: [2, 8, 24, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v22:
+    block_config: [2, 8, 24, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v23:
+    block_config: [2, 8, 24, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v24:
+    block_config: [2, 8, 24, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v25:
+    block_config: [2, 8, 24, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v26:
+    block_config: [2, 8, 24, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v27:
+    block_config: [2, 8, 24, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v28:
+    block_config: [2, 8, 32, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v29:
+    block_config: [2, 8, 32, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v30:
+    block_config: [2, 8, 32, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v31:
+    block_config: [2, 8, 32, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v32:
+    block_config: [2, 8, 32, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v33:
+    block_config: [2, 8, 32, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v34:
+    block_config: [2, 8, 32, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v35:
+    block_config: [2, 8, 32, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v36:
+    block_config: [2, 8, 32, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v37:
+    block_config: [2, 8, 32, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v38:
+    block_config: [2, 8, 32, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v39:
+    block_config: [2, 8, 32, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v40:
+    block_config: [2, 8, 32, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v41:
+    block_config: [2, 8, 32, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v42:
+    block_config: [2, 8, 32, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v43:
+    block_config: [2, 8, 32, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v44:
+    block_config: [2, 8, 32, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v45:
+    block_config: [2, 8, 32, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v46:
+    block_config: [2, 8, 32, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v47:
+    block_config: [2, 8, 32, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v48:
+    block_config: [2, 8, 32, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v49:
+    block_config: [2, 8, 32, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v50:
+    block_config: [2, 8, 32, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v51:
+    block_config: [2, 8, 32, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v52:
+    block_config: [2, 8, 32, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v53:
+    block_config: [2, 8, 32, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v54:
+    block_config: [2, 8, 32, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v55:
+    block_config: [2, 8, 36, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v56:
+    block_config: [2, 8, 36, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v57:
+    block_config: [2, 8, 36, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v58:
+    block_config: [2, 8, 36, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v59:
+    block_config: [2, 8, 36, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v60:
+    block_config: [2, 8, 36, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v61:
+    block_config: [2, 8, 36, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v62:
+    block_config: [2, 8, 36, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v63:
+    block_config: [2, 8, 36, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v64:
+    block_config: [2, 8, 36, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v65:
+    block_config: [2, 8, 36, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v66:
+    block_config: [2, 8, 36, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v67:
+    block_config: [2, 8, 36, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v68:
+    block_config: [2, 8, 36, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v69:
+    block_config: [2, 8, 36, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v70:
+    block_config: [2, 8, 36, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v71:
+    block_config: [2, 8, 36, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v72:
+    block_config: [2, 8, 36, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v73:
+    block_config: [2, 8, 36, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v74:
+    block_config: [2, 8, 36, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v75:
+    block_config: [2, 8, 36, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v76:
+    block_config: [2, 8, 36, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v77:
+    block_config: [2, 8, 36, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v78:
+    block_config: [2, 8, 36, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v79:
+    block_config: [2, 8, 36, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v80:
+    block_config: [2, 8, 36, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v81:
+    block_config: [2, 8, 36, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v82:
+    block_config: [2, 8, 48, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v83:
+    block_config: [2, 8, 48, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v84:
+    block_config: [2, 8, 48, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v85:
+    block_config: [2, 8, 48, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v86:
+    block_config: [2, 8, 48, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v87:
+    block_config: [2, 8, 48, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v88:
+    block_config: [2, 8, 48, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v89:
+    block_config: [2, 8, 48, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v90:
+    block_config: [2, 8, 48, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v91:
+    block_config: [2, 8, 48, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v92:
+    block_config: [2, 8, 48, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v93:
+    block_config: [2, 8, 48, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v94:
+    block_config: [2, 8, 48, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v95:
+    block_config: [2, 8, 48, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v96:
+    block_config: [2, 8, 48, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v97:
+    block_config: [2, 8, 48, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v98:
+    block_config: [2, 8, 48, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v99:
+    block_config: [2, 8, 48, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v100:
+    block_config: [2, 8, 48, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v101:
+    block_config: [2, 8, 48, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v102:
+    block_config: [2, 8, 48, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v103:
+    block_config: [2, 8, 48, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v104:
+    block_config: [2, 8, 48, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v105:
+    block_config: [2, 8, 48, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v106:
+    block_config: [2, 8, 48, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v107:
+    block_config: [2, 8, 48, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v108:
+    block_config: [2, 8, 48, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v109:
+    block_config: [2, 10, 24, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v110:
+    block_config: [2, 10, 24, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v111:
+    block_config: [2, 10, 24, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v112:
+    block_config: [2, 10, 24, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v113:
+    block_config: [2, 10, 24, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v114:
+    block_config: [2, 10, 24, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v115:
+    block_config: [2, 10, 24, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v116:
+    block_config: [2, 10, 24, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v117:
+    block_config: [2, 10, 24, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v118:
+    block_config: [2, 10, 24, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v119:
+    block_config: [2, 10, 24, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v120:
+    block_config: [2, 10, 24, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v121:
+    block_config: [2, 10, 24, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v122:
+    block_config: [2, 10, 24, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v123:
+    block_config: [2, 10, 24, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v124:
+    block_config: [2, 10, 24, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v125:
+    block_config: [2, 10, 24, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v126:
+    block_config: [2, 10, 24, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v127:
+    block_config: [2, 10, 24, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v128:
+    block_config: [2, 10, 24, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v129:
+    block_config: [2, 10, 24, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v130:
+    block_config: [2, 10, 24, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v131:
+    block_config: [2, 10, 24, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v132:
+    block_config: [2, 10, 24, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v133:
+    block_config: [2, 10, 24, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v134:
+    block_config: [2, 10, 24, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v135:
+    block_config: [2, 10, 24, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v136:
+    block_config: [2, 10, 32, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v137:
+    block_config: [2, 10, 32, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v138:
+    block_config: [2, 10, 32, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v139:
+    block_config: [2, 10, 32, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v140:
+    block_config: [2, 10, 32, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v141:
+    block_config: [2, 10, 32, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v142:
+    block_config: [2, 10, 32, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v143:
+    block_config: [2, 10, 32, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v144:
+    block_config: [2, 10, 32, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v145:
+    block_config: [2, 10, 32, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v146:
+    block_config: [2, 10, 32, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v147:
+    block_config: [2, 10, 32, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v148:
+    block_config: [2, 10, 32, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v149:
+    block_config: [2, 10, 32, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v150:
+    block_config: [2, 10, 32, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v151:
+    block_config: [2, 10, 32, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v152:
+    block_config: [2, 10, 32, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v153:
+    block_config: [2, 10, 32, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v154:
+    block_config: [2, 10, 32, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v155:
+    block_config: [2, 10, 32, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v156:
+    block_config: [2, 10, 32, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v157:
+    block_config: [2, 10, 32, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v158:
+    block_config: [2, 10, 32, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v159:
+    block_config: [2, 10, 32, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v160:
+    block_config: [2, 10, 32, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v161:
+    block_config: [2, 10, 32, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v162:
+    block_config: [2, 10, 32, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v163:
+    block_config: [2, 10, 36, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v164:
+    block_config: [2, 10, 36, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v165:
+    block_config: [2, 10, 36, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v166:
+    block_config: [2, 10, 36, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v167:
+    block_config: [2, 10, 36, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v168:
+    block_config: [2, 10, 36, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v169:
+    block_config: [2, 10, 36, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v170:
+    block_config: [2, 10, 36, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v171:
+    block_config: [2, 10, 36, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v172:
+    block_config: [2, 10, 36, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v173:
+    block_config: [2, 10, 36, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v174:
+    block_config: [2, 10, 36, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v175:
+    block_config: [2, 10, 36, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v176:
+    block_config: [2, 10, 36, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v177:
+    block_config: [2, 10, 36, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v178:
+    block_config: [2, 10, 36, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v179:
+    block_config: [2, 10, 36, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v180:
+    block_config: [2, 10, 36, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v181:
+    block_config: [2, 10, 36, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v182:
+    block_config: [2, 10, 36, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v183:
+    block_config: [2, 10, 36, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v184:
+    block_config: [2, 10, 36, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v185:
+    block_config: [2, 10, 36, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v186:
+    block_config: [2, 10, 36, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v187:
+    block_config: [2, 10, 36, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v188:
+    block_config: [2, 10, 36, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v189:
+    block_config: [2, 10, 36, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v190:
+    block_config: [2, 10, 48, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v191:
+    block_config: [2, 10, 48, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v192:
+    block_config: [2, 10, 48, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v193:
+    block_config: [2, 10, 48, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v194:
+    block_config: [2, 10, 48, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v195:
+    block_config: [2, 10, 48, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v196:
+    block_config: [2, 10, 48, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v197:
+    block_config: [2, 10, 48, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v198:
+    block_config: [2, 10, 48, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v199:
+    block_config: [2, 10, 48, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v200:
+    block_config: [2, 10, 48, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v201:
+    block_config: [2, 10, 48, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v202:
+    block_config: [2, 10, 48, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v203:
+    block_config: [2, 10, 48, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v204:
+    block_config: [2, 10, 48, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v205:
+    block_config: [2, 10, 48, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v206:
+    block_config: [2, 10, 48, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v207:
+    block_config: [2, 10, 48, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v208:
+    block_config: [2, 10, 48, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v209:
+    block_config: [2, 10, 48, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v210:
+    block_config: [2, 10, 48, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v211:
+    block_config: [2, 10, 48, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v212:
+    block_config: [2, 10, 48, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v213:
+    block_config: [2, 10, 48, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v214:
+    block_config: [2, 10, 48, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v215:
+    block_config: [2, 10, 48, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v216:
+    block_config: [2, 10, 48, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v217:
+    block_config: [2, 12, 24, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v218:
+    block_config: [2, 12, 24, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v219:
+    block_config: [2, 12, 24, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v220:
+    block_config: [2, 12, 24, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v221:
+    block_config: [2, 12, 24, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v222:
+    block_config: [2, 12, 24, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v223:
+    block_config: [2, 12, 24, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v224:
+    block_config: [2, 12, 24, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v225:
+    block_config: [2, 12, 24, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v226:
+    block_config: [2, 12, 24, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v227:
+    block_config: [2, 12, 24, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v228:
+    block_config: [2, 12, 24, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v229:
+    block_config: [2, 12, 24, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v230:
+    block_config: [2, 12, 24, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v231:
+    block_config: [2, 12, 24, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v232:
+    block_config: [2, 12, 24, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v233:
+    block_config: [2, 12, 24, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v234:
+    block_config: [2, 12, 24, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v235:
+    block_config: [2, 12, 24, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v236:
+    block_config: [2, 12, 24, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v237:
+    block_config: [2, 12, 24, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v238:
+    block_config: [2, 12, 24, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v239:
+    block_config: [2, 12, 24, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v240:
+    block_config: [2, 12, 24, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v241:
+    block_config: [2, 12, 24, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v242:
+    block_config: [2, 12, 24, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v243:
+    block_config: [2, 12, 24, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v244:
+    block_config: [2, 12, 32, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v245:
+    block_config: [2, 12, 32, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v246:
+    block_config: [2, 12, 32, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v247:
+    block_config: [2, 12, 32, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v248:
+    block_config: [2, 12, 32, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v249:
+    block_config: [2, 12, 32, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v250:
+    block_config: [2, 12, 32, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v251:
+    block_config: [2, 12, 32, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v252:
+    block_config: [2, 12, 32, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v253:
+    block_config: [2, 12, 32, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v254:
+    block_config: [2, 12, 32, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v255:
+    block_config: [2, 12, 32, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v256:
+    block_config: [2, 12, 32, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v257:
+    block_config: [2, 12, 32, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v258:
+    block_config: [2, 12, 32, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v259:
+    block_config: [2, 12, 32, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v260:
+    block_config: [2, 12, 32, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v261:
+    block_config: [2, 12, 32, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v262:
+    block_config: [2, 12, 32, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v263:
+    block_config: [2, 12, 32, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v264:
+    block_config: [2, 12, 32, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v265:
+    block_config: [2, 12, 32, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v266:
+    block_config: [2, 12, 32, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v267:
+    block_config: [2, 12, 32, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v268:
+    block_config: [2, 12, 32, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v269:
+    block_config: [2, 12, 32, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v270:
+    block_config: [2, 12, 32, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v271:
+    block_config: [2, 12, 36, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v272:
+    block_config: [2, 12, 36, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v273:
+    block_config: [2, 12, 36, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v274:
+    block_config: [2, 12, 36, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v275:
+    block_config: [2, 12, 36, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v276:
+    block_config: [2, 12, 36, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v277:
+    block_config: [2, 12, 36, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v278:
+    block_config: [2, 12, 36, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v279:
+    block_config: [2, 12, 36, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v280:
+    block_config: [2, 12, 36, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v281:
+    block_config: [2, 12, 36, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v282:
+    block_config: [2, 12, 36, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v283:
+    block_config: [2, 12, 36, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v284:
+    block_config: [2, 12, 36, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v285:
+    block_config: [2, 12, 36, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v286:
+    block_config: [2, 12, 36, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v287:
+    block_config: [2, 12, 36, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v288:
+    block_config: [2, 12, 36, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v289:
+    block_config: [2, 12, 36, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v290:
+    block_config: [2, 12, 36, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v291:
+    block_config: [2, 12, 36, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v292:
+    block_config: [2, 12, 36, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v293:
+    block_config: [2, 12, 36, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v294:
+    block_config: [2, 12, 36, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v295:
+    block_config: [2, 12, 36, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v296:
+    block_config: [2, 12, 36, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v297:
+    block_config: [2, 12, 36, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v298:
+    block_config: [2, 12, 48, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v299:
+    block_config: [2, 12, 48, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v300:
+    block_config: [2, 12, 48, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v301:
+    block_config: [2, 12, 48, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v302:
+    block_config: [2, 12, 48, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v303:
+    block_config: [2, 12, 48, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v304:
+    block_config: [2, 12, 48, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v305:
+    block_config: [2, 12, 48, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v306:
+    block_config: [2, 12, 48, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v307:
+    block_config: [2, 12, 48, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v308:
+    block_config: [2, 12, 48, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v309:
+    block_config: [2, 12, 48, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v310:
+    block_config: [2, 12, 48, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v311:
+    block_config: [2, 12, 48, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v312:
+    block_config: [2, 12, 48, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v313:
+    block_config: [2, 12, 48, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v314:
+    block_config: [2, 12, 48, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v315:
+    block_config: [2, 12, 48, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v316:
+    block_config: [2, 12, 48, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v317:
+    block_config: [2, 12, 48, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v318:
+    block_config: [2, 12, 48, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v319:
+    block_config: [2, 12, 48, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v320:
+    block_config: [2, 12, 48, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v321:
+    block_config: [2, 12, 48, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v322:
+    block_config: [2, 12, 48, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v323:
+    block_config: [2, 12, 48, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v324:
+    block_config: [2, 12, 48, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v325:
+    block_config: [4, 8, 24, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v326:
+    block_config: [4, 8, 24, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v327:
+    block_config: [4, 8, 24, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v328:
+    block_config: [4, 8, 24, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v329:
+    block_config: [4, 8, 24, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v330:
+    block_config: [4, 8, 24, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v331:
+    block_config: [4, 8, 24, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v332:
+    block_config: [4, 8, 24, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v333:
+    block_config: [4, 8, 24, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v334:
+    block_config: [4, 8, 24, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v335:
+    block_config: [4, 8, 24, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v336:
+    block_config: [4, 8, 24, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v337:
+    block_config: [4, 8, 24, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v338:
+    block_config: [4, 8, 24, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v339:
+    block_config: [4, 8, 24, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v340:
+    block_config: [4, 8, 24, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v341:
+    block_config: [4, 8, 24, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v342:
+    block_config: [4, 8, 24, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v343:
+    block_config: [4, 8, 24, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v344:
+    block_config: [4, 8, 24, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v345:
+    block_config: [4, 8, 24, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v346:
+    block_config: [4, 8, 24, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v347:
+    block_config: [4, 8, 24, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v348:
+    block_config: [4, 8, 24, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v349:
+    block_config: [4, 8, 24, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v350:
+    block_config: [4, 8, 24, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v351:
+    block_config: [4, 8, 24, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v352:
+    block_config: [4, 8, 32, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v353:
+    block_config: [4, 8, 32, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v354:
+    block_config: [4, 8, 32, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v355:
+    block_config: [4, 8, 32, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v356:
+    block_config: [4, 8, 32, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v357:
+    block_config: [4, 8, 32, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v358:
+    block_config: [4, 8, 32, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v359:
+    block_config: [4, 8, 32, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v360:
+    block_config: [4, 8, 32, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v361:
+    block_config: [4, 8, 32, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v362:
+    block_config: [4, 8, 32, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v363:
+    block_config: [4, 8, 32, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v364:
+    block_config: [4, 8, 32, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v365:
+    block_config: [4, 8, 32, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v366:
+    block_config: [4, 8, 32, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v367:
+    block_config: [4, 8, 32, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v368:
+    block_config: [4, 8, 32, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v369:
+    block_config: [4, 8, 32, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v370:
+    block_config: [4, 8, 32, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v371:
+    block_config: [4, 8, 32, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v372:
+    block_config: [4, 8, 32, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v373:
+    block_config: [4, 8, 32, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v374:
+    block_config: [4, 8, 32, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v375:
+    block_config: [4, 8, 32, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v376:
+    block_config: [4, 8, 32, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v377:
+    block_config: [4, 8, 32, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v378:
+    block_config: [4, 8, 32, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v379:
+    block_config: [4, 8, 36, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v380:
+    block_config: [4, 8, 36, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v381:
+    block_config: [4, 8, 36, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v382:
+    block_config: [4, 8, 36, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v383:
+    block_config: [4, 8, 36, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v384:
+    block_config: [4, 8, 36, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v385:
+    block_config: [4, 8, 36, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v386:
+    block_config: [4, 8, 36, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v387:
+    block_config: [4, 8, 36, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v388:
+    block_config: [4, 8, 36, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v389:
+    block_config: [4, 8, 36, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v390:
+    block_config: [4, 8, 36, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v391:
+    block_config: [4, 8, 36, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v392:
+    block_config: [4, 8, 36, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v393:
+    block_config: [4, 8, 36, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v394:
+    block_config: [4, 8, 36, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v395:
+    block_config: [4, 8, 36, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v396:
+    block_config: [4, 8, 36, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v397:
+    block_config: [4, 8, 36, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v398:
+    block_config: [4, 8, 36, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v399:
+    block_config: [4, 8, 36, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v400:
+    block_config: [4, 8, 36, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v401:
+    block_config: [4, 8, 36, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v402:
+    block_config: [4, 8, 36, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v403:
+    block_config: [4, 8, 36, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v404:
+    block_config: [4, 8, 36, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v405:
+    block_config: [4, 8, 36, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v406:
+    block_config: [4, 8, 48, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v407:
+    block_config: [4, 8, 48, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v408:
+    block_config: [4, 8, 48, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v409:
+    block_config: [4, 8, 48, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v410:
+    block_config: [4, 8, 48, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v411:
+    block_config: [4, 8, 48, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v412:
+    block_config: [4, 8, 48, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v413:
+    block_config: [4, 8, 48, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v414:
+    block_config: [4, 8, 48, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v415:
+    block_config: [4, 8, 48, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v416:
+    block_config: [4, 8, 48, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v417:
+    block_config: [4, 8, 48, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v418:
+    block_config: [4, 8, 48, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v419:
+    block_config: [4, 8, 48, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v420:
+    block_config: [4, 8, 48, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v421:
+    block_config: [4, 8, 48, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v422:
+    block_config: [4, 8, 48, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v423:
+    block_config: [4, 8, 48, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v424:
+    block_config: [4, 8, 48, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v425:
+    block_config: [4, 8, 48, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v426:
+    block_config: [4, 8, 48, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v427:
+    block_config: [4, 8, 48, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v428:
+    block_config: [4, 8, 48, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v429:
+    block_config: [4, 8, 48, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v430:
+    block_config: [4, 8, 48, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v431:
+    block_config: [4, 8, 48, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v432:
+    block_config: [4, 8, 48, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v433:
+    block_config: [4, 10, 24, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v434:
+    block_config: [4, 10, 24, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v435:
+    block_config: [4, 10, 24, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v436:
+    block_config: [4, 10, 24, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v437:
+    block_config: [4, 10, 24, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v438:
+    block_config: [4, 10, 24, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v439:
+    block_config: [4, 10, 24, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v440:
+    block_config: [4, 10, 24, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v441:
+    block_config: [4, 10, 24, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v442:
+    block_config: [4, 10, 24, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v443:
+    block_config: [4, 10, 24, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v444:
+    block_config: [4, 10, 24, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v445:
+    block_config: [4, 10, 24, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v446:
+    block_config: [4, 10, 24, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v447:
+    block_config: [4, 10, 24, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v448:
+    block_config: [4, 10, 24, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v449:
+    block_config: [4, 10, 24, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v450:
+    block_config: [4, 10, 24, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v451:
+    block_config: [4, 10, 24, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v452:
+    block_config: [4, 10, 24, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v453:
+    block_config: [4, 10, 24, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v454:
+    block_config: [4, 10, 24, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v455:
+    block_config: [4, 10, 24, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v456:
+    block_config: [4, 10, 24, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v457:
+    block_config: [4, 10, 24, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v458:
+    block_config: [4, 10, 24, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v459:
+    block_config: [4, 10, 24, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v460:
+    block_config: [4, 10, 32, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v461:
+    block_config: [4, 10, 32, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v462:
+    block_config: [4, 10, 32, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v463:
+    block_config: [4, 10, 32, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v464:
+    block_config: [4, 10, 32, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v465:
+    block_config: [4, 10, 32, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v466:
+    block_config: [4, 10, 32, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v467:
+    block_config: [4, 10, 32, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v468:
+    block_config: [4, 10, 32, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v469:
+    block_config: [4, 10, 32, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v470:
+    block_config: [4, 10, 32, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v471:
+    block_config: [4, 10, 32, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v472:
+    block_config: [4, 10, 32, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v473:
+    block_config: [4, 10, 32, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v474:
+    block_config: [4, 10, 32, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v475:
+    block_config: [4, 10, 32, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v476:
+    block_config: [4, 10, 32, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v477:
+    block_config: [4, 10, 32, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v478:
+    block_config: [4, 10, 32, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v479:
+    block_config: [4, 10, 32, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v480:
+    block_config: [4, 10, 32, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v481:
+    block_config: [4, 10, 32, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v482:
+    block_config: [4, 10, 32, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v483:
+    block_config: [4, 10, 32, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v484:
+    block_config: [4, 10, 32, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v485:
+    block_config: [4, 10, 32, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v486:
+    block_config: [4, 10, 32, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v487:
+    block_config: [4, 10, 36, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v488:
+    block_config: [4, 10, 36, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v489:
+    block_config: [4, 10, 36, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v490:
+    block_config: [4, 10, 36, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v491:
+    block_config: [4, 10, 36, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v492:
+    block_config: [4, 10, 36, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v493:
+    block_config: [4, 10, 36, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v494:
+    block_config: [4, 10, 36, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v495:
+    block_config: [4, 10, 36, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v496:
+    block_config: [4, 10, 36, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v497:
+    block_config: [4, 10, 36, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v498:
+    block_config: [4, 10, 36, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v499:
+    block_config: [4, 10, 36, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v500:
+    block_config: [4, 10, 36, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v501:
+    block_config: [4, 10, 36, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v502:
+    block_config: [4, 10, 36, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v503:
+    block_config: [4, 10, 36, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v504:
+    block_config: [4, 10, 36, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v505:
+    block_config: [4, 10, 36, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v506:
+    block_config: [4, 10, 36, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v507:
+    block_config: [4, 10, 36, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v508:
+    block_config: [4, 10, 36, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v509:
+    block_config: [4, 10, 36, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v510:
+    block_config: [4, 10, 36, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v511:
+    block_config: [4, 10, 36, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v512:
+    block_config: [4, 10, 36, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v513:
+    block_config: [4, 10, 36, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v514:
+    block_config: [4, 10, 48, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v515:
+    block_config: [4, 10, 48, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v516:
+    block_config: [4, 10, 48, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v517:
+    block_config: [4, 10, 48, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v518:
+    block_config: [4, 10, 48, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v519:
+    block_config: [4, 10, 48, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v520:
+    block_config: [4, 10, 48, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v521:
+    block_config: [4, 10, 48, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v522:
+    block_config: [4, 10, 48, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v523:
+    block_config: [4, 10, 48, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v524:
+    block_config: [4, 10, 48, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v525:
+    block_config: [4, 10, 48, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v526:
+    block_config: [4, 10, 48, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v527:
+    block_config: [4, 10, 48, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v528:
+    block_config: [4, 10, 48, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v529:
+    block_config: [4, 10, 48, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v530:
+    block_config: [4, 10, 48, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v531:
+    block_config: [4, 10, 48, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v532:
+    block_config: [4, 10, 48, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v533:
+    block_config: [4, 10, 48, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v534:
+    block_config: [4, 10, 48, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v535:
+    block_config: [4, 10, 48, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v536:
+    block_config: [4, 10, 48, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v537:
+    block_config: [4, 10, 48, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v538:
+    block_config: [4, 10, 48, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v539:
+    block_config: [4, 10, 48, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v540:
+    block_config: [4, 10, 48, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v541:
+    block_config: [4, 12, 24, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v542:
+    block_config: [4, 12, 24, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v543:
+    block_config: [4, 12, 24, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v544:
+    block_config: [4, 12, 24, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v545:
+    block_config: [4, 12, 24, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v546:
+    block_config: [4, 12, 24, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v547:
+    block_config: [4, 12, 24, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v548:
+    block_config: [4, 12, 24, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v549:
+    block_config: [4, 12, 24, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v550:
+    block_config: [4, 12, 24, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v551:
+    block_config: [4, 12, 24, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v552:
+    block_config: [4, 12, 24, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v553:
+    block_config: [4, 12, 24, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v554:
+    block_config: [4, 12, 24, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v555:
+    block_config: [4, 12, 24, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v556:
+    block_config: [4, 12, 24, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v557:
+    block_config: [4, 12, 24, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v558:
+    block_config: [4, 12, 24, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v559:
+    block_config: [4, 12, 24, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v560:
+    block_config: [4, 12, 24, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v561:
+    block_config: [4, 12, 24, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v562:
+    block_config: [4, 12, 24, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v563:
+    block_config: [4, 12, 24, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v564:
+    block_config: [4, 12, 24, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v565:
+    block_config: [4, 12, 24, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v566:
+    block_config: [4, 12, 24, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v567:
+    block_config: [4, 12, 24, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v568:
+    block_config: [4, 12, 32, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v569:
+    block_config: [4, 12, 32, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v570:
+    block_config: [4, 12, 32, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v571:
+    block_config: [4, 12, 32, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v572:
+    block_config: [4, 12, 32, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v573:
+    block_config: [4, 12, 32, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v574:
+    block_config: [4, 12, 32, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v575:
+    block_config: [4, 12, 32, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v576:
+    block_config: [4, 12, 32, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v577:
+    block_config: [4, 12, 32, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v578:
+    block_config: [4, 12, 32, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v579:
+    block_config: [4, 12, 32, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v580:
+    block_config: [4, 12, 32, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v581:
+    block_config: [4, 12, 32, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v582:
+    block_config: [4, 12, 32, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v583:
+    block_config: [4, 12, 32, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v584:
+    block_config: [4, 12, 32, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v585:
+    block_config: [4, 12, 32, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v586:
+    block_config: [4, 12, 32, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v587:
+    block_config: [4, 12, 32, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v588:
+    block_config: [4, 12, 32, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v589:
+    block_config: [4, 12, 32, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v590:
+    block_config: [4, 12, 32, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v591:
+    block_config: [4, 12, 32, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v592:
+    block_config: [4, 12, 32, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v593:
+    block_config: [4, 12, 32, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v594:
+    block_config: [4, 12, 32, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v595:
+    block_config: [4, 12, 36, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v596:
+    block_config: [4, 12, 36, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v597:
+    block_config: [4, 12, 36, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v598:
+    block_config: [4, 12, 36, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v599:
+    block_config: [4, 12, 36, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v600:
+    block_config: [4, 12, 36, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v601:
+    block_config: [4, 12, 36, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v602:
+    block_config: [4, 12, 36, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v603:
+    block_config: [4, 12, 36, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v604:
+    block_config: [4, 12, 36, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v605:
+    block_config: [4, 12, 36, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v606:
+    block_config: [4, 12, 36, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v607:
+    block_config: [4, 12, 36, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v608:
+    block_config: [4, 12, 36, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v609:
+    block_config: [4, 12, 36, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v610:
+    block_config: [4, 12, 36, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v611:
+    block_config: [4, 12, 36, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v612:
+    block_config: [4, 12, 36, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v613:
+    block_config: [4, 12, 36, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v614:
+    block_config: [4, 12, 36, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v615:
+    block_config: [4, 12, 36, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v616:
+    block_config: [4, 12, 36, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v617:
+    block_config: [4, 12, 36, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v618:
+    block_config: [4, 12, 36, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v619:
+    block_config: [4, 12, 36, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v620:
+    block_config: [4, 12, 36, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v621:
+    block_config: [4, 12, 36, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v622:
+    block_config: [4, 12, 48, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v623:
+    block_config: [4, 12, 48, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v624:
+    block_config: [4, 12, 48, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v625:
+    block_config: [4, 12, 48, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v626:
+    block_config: [4, 12, 48, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v627:
+    block_config: [4, 12, 48, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v628:
+    block_config: [4, 12, 48, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v629:
+    block_config: [4, 12, 48, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v630:
+    block_config: [4, 12, 48, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v631:
+    block_config: [4, 12, 48, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v632:
+    block_config: [4, 12, 48, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v633:
+    block_config: [4, 12, 48, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v634:
+    block_config: [4, 12, 48, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v635:
+    block_config: [4, 12, 48, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v636:
+    block_config: [4, 12, 48, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v637:
+    block_config: [4, 12, 48, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v638:
+    block_config: [4, 12, 48, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v639:
+    block_config: [4, 12, 48, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v640:
+    block_config: [4, 12, 48, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v641:
+    block_config: [4, 12, 48, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v642:
+    block_config: [4, 12, 48, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v643:
+    block_config: [4, 12, 48, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v644:
+    block_config: [4, 12, 48, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v645:
+    block_config: [4, 12, 48, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v646:
+    block_config: [4, 12, 48, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v647:
+    block_config: [4, 12, 48, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v648:
+    block_config: [4, 12, 48, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v649:
+    block_config: [6, 8, 24, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v650:
+    block_config: [6, 8, 24, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v651:
+    block_config: [6, 8, 24, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v652:
+    block_config: [6, 8, 24, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v653:
+    block_config: [6, 8, 24, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v654:
+    block_config: [6, 8, 24, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v655:
+    block_config: [6, 8, 24, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v656:
+    block_config: [6, 8, 24, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v657:
+    block_config: [6, 8, 24, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v658:
+    block_config: [6, 8, 24, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v659:
+    block_config: [6, 8, 24, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v660:
+    block_config: [6, 8, 24, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v661:
+    block_config: [6, 8, 24, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v662:
+    block_config: [6, 8, 24, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v663:
+    block_config: [6, 8, 24, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v664:
+    block_config: [6, 8, 24, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v665:
+    block_config: [6, 8, 24, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v666:
+    block_config: [6, 8, 24, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v667:
+    block_config: [6, 8, 24, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v668:
+    block_config: [6, 8, 24, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v669:
+    block_config: [6, 8, 24, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v670:
+    block_config: [6, 8, 24, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v671:
+    block_config: [6, 8, 24, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v672:
+    block_config: [6, 8, 24, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v673:
+    block_config: [6, 8, 24, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v674:
+    block_config: [6, 8, 24, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v675:
+    block_config: [6, 8, 24, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v676:
+    block_config: [6, 8, 32, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v677:
+    block_config: [6, 8, 32, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v678:
+    block_config: [6, 8, 32, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v679:
+    block_config: [6, 8, 32, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v680:
+    block_config: [6, 8, 32, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v681:
+    block_config: [6, 8, 32, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v682:
+    block_config: [6, 8, 32, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v683:
+    block_config: [6, 8, 32, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v684:
+    block_config: [6, 8, 32, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v685:
+    block_config: [6, 8, 32, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v686:
+    block_config: [6, 8, 32, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v687:
+    block_config: [6, 8, 32, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v688:
+    block_config: [6, 8, 32, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v689:
+    block_config: [6, 8, 32, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v690:
+    block_config: [6, 8, 32, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v691:
+    block_config: [6, 8, 32, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v692:
+    block_config: [6, 8, 32, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v693:
+    block_config: [6, 8, 32, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v694:
+    block_config: [6, 8, 32, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v695:
+    block_config: [6, 8, 32, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v696:
+    block_config: [6, 8, 32, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v697:
+    block_config: [6, 8, 32, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v698:
+    block_config: [6, 8, 32, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v699:
+    block_config: [6, 8, 32, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v700:
+    block_config: [6, 8, 32, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v701:
+    block_config: [6, 8, 32, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v702:
+    block_config: [6, 8, 32, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v703:
+    block_config: [6, 8, 36, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v704:
+    block_config: [6, 8, 36, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v705:
+    block_config: [6, 8, 36, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v706:
+    block_config: [6, 8, 36, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v707:
+    block_config: [6, 8, 36, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v708:
+    block_config: [6, 8, 36, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v709:
+    block_config: [6, 8, 36, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v710:
+    block_config: [6, 8, 36, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v711:
+    block_config: [6, 8, 36, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v712:
+    block_config: [6, 8, 36, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v713:
+    block_config: [6, 8, 36, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v714:
+    block_config: [6, 8, 36, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v715:
+    block_config: [6, 8, 36, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v716:
+    block_config: [6, 8, 36, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v717:
+    block_config: [6, 8, 36, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v718:
+    block_config: [6, 8, 36, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v719:
+    block_config: [6, 8, 36, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v720:
+    block_config: [6, 8, 36, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v721:
+    block_config: [6, 8, 36, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v722:
+    block_config: [6, 8, 36, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v723:
+    block_config: [6, 8, 36, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v724:
+    block_config: [6, 8, 36, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v725:
+    block_config: [6, 8, 36, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v726:
+    block_config: [6, 8, 36, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v727:
+    block_config: [6, 8, 36, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v728:
+    block_config: [6, 8, 36, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v729:
+    block_config: [6, 8, 36, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v730:
+    block_config: [6, 8, 48, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v731:
+    block_config: [6, 8, 48, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v732:
+    block_config: [6, 8, 48, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v733:
+    block_config: [6, 8, 48, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v734:
+    block_config: [6, 8, 48, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v735:
+    block_config: [6, 8, 48, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v736:
+    block_config: [6, 8, 48, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v737:
+    block_config: [6, 8, 48, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v738:
+    block_config: [6, 8, 48, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v739:
+    block_config: [6, 8, 48, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v740:
+    block_config: [6, 8, 48, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v741:
+    block_config: [6, 8, 48, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v742:
+    block_config: [6, 8, 48, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v743:
+    block_config: [6, 8, 48, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v744:
+    block_config: [6, 8, 48, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v745:
+    block_config: [6, 8, 48, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v746:
+    block_config: [6, 8, 48, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v747:
+    block_config: [6, 8, 48, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v748:
+    block_config: [6, 8, 48, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v749:
+    block_config: [6, 8, 48, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v750:
+    block_config: [6, 8, 48, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v751:
+    block_config: [6, 8, 48, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v752:
+    block_config: [6, 8, 48, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v753:
+    block_config: [6, 8, 48, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v754:
+    block_config: [6, 8, 48, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v755:
+    block_config: [6, 8, 48, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v756:
+    block_config: [6, 8, 48, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v757:
+    block_config: [6, 10, 24, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v758:
+    block_config: [6, 10, 24, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v759:
+    block_config: [6, 10, 24, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v760:
+    block_config: [6, 10, 24, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v761:
+    block_config: [6, 10, 24, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v762:
+    block_config: [6, 10, 24, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v763:
+    block_config: [6, 10, 24, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v764:
+    block_config: [6, 10, 24, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v765:
+    block_config: [6, 10, 24, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v766:
+    block_config: [6, 10, 24, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v767:
+    block_config: [6, 10, 24, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v768:
+    block_config: [6, 10, 24, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v769:
+    block_config: [6, 10, 24, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v770:
+    block_config: [6, 10, 24, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v771:
+    block_config: [6, 10, 24, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v772:
+    block_config: [6, 10, 24, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v773:
+    block_config: [6, 10, 24, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v774:
+    block_config: [6, 10, 24, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v775:
+    block_config: [6, 10, 24, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v776:
+    block_config: [6, 10, 24, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v777:
+    block_config: [6, 10, 24, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v778:
+    block_config: [6, 10, 24, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v779:
+    block_config: [6, 10, 24, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v780:
+    block_config: [6, 10, 24, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v781:
+    block_config: [6, 10, 24, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v782:
+    block_config: [6, 10, 24, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v783:
+    block_config: [6, 10, 24, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v784:
+    block_config: [6, 10, 32, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v785:
+    block_config: [6, 10, 32, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v786:
+    block_config: [6, 10, 32, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v787:
+    block_config: [6, 10, 32, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v788:
+    block_config: [6, 10, 32, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v789:
+    block_config: [6, 10, 32, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v790:
+    block_config: [6, 10, 32, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v791:
+    block_config: [6, 10, 32, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v792:
+    block_config: [6, 10, 32, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v793:
+    block_config: [6, 10, 32, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v794:
+    block_config: [6, 10, 32, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v795:
+    block_config: [6, 10, 32, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v796:
+    block_config: [6, 10, 32, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v797:
+    block_config: [6, 10, 32, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v798:
+    block_config: [6, 10, 32, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v799:
+    block_config: [6, 10, 32, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v800:
+    block_config: [6, 10, 32, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v801:
+    block_config: [6, 10, 32, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v802:
+    block_config: [6, 10, 32, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v803:
+    block_config: [6, 10, 32, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v804:
+    block_config: [6, 10, 32, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v805:
+    block_config: [6, 10, 32, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v806:
+    block_config: [6, 10, 32, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v807:
+    block_config: [6, 10, 32, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v808:
+    block_config: [6, 10, 32, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v809:
+    block_config: [6, 10, 32, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v810:
+    block_config: [6, 10, 32, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v811:
+    block_config: [6, 10, 36, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v812:
+    block_config: [6, 10, 36, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v813:
+    block_config: [6, 10, 36, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v814:
+    block_config: [6, 10, 36, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v815:
+    block_config: [6, 10, 36, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v816:
+    block_config: [6, 10, 36, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v817:
+    block_config: [6, 10, 36, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v818:
+    block_config: [6, 10, 36, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v819:
+    block_config: [6, 10, 36, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v820:
+    block_config: [6, 10, 36, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v821:
+    block_config: [6, 10, 36, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v822:
+    block_config: [6, 10, 36, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v823:
+    block_config: [6, 10, 36, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v824:
+    block_config: [6, 10, 36, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v825:
+    block_config: [6, 10, 36, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v826:
+    block_config: [6, 10, 36, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v827:
+    block_config: [6, 10, 36, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v828:
+    block_config: [6, 10, 36, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v829:
+    block_config: [6, 10, 36, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v830:
+    block_config: [6, 10, 36, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v831:
+    block_config: [6, 10, 36, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v832:
+    block_config: [6, 10, 36, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v833:
+    block_config: [6, 10, 36, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v834:
+    block_config: [6, 10, 36, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v835:
+    block_config: [6, 10, 36, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v836:
+    block_config: [6, 10, 36, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v837:
+    block_config: [6, 10, 36, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v838:
+    block_config: [6, 10, 48, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v839:
+    block_config: [6, 10, 48, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v840:
+    block_config: [6, 10, 48, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v841:
+    block_config: [6, 10, 48, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v842:
+    block_config: [6, 10, 48, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v843:
+    block_config: [6, 10, 48, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v844:
+    block_config: [6, 10, 48, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v845:
+    block_config: [6, 10, 48, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v846:
+    block_config: [6, 10, 48, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v847:
+    block_config: [6, 10, 48, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v848:
+    block_config: [6, 10, 48, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v849:
+    block_config: [6, 10, 48, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v850:
+    block_config: [6, 10, 48, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v851:
+    block_config: [6, 10, 48, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v852:
+    block_config: [6, 10, 48, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v853:
+    block_config: [6, 10, 48, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v854:
+    block_config: [6, 10, 48, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v855:
+    block_config: [6, 10, 48, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v856:
+    block_config: [6, 10, 48, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v857:
+    block_config: [6, 10, 48, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v858:
+    block_config: [6, 10, 48, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v859:
+    block_config: [6, 10, 48, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v860:
+    block_config: [6, 10, 48, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v861:
+    block_config: [6, 10, 48, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v862:
+    block_config: [6, 10, 48, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v863:
+    block_config: [6, 10, 48, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v864:
+    block_config: [6, 10, 48, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v865:
+    block_config: [6, 12, 24, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v866:
+    block_config: [6, 12, 24, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v867:
+    block_config: [6, 12, 24, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v868:
+    block_config: [6, 12, 24, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v869:
+    block_config: [6, 12, 24, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v870:
+    block_config: [6, 12, 24, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v871:
+    block_config: [6, 12, 24, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v872:
+    block_config: [6, 12, 24, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v873:
+    block_config: [6, 12, 24, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v874:
+    block_config: [6, 12, 24, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v875:
+    block_config: [6, 12, 24, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v876:
+    block_config: [6, 12, 24, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v877:
+    block_config: [6, 12, 24, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v878:
+    block_config: [6, 12, 24, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v879:
+    block_config: [6, 12, 24, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v880:
+    block_config: [6, 12, 24, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v881:
+    block_config: [6, 12, 24, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v882:
+    block_config: [6, 12, 24, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v883:
+    block_config: [6, 12, 24, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v884:
+    block_config: [6, 12, 24, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v885:
+    block_config: [6, 12, 24, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v886:
+    block_config: [6, 12, 24, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v887:
+    block_config: [6, 12, 24, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v888:
+    block_config: [6, 12, 24, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v889:
+    block_config: [6, 12, 24, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v890:
+    block_config: [6, 12, 24, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v891:
+    block_config: [6, 12, 24, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v892:
+    block_config: [6, 12, 32, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v893:
+    block_config: [6, 12, 32, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v894:
+    block_config: [6, 12, 32, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v895:
+    block_config: [6, 12, 32, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v896:
+    block_config: [6, 12, 32, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v897:
+    block_config: [6, 12, 32, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v898:
+    block_config: [6, 12, 32, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v899:
+    block_config: [6, 12, 32, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v900:
+    block_config: [6, 12, 32, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v901:
+    block_config: [6, 12, 32, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v902:
+    block_config: [6, 12, 32, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v903:
+    block_config: [6, 12, 32, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v904:
+    block_config: [6, 12, 32, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v905:
+    block_config: [6, 12, 32, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v906:
+    block_config: [6, 12, 32, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v907:
+    block_config: [6, 12, 32, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v908:
+    block_config: [6, 12, 32, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v909:
+    block_config: [6, 12, 32, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v910:
+    block_config: [6, 12, 32, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v911:
+    block_config: [6, 12, 32, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v912:
+    block_config: [6, 12, 32, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v913:
+    block_config: [6, 12, 32, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v914:
+    block_config: [6, 12, 32, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v915:
+    block_config: [6, 12, 32, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v916:
+    block_config: [6, 12, 32, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v917:
+    block_config: [6, 12, 32, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v918:
+    block_config: [6, 12, 32, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v919:
+    block_config: [6, 12, 36, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v920:
+    block_config: [6, 12, 36, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v921:
+    block_config: [6, 12, 36, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v922:
+    block_config: [6, 12, 36, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v923:
+    block_config: [6, 12, 36, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v924:
+    block_config: [6, 12, 36, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v925:
+    block_config: [6, 12, 36, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v926:
+    block_config: [6, 12, 36, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v927:
+    block_config: [6, 12, 36, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v928:
+    block_config: [6, 12, 36, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v929:
+    block_config: [6, 12, 36, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v930:
+    block_config: [6, 12, 36, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v931:
+    block_config: [6, 12, 36, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v932:
+    block_config: [6, 12, 36, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v933:
+    block_config: [6, 12, 36, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v934:
+    block_config: [6, 12, 36, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v935:
+    block_config: [6, 12, 36, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v936:
+    block_config: [6, 12, 36, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v937:
+    block_config: [6, 12, 36, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v938:
+    block_config: [6, 12, 36, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v939:
+    block_config: [6, 12, 36, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v940:
+    block_config: [6, 12, 36, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v941:
+    block_config: [6, 12, 36, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v942:
+    block_config: [6, 12, 36, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v943:
+    block_config: [6, 12, 36, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v944:
+    block_config: [6, 12, 36, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v945:
+    block_config: [6, 12, 36, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v946:
+    block_config: [6, 12, 48, 16]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v947:
+    block_config: [6, 12, 48, 16]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v948:
+    block_config: [6, 12, 48, 16]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v949:
+    block_config: [6, 12, 48, 16]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v950:
+    block_config: [6, 12, 48, 16]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v951:
+    block_config: [6, 12, 48, 16]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v952:
+    block_config: [6, 12, 48, 16]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v953:
+    block_config: [6, 12, 48, 16]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v954:
+    block_config: [6, 12, 48, 16]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v955:
+    block_config: [6, 12, 48, 24]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v956:
+    block_config: [6, 12, 48, 24]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v957:
+    block_config: [6, 12, 48, 24]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v958:
+    block_config: [6, 12, 48, 24]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v959:
+    block_config: [6, 12, 48, 24]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v960:
+    block_config: [6, 12, 48, 24]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v961:
+    block_config: [6, 12, 48, 24]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v962:
+    block_config: [6, 12, 48, 24]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v963:
+    block_config: [6, 12, 48, 24]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v964:
+    block_config: [6, 12, 48, 32]
+    growth_rate: 16
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v965:
+    block_config: [6, 12, 48, 32]
+    growth_rate: 16
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v966:
+    block_config: [6, 12, 48, 32]
+    growth_rate: 16
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v967:
+    block_config: [6, 12, 48, 32]
+    growth_rate: 32
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v968:
+    block_config: [6, 12, 48, 32]
+    growth_rate: 32
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v969:
+    block_config: [6, 12, 48, 32]
+    growth_rate: 32
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v970:
+    block_config: [6, 12, 48, 32]
+    growth_rate: 48
+    num_init_features: 32
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v971:
+    block_config: [6, 12, 48, 32]
+    growth_rate: 48
+    num_init_features: 64
+    hidden_dim: 2048
+    out_features: 128
+
+densenet_v972:
+    block_config: [6, 12, 48, 32]
+    growth_rate: 48
+    num_init_features: 96
+    hidden_dim: 2048
+    out_features: 128
