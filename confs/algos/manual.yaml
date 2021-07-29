@@ -3,17 +3,20 @@ __include__: 'darts.yaml' # just use darts defaults
 
 nas:
   eval:
-    model_factory_spec: 'resnet18'
+    model_factory_spec: 'resnet50'
 
     #darts loader/trainer
     loader:
-      train_batch: 128 #96
-      cutout: 0
+      train_batch: 32 #96
+      test_batch: 32
+      cutout: 96
+      img_size: 224
+      aug: 'autoaug_cifar10'
     trainer:
+      batch_chunks: 1
       aux_weight: 0.0
-      grad_clip: 0.0
       drop_path_prob: 0.0 # probability that given edge will be dropped
-      epochs: 200
+      epochs: 400
       optimizer:
         type: 'sgd'
         lr: 0.0333 #0.025 # init learning rate
