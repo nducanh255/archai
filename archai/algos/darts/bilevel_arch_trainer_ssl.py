@@ -69,15 +69,17 @@ class BilevelArchTrainerSimClr(ArchTrainerSimClr):
         del self._val_dl
         del self._valid_iter # clean up
         super().post_epoch(data_loaders, epoch)
-        if self.epoch_model_desc['freq']>0 and (epoch+1)%self.epoch_model_desc['freq']==0 and utils.is_main_process():
+        if self.epoch_model_desc['freq']>0 and ((epoch+1)%self.epoch_model_desc['freq'])==0 and self._apex.is_master():
+            print('Saving model desc in master process..')
             if self._apex.is_dist():
-                model_desc = self.model.module.finalizers.finalize_model(self.model.module)
+                model_copy = copy.deepcopy(self.model.module)
             else:
-                model_desc = self.model.finalizers.finalize_model(self.model)
+                model_copy = copy.deepcopy(self.model)
+            model_desc = model_copy.finalizers.finalize_model(model_copy)
             filename, savedir = self.epoch_model_desc['filename'], utils.full_path(self.epoch_model_desc['savedir'])
-            os.makedirs(savedir,exist_ok=True)
             desc_filename = os.path.join(savedir,f'{filename}_{epoch+1}.yaml')
             model_desc.save(desc_filename)
+            print('Saved model desc in master process')
         
 
     @overrides

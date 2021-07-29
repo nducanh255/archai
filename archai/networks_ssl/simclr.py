@@ -86,3 +86,16 @@ class ModelSimCLRDenseNet(nn.Module):
         h = self.backbone(x)[-1]
         z = self.projection(h)
         return z
+
+class ModelSimCLRMobileNet(nn.Module):
+    
+    def __init__(self, dataset: str, hidden_dim: int, out_features:int, **kwargs: Any):
+        super(ModelSimCLRMobileNet, self).__init__()
+        self.backbone = _densenet(dataset, **kwargs)
+        input_dim = self.backbone.output_features
+        self.projection = Projection(input_dim, hidden_dim, out_features)
+
+    def forward(self, x):
+        h = self.backbone(x)[-1]
+        z = self.projection(h)
+        return z

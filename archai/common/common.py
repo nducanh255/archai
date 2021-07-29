@@ -51,6 +51,9 @@ def get_conf_common(conf:Optional[Config]=None)->Config:
 def get_conf_dataset(conf:Optional[Config]=None)->Config:
     return get_conf(conf)['dataset']
 
+def get_conf_search(conf:Optional[Config]=None)->Config:
+    return get_conf(conf)['nas']['search']
+
 def get_experiment_name(conf:Optional[Config]=None)->str:
     return get_conf_common(conf)['experiment_name']
 
@@ -244,6 +247,7 @@ def _update_conf(conf:Config)->None:
 
     conf_common = get_conf_common(conf)
     conf_dataset = get_conf_dataset(conf)
+
     experiment_name = conf_common['experiment_name']
 
     # make sure dataroot exists
@@ -321,6 +325,12 @@ def create_dirs(conf:Config, clean_expdir:bool)->Optional[str]:
                  # create info file for current system
                  'PT_DATA_DIR': pt_data_dir, 'PT_OUTPUT_DIR': pt_output_dir})
 
+def create_epoch_desc_dir(conf:Config)->None:
+    conf_common = get_conf_common(conf)
+    conf_search = get_conf_search(conf)
+    epoch_desc_dir = utils.full_path(conf_search['epoch_model_desc']['savedir'])
+    os.makedirs(epoch_desc_dir, exist_ok=True)
+    
 def create_intermediate_dirs(conf:Config)->None:
     conf_common = get_conf_common(conf)
     conf_checkpoint = conf_common['checkpoint']

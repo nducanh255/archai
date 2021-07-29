@@ -210,7 +210,7 @@ class TrainerSimClr(EnforceOverrides):
         if self._checkpoint is not None and self._apex.is_master() and \
             self._checkpoint.freq > 0 and (self._metrics.epochs() % self._checkpoint.freq == 0 or \
                     self._metrics.epochs() >= self._epochs):
-            
+            print('Running save checkpoint in master process')
             best_train = self._checkpoint["trainer_best_train"] \
                         if "trainer_best_train" in self._checkpoint.data.keys() else None
             best_val = self._checkpoint["trainer_best_val"] \
@@ -221,7 +221,9 @@ class TrainerSimClr(EnforceOverrides):
             if best_val:
                 self._checkpoint["trainer_best_val"] = best_val
             self._checkpoint["epoch"] = epoch
+            print('Updating best checkpoint values')
             self.update_checkpoint(self._checkpoint)
+            print('Saving best checkpoint')
             self._checkpoint.commit()
 
     def pre_step(self, xi:Tensor, xj:Tensor)->None:

@@ -74,6 +74,7 @@ class DartsExperimentRunnerSimClr(ExperimentRunner):
             conf = common.common_init(config_filepath=config_filename,
                 param_args=['--common.experiment_name', self.get_expname(is_search_or_eval),
                             ], clean_expdir=clean_expdir)
+            common.create_epoch_desc_dir(conf)
             print('Running main process')
         else:
             conf = common.create_conf(config_filepath=config_filename,
