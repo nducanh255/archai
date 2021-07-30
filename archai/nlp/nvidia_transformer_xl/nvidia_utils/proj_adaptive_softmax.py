@@ -97,11 +97,15 @@ class ProjectedAdaptiveLogSoftmax(nn.Module):
 
         self.keep_order = keep_order
 
+        self.flops = 0
+
     def _compute_logit(self, hidden, weight, bias, proj):
         if proj is None:
             logit = F.linear(hidden, weight, bias=bias)
+            self.flops += torch.prod(torch.tensor(logit.size())) * hidden.size(-1)
         else:
             logit = torch.einsum('bd,de,ev->bv', (hidden, proj, weight.t()))
+            self.flops += hidden.size(0) * (torch.prod(torch.tensor(proj.size())) + torch.prod(torch.tensor(weight.size())))
             if bias is not None:
                 logit = logit + bias
         return logit
@@ -193,7 +197,7 @@ class ProjectedAdaptiveLogSoftmax(nn.Module):
 
         return nll
 
-    def _get_full_log_prob(self, input, head_output, weights, biases):
+    def _get_full_log_prob(self, input, head_output, weights, biases, projs):
         """ Given input tensor, and output of `self.head`,
         compute the log of the full distribution """
 
@@ -203,7 +207,7 @@ class ProjectedAdaptiveLogSoftmax(nn.Module):
         out[:, :self.shortlist_size] = head_logprob[:, :self.shortlist_size]
 
         for i, (start_idx, stop_idx) in enumerate(zip(self.cutoffs, self.cutoffs[1:])):
-            weight_i, bias_i, proj_i = weights[i], biases[i], self.get_out_proj(i)
+            weight_i, bias_i, proj_i = weights[i], biases[i], projs[i]
             cluster_output = self._compute_logit(input, weight_i, bias_i, proj_i) #self.tail[i](input)
             cluster_logprob = F.log_softmax(cluster_output, dim=1)
             output_logprob = cluster_logprob + head_logprob[:, self.shortlist_size + i].unsqueeze(1)
@@ -212,56 +216,55 @@ class ProjectedAdaptiveLogSoftmax(nn.Module):
 
         return out
 
-# provides a full log probability over the entire vocab
-def predict(self, hidden, target, keep_order=False):
-    '''
-        hidden :: [len*bsz x d_proj]
-        target :: [len*bsz]
-    '''
-    if hidden.size(0) != target.size(0):
-        raise RuntimeError('Input and target should have the same size '
-                            'in the batch dimension.')
+    # provides a full log probability over the entire vocab
+    def predict(self, hidden, target=None, keep_order=False):
+        '''
+            hidden :: [len*bsz x d_proj]
+        '''
+        self.flops = 0
 
-    if self.n_clusters == 0:
-        logit = self._compute_logit(hidden, self.out_layers_weights[0], self.out_layers_biases[0], self.get_out_proj(0))
-        output = torch.argmax(logit, dim=1)
-    else:
-        # construct weights and biases
-        weights, biases = [], []
-        for i in range(len(self.cutoffs)):
-            if self.div_val == 1:
-                l_idx, r_idx = self.cutoff_ends[i], self.cutoff_ends[i + 1]
-                weight_i = self.out_layers_weights[0][l_idx:r_idx]
-                bias_i = self.out_layers_biases[0][l_idx:r_idx]
-            else:
-                weight_i = self.out_layers_weights[i]
-                bias_i = self.out_layers_biases[i]
-
-            if i == 0:
-                weight_i = torch.cat([weight_i, self.cluster_weight], dim=0)
-                bias_i = torch.cat([bias_i, self.cluster_bias], dim=0)
-
-            weights.append(weight_i)
-            biases.append(bias_i)
-
-        head_weight, head_bias, head_proj = weights[0], biases[0], self.get_out_proj(0)
-        head_logit = self._compute_logit(hidden, head_weight, head_bias, head_proj)
-        # print('####', hidden.size(), head_logit.size())
-        
-        log_prob = self._get_full_log_prob(hidden, head_logit, weights[1:], biases[1:])
-        # print('####', log_prob.size())
-        
-        output = torch.argmax(head_logit, dim=1)
-        not_in_shortlist = (output >= self.shortlist_size)
-        all_in_shortlist = not (not_in_shortlist.any()) 
-        
-        if all_in_shortlist:
-            pass
-            # return output
-        elif not_in_shortlist.all():
-            output = torch.argmax(log_prob, dim=1)   
+        if self.n_clusters == 0:
+            logit = self._compute_logit(hidden, self.out_layers_weights[0], self.out_layers_biases[0], self.get_out_proj(0))
+            output = torch.argmax(logit, dim=1)
         else:
-            # log_prob = self._get_full_log_prob(hidden[not_in_shortlist], head_logit[not_in_shortlist], weights[not_in_shortlist], biases[not_in_shortlist])
-            output[not_in_shortlist] = torch.argmax(log_prob, dim=1)
+            # construct weights and biases
+            weights, biases, projs = [], [], []
+            for i in range(len(self.cutoffs)):
+                if self.div_val == 1:
+                    l_idx, r_idx = self.cutoff_ends[i], self.cutoff_ends[i + 1]
+                    weight_i = self.out_layers_weights[0][l_idx:r_idx]
+                    bias_i = self.out_layers_biases[0][l_idx:r_idx]
+                else:
+                    weight_i = self.out_layers_weights[i]
+                    bias_i = self.out_layers_biases[i]
+                projs.append(self.get_out_proj(i))
 
-    return output, log_prob
+                if i == 0:
+                    weight_i = torch.cat([weight_i, self.cluster_weight], dim=0)
+                    bias_i = torch.cat([bias_i, self.cluster_bias], dim=0)
+
+                weights.append(weight_i)
+                biases.append(bias_i)
+
+            head_weight, head_bias, head_proj = weights[0], biases[0], projs[0]
+            head_logit = self._compute_logit(hidden, head_weight, head_bias, head_proj)
+            
+            log_prob = self._get_full_log_prob(hidden, head_logit, weights[1:], biases[1:], projs[1:])
+            # print('####', log_prob.size())
+            
+            output = torch.argmax(head_logit, dim=1)
+            not_in_shortlist = (output >= self.shortlist_size)
+            all_in_shortlist = not (not_in_shortlist.any()) 
+            
+            if all_in_shortlist:
+                # pass
+                return output
+            elif not_in_shortlist.all():
+                print('################# here 1')
+                # log_prob = self._get_full_log_prob(hidden, head_logit, weights[1:], biases[1:], projs[1:])
+                return torch.argmax(log_prob, dim=1)   
+            else:
+                print('################# here 2')
+                # log_prob = self._get_full_log_prob(hidden[not_in_shortlist], head_logit[not_in_shortlist], weights[not_in_shortlist], biases[not_in_shortlist], projs[not_in_shortlist])
+                output[not_in_shortlist] = torch.argmax(log_prob[not_in_shortlist], dim=1)
+                return output

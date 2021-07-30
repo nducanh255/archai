@@ -15,6 +15,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.profiler import profile, record_function, ProfilerActivity
 
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.log_uniform_sampler import LogUniformSampler
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.log_uniform_sampler import sample_logits
@@ -24,6 +25,15 @@ from archai.nlp.nvidia_transformer_xl.nvidia_utils.proj_adaptive_softmax import 
 @torch.jit.script
 def add_and_scale(tensor1, tensor2, alpha: float):
     return alpha * (tensor1 + tensor2)
+
+torch_triu = torch.triu
+def triu_onnx(x, diagonal=0):
+    assert len(x.shape) == 2
+    arange = torch.arange(x.size(0), device = x.device)
+    arange2 = torch.arange(x.size(1), device = x.device)
+    mask = arange.unsqueeze(-1).expand(-1, x.size(1)) <= (arange2 - diagonal)
+    return x.masked_fill(mask==0, 0)
+torch.triu = triu_onnx
 
 
 class PositionalEmbedding(nn.Module):
@@ -232,9 +242,12 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
 
         self.r_net = nn.Linear(self.d_model, self.n_head * self.d_head, bias=False)
 
+        self.flops = 0
+
     def forward(self, w, r, r_w_bias, r_r_bias, attn_mask=None, mems=None):
         qlen, rlen, bsz = w.size(0), r.size(0), w.size(1)
 
+        self.flops = 0
         if mems is not None:
             cat = torch.cat([mems, w], 0)
             if self.pre_lnorm:
@@ -242,7 +255,7 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
             else:
                 w_heads = self.qkv_net(cat)
             r_head_k = self.r_net(r)
-
+            
             w_head_q, w_head_k, w_head_v = torch.chunk(w_heads, 3, dim=-1)
             w_head_q = w_head_q[-qlen:]
         else:
@@ -254,6 +267,9 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
 
             w_head_q, w_head_k, w_head_v = torch.chunk(w_heads, 3, dim=-1)
 
+        self.flops += torch.prod(torch.tensor(w_heads.size())) * w.size(-1)
+        self.flops += torch.prod(torch.tensor(r_head_k.size())) * r.size(-1)
+        
         klen = w_head_k.size(0)
 
         w_head_q = w_head_q.view(qlen, bsz, self.n_head, self.d_head)  # qlen x bsz x n_head x d_head
@@ -265,9 +281,11 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
         # compute attention score
         rw_head_q = w_head_q + r_w_bias                                # qlen x bsz x n_head x d_head
         AC = torch.einsum('ibnd,jbnd->bnij', (rw_head_q, w_head_k))    # bsz x n_head x qlen x klen
+        self.flops += torch.prod(torch.tensor(AC.size())) * w_head_k.size(-1)
 
         rr_head_q = w_head_q + r_r_bias
         BD = torch.einsum('ibnd,jnd->bnij', (rr_head_q, r_head_k))     # bsz x n_head x qlen x klen
+        self.flops += torch.prod(torch.tensor(BD.size())) * r_head_k.size(-1)
         BD = self._rel_shift(BD)
 
         # [bsz x n_head x qlen x klen]
@@ -286,13 +304,14 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
 
         # compute attention vector
         attn_vec = torch.einsum('bnij,jbnd->ibnd', (attn_prob, w_head_v))
+        self.flops += torch.prod(torch.tensor(attn_vec.size())) * attn_prob.size(-1)
 
         # [qlen x bsz x n_head x d_head]
-        attn_vec = attn_vec.contiguous().view(
-            attn_vec.size(0), attn_vec.size(1), self.n_head * self.d_head)
+        attn_vec = attn_vec.contiguous().view(attn_vec.size(0), attn_vec.size(1), self.n_head * self.d_head)
 
         # linear projection
         attn_out = self.o_net(attn_vec)
+        self.flops += torch.prod(torch.tensor(attn_out.size())) * attn_vec.size(-1)
         attn_out = self.drop(attn_out)
 
         if self.pre_lnorm:
@@ -468,6 +487,7 @@ class AdaptiveEmbedding(nn.Module):
 
         self.emb_layers = nn.ModuleList()
         self.emb_projs = nn.ParameterList() #nn.ModuleList()
+
         if div_val == 1:
             self.emb_layers.append(nn.Embedding(n_token, d_embed, sparse=(sample_softmax > 0)))
             if d_proj != d_embed:
@@ -490,8 +510,7 @@ class AdaptiveEmbedding(nn.Module):
         else:
             param = next(self.parameters())
             inp_flat = inp.view(-1)
-            emb_flat = torch.zeros([inp_flat.size(0), self.d_proj],
-                                   dtype=param.dtype, device=param.device)
+            emb_flat = torch.zeros([inp_flat.size(0), self.d_proj], dtype=param.dtype, device=param.device)
             for i in range(len(self.cutoffs)):
                 l_idx, r_idx = self.cutoff_ends[i], self.cutoff_ends[i + 1]
 
@@ -932,7 +951,7 @@ def predict(self, hidden, target, keep_order=False):
         output = torch.argmax(logit, dim=1)
     else:
         # construct weights and biases
-        weights, biases = [], []
+        weights, biases, projs = [], [], []
         for i in range(len(self.cutoffs)):
             if self.div_val == 1:
                 l_idx, r_idx = self.cutoff_ends[i], self.cutoff_ends[i + 1]
@@ -941,6 +960,7 @@ def predict(self, hidden, target, keep_order=False):
             else:
                 weight_i = self.out_layers_weights[i]
                 bias_i = self.out_layers_biases[i]
+            projs.append(self.get_out_proj(i))
 
             if i == 0:
                 weight_i = torch.cat([weight_i, self.cluster_weight], dim=0)
@@ -949,12 +969,10 @@ def predict(self, hidden, target, keep_order=False):
             weights.append(weight_i)
             biases.append(bias_i)
 
-        head_weight, head_bias, head_proj = weights[0], biases[0], self.get_out_proj(0)
+        head_weight, head_bias, head_proj = weights[0], biases[0], projs[0]
         head_logit = self._compute_logit(hidden, head_weight, head_bias, head_proj)
-        # print('####', hidden.size(), head_logit.size())
         
-        log_prob = self._get_full_log_prob(hidden, head_logit, weights[1:], biases[1:])
-        # print('####', log_prob.size())
+        log_prob = self._get_full_log_prob(hidden, head_logit, weights[1:], biases[1:], projs[1:])
         
         output = torch.argmax(head_logit, dim=1)
         not_in_shortlist = (output >= self.shortlist_size)
@@ -964,10 +982,12 @@ def predict(self, hidden, target, keep_order=False):
             pass
             # return output
         elif not_in_shortlist.all():
+            # log_prob = self._get_full_log_prob(hidden, head_logit, weights[1:], biases[1:], projs[1:])
             output = torch.argmax(log_prob, dim=1)   
         else:
-            # log_prob = self._get_full_log_prob(hidden[not_in_shortlist], head_logit[not_in_shortlist], weights[not_in_shortlist], biases[not_in_shortlist])
-            output[not_in_shortlist] = torch.argmax(log_prob, dim=1)
+            # log_prob = self._get_full_log_prob(hidden[not_in_shortlist], head_logit[not_in_shortlist], weights[not_in_shortlist], biases[not_in_shortlist], projs[not_in_shortlist])
+            output[not_in_shortlist] = torch.argmax(log_prob[not_in_shortlist], dim=1)
+            # return output
 
     return output, log_prob
 
