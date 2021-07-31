@@ -8,7 +8,6 @@ import random
 import collections
 import re
 
-
 _mapping_tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
 
 def meta_constructor_mapping(loader, node):
@@ -22,11 +21,16 @@ def meta_constructor_sequence(loader, node):
 yaml.add_constructor(u'tag:yaml.org,2002:python/object/apply:numpy.core.multiarray.scalar', meta_constructor_sequence)
 yaml.add_constructor(u'tag:yaml.org,2002:python/object/apply:numpy.dtype', meta_constructor_mapping)
 
-fear_stage = 3   #3: baseline
+generation_seed = 1111
+np.random.seed(generation_seed)
+random.seed(generation_seed)
+
+fear_stage = 1   #3: baseline
 n_unfreeze = 3
 different_seeds = None #[1111,1009,1200,1234,1302,1562,2222,3334,3425,4567]
 max_step = 500
 
+targets = ['itpeastusv100cl', 'itpeastusv100cl2', 'itpseasiav100cl', 'itpscusv100cl']  # amulet targets
 gpu_config = ['dgx1_4gpu_fp32'] # dgx1_8gpu_fp16, dgx1_1gpu_fp16, toy, default, dgx1_4gpu_fp16
 n_gpus = 4
 
@@ -34,6 +38,7 @@ n_configs = 100 # number fo configs to generate
 batch_configs = 10 #how many configs in the same bash file
 start_config = 0
 indep_dhead = False # if set to False, n_head is determined based on n_head and d_model so that n_head * d_head = d_model
+homogeneous_layers = False # if set to True, all decoder layers will have the same config within a model
 
 n_layers = [5, 8]
 n_heads = [2, 8]
@@ -44,6 +49,34 @@ div_vals = [1, 2, 4]
 #-----optional
 d_heads = [32, 128]
 d_inners = [512, 2048]
+
+#TODO: add this to fear stage 2 and 3
+def generate_bash_files(path_to_configs, f_name, exp_name=None):
+  assert exp_name is not None, 'provide and experiment name for amulet jobs'
+  
+  bash_idx = 0
+  while True:
+    bash_file = os.path.join(path_to_configs, f_name+'_'+str(bash_idx)+'.sh')
+    if os.path.exists(bash_file):
+          os.remove(bash_file)  
+    with open(bash_file, 'a') as f:
+      for t in range(len(targets)):
+        for i in range(batch_configs):
+          job_idx = i + t * batch_configs + bash_idx * len(targets) * batch_configs
+          print(job_idx)
+          if job_idx >= n_configs:
+            break
+          if different_seeds:
+            f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/{} {} -t {}\n'.format('nv_train_{}.yaml'.format(job_idx), exp_name, targets[t]))
+          else:
+            f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/{} {} -t {}\n'.format('nv_train_{}.yaml'.format(job_idx), exp_name, targets[t]))          
+        if job_idx >= n_configs:
+            break      
+    if job_idx >= n_configs:
+            break
+
+    bash_idx += 1
+
 
 def get_run_command(max_step, config_num, seed=None):
   if seed:
@@ -62,6 +95,18 @@ def get_run_command(max_step, config_num, seed=None):
 
   return command
 
+
+def get_yaml_values(value):
+  if isinstance(value, list):
+    value_string = ''
+    for v in value:
+      value_string += (str(v) + ',')
+    return value_string[:-1]
+  else:
+    return value
+
+
+#TODO: fix encode function
 def encode(config):
   # [n_layers, n_heads, d_models, d_heads, d_inners, d_embeds, div_vals]
   code = []
@@ -69,7 +114,11 @@ def encode(config):
     if n=='n_layer':
       code.append(config[n]-n_layers[0])
     elif n=='n_head':
-      code.append(math.log2(config[n]/n_heads[0]))
+      if homogeneous_layers:
+        code.append(math.log2(config[n]/n_heads[0]))
+      else:
+        for n_head in config[n]:
+          code.append(math.log2(n_head/n_heads[0]))
     elif n=='d_model':
       code.append(math.log2(config[n]/d_models[0]))
     elif n=='d_embed':
@@ -77,41 +126,69 @@ def encode(config):
     elif n=='div_val':
       code.append(math.log2(config[n]/div_vals[0]))
     elif n=='d_inner':
-      code.append(math.log2(config[n]/d_inners[0]))
+      if homogeneous_layers:
+        code.append(math.log2(config[n]/d_inners[0]))
+      else:
+        for d_inner in config[n]:
+          code.append(math.log2(d_inner/d_inners[0]))
     elif n=='d_head':
       if indep_dhead:
+        if homogeneous_layers:
           code.append(math.log2(config[n]/d_heads[0]))
+        else:
+          for d_head in config[n]:
+            code.append(math.log2(d_head/d_heads[0]))
     else:
       assert False, 'invalid parameter name'
 
   code_val = 0
   for i, c in enumerate(code):
-    code_val += c*(2**i)
+    code_val += c*(10**i)
 
   return code_val
 
+
 def get_code(param_values, idx):
   config = collections.OrderedDict({k:param_values[k][idx] for k in param_values.keys()})
-  
   return encode(config)
 
-def generate_params(n_configs):
-    values = collections.OrderedDict({})
-    values['n_layer'] = (np.random.randint(low=n_layers[0], high=n_layers[-1], size=n_configs, dtype=np.int32)).tolist()
-    values['n_head'] = (2**np.random.randint(low=np.log2(n_heads[0]), high=np.log2(n_heads[-1]), size=n_configs, dtype=np.int32)).tolist()
-    values['d_model'] = (2**np.random.randint(low=np.log2(d_models[0]), high=np.log2(d_models[-1]), size=n_configs, dtype=np.int32)).tolist()
-    values['d_embed'] = (2**np.random.randint(low=np.log2(d_embeds[0]), high=np.log2(d_embeds[-1]), size=n_configs, dtype=np.int32)).tolist()
-    values['div_val'] = np.random.choice(div_vals, size=n_configs).astype(np.int32).tolist()
-    
-    if indep_dhead:
-      values['d_head'] = (2**np.random.randint(low=np.log2(d_heads[0]), high=np.log2(d_heads[-1]), size=n_configs, dtype=np.int32)).tolist()
-    else:
-      values['d_head'] = [int(values['d_model'][i] / values['n_head'][i]) for i in range(n_configs)]
-    
-    # values['d_inner']    = (2**np.random.randint(low=np.log2(d_inners[0]), high=np.log2(d_inners[-1]), size=n_configs, dtype=np.int32)).tolist()
-    values['d_inner'] = [random.randint(max(int(2*values['d_model'][i]), d_inners[0]), d_inners[-1]) for i in range(n_configs)]
 
-    return values
+def generate_params_homogeneous(n_configs):
+  # generate n_configs with homogeneous decoder layers 
+  values = collections.OrderedDict({})
+  values['n_layer'] = (np.random.randint(low=n_layers[0], high=n_layers[-1]+1, size=n_configs, dtype=np.int32)).tolist()
+  values['n_head'] = (2**np.random.randint(low=np.log2(n_heads[0]), high=np.log2(n_heads[-1])+1, size=n_configs, dtype=np.int32)).tolist()
+  values['d_model'] = (2**np.random.randint(low=np.log2(d_models[0]), high=np.log2(d_models[-1])+1, size=n_configs, dtype=np.int32)).tolist()
+  values['d_embed'] = (2**np.random.randint(low=np.log2(d_embeds[0]), high=np.log2(d_embeds[-1])+1, size=n_configs, dtype=np.int32)).tolist()
+  values['div_val'] = np.random.choice(div_vals, size=n_configs).astype(np.int32).tolist()
+  
+  if indep_dhead:
+    values['d_head'] = (2**np.random.randint(low=np.log2(d_heads[0]), high=np.log2(d_heads[-1])+1, size=n_configs, dtype=np.int32)).tolist()
+  else:
+    values['d_head'] = [int(values['d_model'][i] / values['n_head'][i]) for i in range(n_configs)]
+  
+  # values['d_inner']    = (2**np.random.randint(low=np.log2(d_inners[0]), high=np.log2(d_inners[-1]), size=n_configs, dtype=np.int32)).tolist()
+  values['d_inner'] = [random.randint(max(int(2*values['d_model'][i]), d_inners[0]), d_inners[-1]) for i in range(n_configs)]
+
+  return values
+
+
+def generate_params_heterogeneous(n_configs):
+  # generate n_configs with heterogeneous decoder layers 
+  values = collections.OrderedDict({})
+  values['n_layer'] = (np.random.randint(low=n_layers[0], high=n_layers[-1]+1, size=n_configs, dtype=np.int32)).tolist()
+  values['n_head'] = [(2**np.random.randint(low=np.log2(n_heads[0]), high=np.log2(n_heads[-1])+1, size=values['n_layer'][i], dtype=np.int32)).tolist() for i in range(n_configs)]
+  values['d_model'] = (2**np.random.randint(low=np.log2(d_models[0]), high=np.log2(d_models[-1])+1, size=n_configs, dtype=np.int32)).tolist()
+  values['d_embed'] = (2**np.random.randint(low=np.log2(d_embeds[0]), high=np.log2(d_embeds[-1])+1, size=n_configs, dtype=np.int32)).tolist()
+  values['div_val'] = np.random.choice(div_vals, size=n_configs).astype(np.int32).tolist()
+  
+  if indep_dhead:
+    values['d_head'] = [(2**np.random.randint(low=np.log2(d_heads[0]), high=np.log2(d_heads[-1])+1, size=values['n_layer'][i], dtype=np.int32)).tolist() for i in range(n_configs)]
+  else:
+    values['d_head'] = [(values['d_model'][i]//np.asarray(values['n_head'][i])).tolist() for i in range(n_configs)]
+  
+  values['d_inner'] = [np.random.randint(low=max(int(2*values['d_model'][i]), d_inners[0]), high=d_inners[-1]+1, size=values['n_layer'][i]).tolist() for i in range(n_configs)]
+  return values
 
 
 if __name__ == '__main__':
@@ -120,20 +197,19 @@ if __name__ == '__main__':
       os.mkdir(path_to_configs)
   
   if fear_stage==1:
-      for bash_idx in range(0, n_configs//batch_configs):
-        bash_file = os.path.join(path_to_configs, 'amlt_run_'+str(bash_idx)+'.sh')
-        if os.path.exists(bash_file):
-          os.remove(bash_file)
-
+      # generate random architectures
       count = 0
       codes = []
       param_values = {}
       while count < n_configs:
         print('generating a new batch of configs')
-        new_param_values = generate_params(n_configs)
-        # pprint.pprint(new_param_values)
+        if homogeneous_layers:
+          new_param_values = generate_params_homogeneous(n_configs)
+          # pprint.pprint(new_param_values)
+        else:
+          new_param_values = generate_params_heterogeneous(n_configs)
 
-        for idx in range(n_configs):
+        for idx in range(len(new_param_values['n_layer'])):
           curr_code = get_code(new_param_values, idx)
           if curr_code in codes:
             print('duplicate config')
@@ -145,14 +221,11 @@ if __name__ == '__main__':
                 param_values[k] = [new_param_values[k][idx]]
             codes.append(curr_code)
             count += 1
-            idx += 1
             if count==n_configs:
               break
-
       pprint.pprint(param_values)
 
-      bash_idx = 0
-      per_bash = 0
+      # create corresponding yaml files for amulet jobs
       for c in range(n_configs): 
         with open('/home/t-mojanj/Projects/archaiphilly/nv_train.yaml') as file:
           amlt_config = yaml.load(file)
@@ -166,37 +239,37 @@ if __name__ == '__main__':
                                         --config {config} --config_file wt103_base_FEAR.yaml \
                                         --n_layer {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head} \
                                         --d_inner {d_inner} --d_embed {d_embed} --div_val {div_val}' % (str(n_gpus)) #--vocab_size {vocab_size} --attn_type 2 
-        
         amlt_config['search']['params'][0]['values'] = gpu_config
         
         names = list(param_values.keys())   #['n_layer', 'n_head', 'd_model', 'd_head', 'd_inner', 'd_embed', 'div_val']
         for n in names:
-          # print(n, ':', param_values[n][c])
+          values = get_yaml_values(param_values[n][c])
           try:
-            amlt_config['search']['params'].append({'name':n,
-                                                    'spec':'discrete',
-                                                    'values': [param_values[n][c]]})
+            amlt_config['search']['params'].append({'name':n, 'spec':'discrete', 'values': [values]})
           except:
-            amlt_config['search']['params'] = [{'name':n,
-                                                    'spec':'discrete',
-                                                    'values': [param_values[n][c]]}]
+            amlt_config['search']['params'] = [{'name':n, 'spec':'discrete', 'values': [values]}]
 
         config_file = 'nv_train_'+str(int(start_config + c))+'.yaml'
         f_name = os.path.join(path_to_configs, config_file)
         with open(f_name, 'w') as file:
             yaml.dump(amlt_config, file)
 
-        bash_file = os.path.join(path_to_configs, 'amlt_run_'+str(bash_idx)+'.sh')
-        with open(bash_file, 'a') as f:
-          f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/{} fear_stage_1 \n'.format(config_file))
-          f.write('sleep 10 \n')
-        per_bash +=1
-        if per_bash==batch_configs: 
-          bash_idx += 1
-          per_bash = 0
+      generate_bash_files(path_to_configs, f_name='amlt_run_fear_stage1', exp_name='fear_stage_1_heterogeneous')
+
+      local_test_bashfile = os.path.join(path_to_configs, 'local_test.sh')
+      if os.path.exists(local_test_bashfile):
+            os.remove(local_test_bashfile)  
+      with open(local_test_bashfile, 'a') as f:
+        for c in range(n_configs):
+          keys = ['n_layer', 'n_head', 'd_model', 'd_head', 'd_inner', 'd_embed', 'div_val']
+          values = []
+          for k in keys:
+            values.append(get_yaml_values(param_values[k][c]))
+          command = 'python archai/nlp/nvidia_transformer_xl/mem_transformer.py --n_layer {} --n_head {} --d_model {} --d_head {} --d_inner {} --d_embed {} --div_val {} \n'.format(*values)
+          f.write(command) 
+          f.write('if [ $? -ne 0 ]; then \n echo FAIL \n exit \n fi \n')
 
   elif fear_stage==2:
-    targets = ['itpeastusv100cl', 'itpeastusv100cl2', 'itplabrr1cl1']
     bash_idx = 0
     while True:
       bash_file = os.path.join(path_to_configs, 'amlt_run_fear_stage2_'+str(bash_idx)+'.sh')
@@ -226,13 +299,14 @@ if __name__ == '__main__':
       
   else:
     files = os.listdir(path_to_configs)
+    ref_exp_name = 'fear_stage_1' # name of the amlt experiment with full runs to use as the ground-truth configutation
     for f in files:
       if re.search('(nv_train_[0-9]+.yaml)', f):
         with open(os.path.join(path_to_configs, f), 'r') as file:
           prev_config = yaml.load(file)
 
         job_name = 'train_xl_config_' + f.replace('.yaml','').split('_')[-1]
-        gt_config_path = os.path.join('/home/t-mojanj/logdir/nv_xformer_xl/prev_jobs/fear_stage_1', job_name, 'config.yaml')
+        gt_config_path = os.path.join('/home/t-mojanj/logdir/nv_xformer_xl/prev_jobs/{}'.format(ref_exp_name), job_name, 'config.yaml')
         if os.path.isfile(gt_config_path):
           with open(gt_config_path, 'r') as file:
             gt_config = yaml.load(file)
@@ -287,27 +361,7 @@ if __name__ == '__main__':
         with open(os.path.join(path_to_configs, f), 'w') as file:
           yaml.dump(prev_config, file)
 
-    targets = ['itpeastusv100cl', 'itpeastusv100cl2', 'itpseasiav100cl', 'itpscusv100cl']
-    bash_idx = 0
-    while True:
-      bash_file = os.path.join(path_to_configs, 'amlt_run_fear_baseline_'+str(bash_idx)+'.sh')
-      if os.path.exists(bash_file):
-            os.remove(bash_file)
-          
-      with open(bash_file, 'a') as f:
-        for t in range(len(targets)):
-          for i in range(batch_configs):
-            job_idx = i + t * batch_configs + bash_idx * len(targets) * batch_configs
-            print(job_idx)
-            if job_idx >= n_configs:
-              break
-            if different_seeds:
-              f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/{} fear_baseline_{}_step -t {}\n'.format('nv_train_{}.yaml'.format(job_idx), max_step, targets[t]))
-            else:
-              f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/{} fear_baseline_constLR -t {}\n'.format('nv_train_{}.yaml'.format(job_idx), targets[t]))          
-          if job_idx >= n_configs:
-              break      
-      if job_idx >= n_configs:
-              break
+    exp_name = 'fear_baseline_{}_step'.format(max_step)
+    # exp_name = 'fear_baseline_constLR'
 
-      bash_idx += 1
+    generate_bash_files(path_to_configs, f_name='amlt_run_fear_baseline', exp_name=None)
