@@ -7,13 +7,10 @@ import collections
 import argparse
 import re
 import types
-import functools
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 18})
 
 import torch
-import torch.nn as nn
-from torch.profiler import profile, record_function, ProfilerActivity
 
 from archai.nlp.nvidia_transformer_xl.mem_transformer import MemTransformerLM
 from archai.nlp.nvidia_transformer_xl.mem_transformer import PositionwiseFF, MultiHeadAttn, RelMultiHeadAttn, \
@@ -26,8 +23,6 @@ from archai.nlp.nvidia_transformer_xl.nvidia_utils import exp_utils
 from archai.common import utils, common
 
 from gather_results import get_metrics
-from zero_cost_utils import compute_synflow_per_weight
-
 
 def meta_constructor_mapping(loader, node):
     value = loader.construct_mapping(node)
@@ -41,10 +36,6 @@ yaml.add_constructor(u'tag:yaml.org,2002:python/object/apply:numpy.core.multiarr
 yaml.add_constructor(u'tag:yaml.org,2002:python/object/apply:numpy.dtype', meta_constructor_mapping)
 
 def forward_predict_memtransformer(self, data, target, mems):
-  # nn.DataParallel does not allow size(0) tensors to be broadcasted.
-  # So, have to initialize size(0) mems inside the model forward.
-  # Moreover, have to return new_mems to allow nn.DataParallel to piece
-  # them together.
   if mems is None:
       mems = self.init_mems()
 
@@ -90,6 +81,7 @@ def get_layer_flops(l):
   else:
     raise NotImplemented
 
+
 def get_model_flops(model, inp, tgt):
   layers_with_flops = get_list_of_layers(model, layerType=[AdaptiveEmbedding, PositionwiseFF, MultiHeadAttn, RelMultiHeadAttn, \
                                                             RelPartialLearnableMultiHeadAttn, RelLearnableMultiHeadAttn, ProjectedAdaptiveLogSoftmax])
@@ -103,12 +95,26 @@ def get_model_flops(model, inp, tgt):
   _, mems = model(inp, tgt, None)
   model(inp, tgt, mems)
 
-  flops = 0
+  flops = {}
   for l in layers_with_flops:
     f = get_layer_flops(l)
-    # print(type(l), f)
-    flops += f.item()
-  
+    
+    if isinstance(l, AdaptiveEmbedding):
+      key = 'AdaEmb'
+    elif isinstance(l, PositionwiseFF):
+      key = 'FFN'
+    elif isinstance(l, RelPartialLearnableMultiHeadAttn):
+      key = 'Attn'
+    elif isinstance(l, ProjectedAdaptiveLogSoftmax):
+      key = 'Sftmax'
+    else:
+      raise NotImplemented
+      
+    if key in flops.keys():
+      flops[key] += f.item()
+    else:
+      flops[key] = f.item()
+    
   return flops
 
 
@@ -175,12 +181,15 @@ def get_flops(args):
           for idx, (inp, tgt, seqlen, _) in enumerate(train_iter):
             curr_flops = get_model_flops(model, inp, tgt)
             break
+          total_flops = np.sum([curr_flops[k] for k in curr_flops.keys()]).tolist()
           
           flops[config_name] = curr_flops
+          flops[config_name]['total'] = total_flops
           print(config_name, flops[config_name])
 
     with open(yaml_file, 'w') as f:
         yaml.dump(flops, f)
+
 
 def plot(args):
   # load the ground-truth rankings
@@ -204,7 +213,7 @@ def plot(args):
   # zero-cost score results:
   target_flops = []
   for k in common_configs:
-    target_flops.append(flops[k])   # the higher the score, the better the architecture (reversely correlated with ppl)
+    target_flops.append(flops[k]['total'])   # the higher the score, the better the architecture (reversely correlated with ppl)
   sorted_target = np.argsort(target_flops)
 
   common_ratios = []
@@ -243,6 +252,27 @@ def plot(args):
   plt.grid(axis='y')
   plt.title('ranking based on FLOPs')
   plt.savefig('spearman_topk_flops.png', bbox_inches="tight")
+
+  # create a box plot of parameter size variation across architectures
+  fig, ax = plt.subplots()
+  flops_adaptive_embedding_list = [flops[k]['AdaEmb'] for k in common_configs]
+  flops_adaptive_softmax_list = [flops[k]['Sftmax'] for k in common_configs]
+  flops_attention_list = [flops[k]['Attn'] for k in common_configs]
+  flops_ff_list = [flops[k]['FFN'] for k in common_configs]
+  flops_total_list = [flops[k]['total'] for k in common_configs]
+  data = np.asarray([flops_adaptive_embedding_list, flops_adaptive_softmax_list, flops_attention_list, flops_ff_list])/np.asarray(flops_total_list) * 100.
+  bp = ax.boxplot(data.tolist(), sym='k+', showmeans=True)
+  m = [np.mean(d, axis=0) for d in data]
+  for i, line in enumerate(bp['medians']):
+      x, y = line.get_xydata()[1]
+      text = ' μ={:.2f}'.format(m[i])
+      if i>0:
+        ax.annotate(text, xy=(x-0.2, y+20))
+      else:
+        ax.annotate(text, xy=(x, y))
+  ax.grid(axis='y')
+  plt.xticks(range(1, 5), ['AdaEmb', 'Sftmax', 'Attn', 'FFN'])
+  plt.savefig('flops_breakdown.png', bbox_inches="tight")
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Results Analysis.')

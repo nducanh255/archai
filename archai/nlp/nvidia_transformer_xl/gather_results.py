@@ -63,37 +63,6 @@ def forward_with_output_memtransformer(self, data, target, mems):
         out, loss = self.crit(pred_hid.view(-1, pred_hid.size(-1)), target.view(-1))
 
 
-def get_flops(config, model):
-  #TODO: add flops measurement for adaptive softmax layer
-
-  path_to_data = common.default_dataroot()
-  path_to_data = utils.full_path(os.path.join(path_to_data,'textpred', exp_utils.dataset_dir_name(config['dataset'])))
-  corpus = get_lm_corpus(path_to_data, config['dataset'], config['vocab'], max_size=config['vocab_size'])
-  train_iter = corpus.get_iterator('train', 1, config['tgt_len'],
-                                device='cuda', ext_len=config['ext_len'])
-
-  def input_constructor(train_iter):
-    for batch, (data, target, seq_len, _) in enumerate(train_iter, start=1):
-      return data, target, None
-
-  with torch.cuda.device(0):
-    macs, params = get_model_profile(model, input_constructor=partial(input_constructor, train_iter=train_iter), print_profile=False, print_aggregated_profile=False,)
-    print("{:<30}  {:<8}".format("Number of MACs: ", macs))
-    print("{:<30}  {:<8}".format("Number of parameters: ", params))
-
-  # with torch.profiler.profile(
-  #                           # activities=[torch.profiler.ProfilerActivity.CUDA,],
-  #                           schedule=torch.profiler.schedule(wait=1, warmup=0, active=2)) as p:
-  #   for batch, (data, target, seq_len, _) in enumerate(train_iter, start=1):
-  #     print(batch)
-  #     _ = model(data, target, None)
-  #     p.step()
-  #     if batch >= 2:
-  #       break
-
-  return macs, params
-
-
 def get_metrics(topk, sorted_ground_truth, sorted_target, val_ppl_list_gt, val_ppl_list_target, common_configs=None):
   idx = int(topk/100.*len(sorted_ground_truth))
   sorted_ground_truth_binned = sorted_ground_truth[:idx].astype(np.int32)
@@ -144,7 +113,7 @@ def process_parameters(model):
   # assert n_all_param_gt == n_all_param, print(n_all_param_gt, n_all_param)
   assert n_nonemb_param_gt == n_nonemb_param, print(n_nonemb_param_gt, n_nonemb_param)
 
-  return n_all_param, params_adaptive_embedding*100./n_all_param, params_adaptive_softmax*100./n_all_param, params_attention*100./n_all_param, params_ff*100./n_all_param
+  return n_all_param, params_adaptive_embedding, params_adaptive_softmax, params_attention, params_ff
                           
 
 def extract_date_time(log_str):
@@ -298,11 +267,12 @@ def recurse_dir(args, exp_name, path_to_dir, read_log_file=False):
   
   return results
 
+
 def get_parser():
   parser = argparse.ArgumentParser(description='Results Analysis.')
   parser.add_argument('--results_dir', type=str, default='/home/t-mojanj/logdir/nv_xformer_xl/prev_jobs/',
                       help='path where amulet results are downloaded')
-  parser.add_argument('--exp_name', type=lambda s: [item for item in s.split(',')], required=True,
+  parser.add_argument('--exp_name', type=lambda s: [item for item in s.split(',')], #required=True,
                       help='name of maulet experiment')
   parser.add_argument('--step', type=lambda s: [int(item) for item in s.split(',')], default=[],
                       help='training step to extract the log from')
@@ -322,8 +292,6 @@ def get_parser():
                       help='analyze model parameter size')     
   parser.add_argument('--param_ranking', action='store_true',
                       help='generate metrics w.r.t parameter size')    
-  parser.add_argument('--flops_ranking', action='store_true',
-                      help='generate metrics w.r.t flops count')   
   parser.add_argument('--cross_seeds', action='store_true',
                       help='generate metrics across various seeds')        
   parser.add_argument('--animation', action='store_true',
@@ -332,9 +300,10 @@ def get_parser():
   args = parser.parse_args()
   return args
 
+
 def main():
   args = get_parser()
-  if args.analyze:
+  if args.analyze:    # provides 2 plots: 1) common ratio versus topk and 2) spearman corr versus topk
     results = {}
     common_ratios = {}
     spr_ranks = {}
@@ -415,7 +384,7 @@ def main():
     plt.savefig('spearman_topk.png', bbox_inches="tight")
 
 
-  elif args.cross_seeds:
+  elif args.cross_seeds: # provides the plots similar to args.analyze but across different random seeds of the same experiment
     results = {}
     common_ratios = {}
     spr_ranks = {}
@@ -512,7 +481,7 @@ def main():
     plt.savefig('spearman_topk_seeds.png', bbox_inches="tight")
     
 
-  elif args.read_jsons:
+  elif args.read_jsons: # extracts information from the .json training log (see get_info_from_json function above)
     for exp_name in args.exp_name:
       path_to_results = os.path.join(args.results_dir, exp_name)
 
@@ -530,7 +499,7 @@ def main():
         print('saved results summary to', fname)
 
 
-  elif args.generate_plots:
+  elif args.generate_plots: # creates 2 plots per topk value: 1) common ratio versus training time and 2) spearman corr versus training time
     results = {}
     results_structured = {}
     common_ratios = {}
@@ -815,7 +784,7 @@ def main():
     #   plt.savefig('spearman_topk_{}.png'.format(topk), bbox_inches="tight")
 
 
-  elif args.analyze_params:
+  elif args.analyze_params: # creates a .yaml file containing config names and corresponding parameter sizes
     model_config_keys = ['n_token', 'n_layer','n_head','d_model','d_head','d_inner','dropout','dropatt', \
                         'd_embed','div_val','pre_lnorm','tgt_len','ext_len','mem_len', \
                         'same_length','attn_type','clamp_len','sample_softmax']
@@ -830,7 +799,6 @@ def main():
       params_ff_list = []
       
       n_all_params = {}
-      n_all_flops = {}
       for j in jobs:
         if args.n_unfreeze is not None and 'unfreeze_{}'.format(args.n_unfreeze) not in j:
           continue
@@ -857,44 +825,31 @@ def main():
                 model_config['dtype'] = None
 
                 model = MemTransformerLM(**model_config)
-                model = model.to(device='cuda')
+                model = model.to(device='cpu')
                 
                 curr_n_all_param, params_adaptive_embedding, params_adaptive_softmax, params_attention, params_ff = process_parameters(model)
-                params_adaptive_embedding_list.append(params_adaptive_embedding)
-                params_adaptive_softmax_list.append(params_adaptive_softmax)
-                params_attention_list.append(params_attention)
-                params_ff_list.append(params_ff)
 
                 config_name = re.search('(config_[0-9]+)', j).group(1)
-                n_all_params[config_name] = int(curr_n_all_param)
-
-                # replace ProjectedAdaptiveLogSoftmax with pytorch version
-                # model.forward = types.MethodType(forward_with_output_memtransformer, model)
-                # model.crit = nn.AdaptiveLogSoftmaxWithLoss(in_features=model.crit.d_proj,
-                #                                             n_classes=model.crit.n_token,
-                #                                             cutoffs=cutoffs,
-                #                                             div_value=model.crit.div_val).to(device='cuda')
-                macs, params = get_flops(config, model)
-                n_all_flops[config_name] = 2 * macs
-                exit()
+                n_all_params[config_name] = {'AdaEmb': float(params_adaptive_embedding), 'Sftmax': float(params_adaptive_softmax), \
+                                  'Attn': float(params_attention), 'FFN': float(params_ff), 'total': float(curr_n_all_param)}
                 
+                params_adaptive_embedding_list.append(params_adaptive_embedding*100./curr_n_all_param)
+                params_adaptive_softmax_list.append(params_adaptive_softmax*100./curr_n_all_param)
+                params_attention_list.append(params_attention*100./curr_n_all_param)
+                params_ff_list.append(params_ff*100./curr_n_all_param)
+
+                # n_all_params[config_name] = int(curr_n_all_param)    
+                
+                print(config_name, n_all_params[config_name])        
       
       yaml_file = os.path.join(path_to_results, 'params_summary.yaml')
       with open(yaml_file, 'w') as f:
           yaml.dump(n_all_params, f)
 
-      yaml_file = os.path.join(path_to_results, 'flops_summary.yaml')
-      with open(yaml_file, 'w') as f:
-          yaml.dump(n_all_flops, f)
-
+      # create a box plot of parameter size variation across architectures
       fig, ax = plt.subplots()
       data = [params_adaptive_embedding_list, params_adaptive_softmax_list, params_attention_list, params_ff_list]
       bp = ax.boxplot(data, sym='k+', showmeans=True)
-      # , label=)
-      # plt.boxplot(, label=)
-      # plt.boxplot(, label=)
-      # plt.boxplot(, label=)
-      # plt.legend()
       m = [np.mean(d, axis=0) for d in data]
       for i, line in enumerate(bp['medians']):
           x, y = line.get_xydata()[1]
@@ -908,39 +863,33 @@ def main():
       plt.xticks(range(1, 5), ['AdaEmb', 'Sftmax', 'Attn', 'FFN'])
       plt.savefig('parameter_breakdown.png', bbox_inches="tight")
   
-
-  elif args.param_ranking:
-    exp_name = args.exp_name[0]
+  
+  elif args.param_ranking: # 3 plots: 1,2) common_ratio and spearman correlation versus topk for ranking based on parameter size 3) ppl versus parameter size pareto curve
+    exp_name = 'fear_stage_1'
     path_to_results = os.path.join(args.results_dir, exp_name)
-
-    if 'stage_2' in exp_name:
-      fname = 'result_summary_unfreeze_{}.yaml'.format(n_unfreeze) #'2' if args.n_unfreeze is None else args.n_unfreeze)
-      exp_name = 'fear_stage_2'
-    else:
-      fname = 'result_summary.yaml'
-
-    results = {}
-    yaml_file = os.path.join(path_to_results, fname)
+    yaml_file = os.path.join(path_to_results, 'result_summary.yaml')
     with open(yaml_file, 'r') as f:
-      results[exp_name] = collections.OrderedDict(yaml.safe_load(f))
+      results_gt = collections.OrderedDict(yaml.safe_load(f))
 
     yaml_file = os.path.join(path_to_results, 'params_summary.yaml')
     with open(yaml_file, 'r') as f:
         n_all_params = yaml.safe_load(f)
 
-    common_configs = np.intersect1d(list(results['fear_stage_1'].keys()), list(n_all_params.keys()))
+    common_configs = np.intersect1d(list(results_gt.keys()), list(n_all_params.keys()))
     print('analyzing {} architectures'.format(len(common_configs)))
 
     # fear_stage_1 results:
-    val_ppl_list_stage1 = []
+    val_ppl_list_gt = []
     for k in common_configs:
-      val_ppl_list_stage1.append(results['fear_stage_1'][k]['valid_perplexity'])
-    sorted_ground_truth = np.argsort(val_ppl_list_stage1)
+      val_ppl_list_gt.append(results_gt[k]['valid_perplexity'])
+    sorted_ground_truth = np.argsort(val_ppl_list_gt)
 
     # n_param results:
     n_params = []
+    n_params_total = []
     for k in common_configs:
-      n_params.append(n_all_params[k])
+      n_params.append(-(n_all_params[k]['FFN'] + n_all_params[k]['Attn']))
+      n_params_total.append(n_all_params[k]['total'])
     sorted_fear = np.argsort(n_params)
 
     common_ratios = []
@@ -949,10 +898,18 @@ def main():
     topk_list = range(10,101,10)
     for topk in topk_list:
       common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth, sorted_target=sorted_fear, \
-                                            val_ppl_list_gt=val_ppl_list_stage1, val_ppl_list_target=n_params)
+                                            val_ppl_list_gt=val_ppl_list_gt, val_ppl_list_target=n_params)
       common_ratios.append(common_ratio)
       spr_ranks.append(spr_rank)
 
+    plt.figure()
+    plt.scatter(np.asarray(n_params_total)[sorted_ground_truth], np.asarray(val_ppl_list_gt)[sorted_ground_truth])
+    plt.ylabel('Validation PPL')
+    plt.xlabel('nParams')
+    plt.title('Pareto Curve')
+    plt.grid(axis='y')
+    plt.savefig('pareto_params.png', bbox_inches="tight")
+    
     plt.figure()
     plt.scatter(topk_list, common_ratios)
     plt.ylabel('Common ratio')
@@ -971,62 +928,6 @@ def main():
     plt.grid(axis='y')
     plt.title('ranking based on number of parameters')
     plt.savefig('spearman_topk_nparams.png', bbox_inches="tight")
-
-
-  elif args.flops_ranking:
-    path_to_results = os.path.join(args.results_dir, 'fear_stage_1')
-    fname = 'result_summary.yaml'
-    yaml_file = os.path.join(path_to_results, fname)
-    with open(yaml_file, 'r') as f:
-      results = collections.OrderedDict(yaml.safe_load(f))
-
-    yaml_file = os.path.join(path_to_results, 'flops_summary.yaml')
-    with open(yaml_file, 'r') as f:
-        n_all_flops = yaml.safe_load(f)
-
-    common_configs = np.intersect1d(list(results.keys()), list(n_all_flops.keys()))
-    print('analyzing {} architectures'.format(len(common_configs)))
-
-    # fear_stage_1 results:
-    val_ppl_list_stage1 = []
-    for k in common_configs:
-      val_ppl_list_stage1.append(results[k]['valid_perplexity'])
-    sorted_ground_truth = np.argsort(val_ppl_list_stage1)
-
-    # n_param results:
-    n_flops = []
-    for k in common_configs:
-      n_flops.append(n_all_flops[k])
-    sorted_flops = np.argsort(n_flops)
-
-    common_ratios = []
-    spr_ranks = []
-    # extract common ratio and spearmanrank
-    topk_list = range(10,101,10)
-    for topk in topk_list:
-      common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth, sorted_target=sorted_flops, \
-                                            val_ppl_list_gt=val_ppl_list_stage1, val_ppl_list_target=n_flops)
-      common_ratios.append(common_ratio)
-      spr_ranks.append(spr_rank)
-
-    plt.figure()
-    plt.scatter(topk_list, common_ratios)
-    plt.ylabel('Common ratio')
-    plt.xlabel('Topk (%)')
-    plt.xticks(topk_list)
-    plt.title('ranking based on number of FLOPs')
-    plt.grid(axis='y')
-    plt.savefig('common_ratio_topk_nflops.png', bbox_inches="tight")
-
-    plt.figure()
-    plt.scatter(topk_list, spr_ranks)
-    plt.ylabel('Spearman\'s Correlation')
-    plt.xlabel('Topk (%)')
-    plt.xticks(topk_list)
-    plt.ylim(top=1)
-    plt.grid(axis='y')
-    plt.title('ranking based on number of FLOPs')
-    plt.savefig('spearman_topk_nflops.png', bbox_inches="tight")
 
 
   elif args.cross_step:

@@ -8,6 +8,7 @@ import argparse
 import re
 import types
 import functools
+from scipy.stats import spearmanr
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 18})
 
@@ -21,7 +22,7 @@ from archai.nlp.nvidia_transformer_xl.mem_transformer import PositionwiseFF, Mul
 from archai.nlp.nvidia_transformer_xl.utils import get_parameter_breakdown, get_list_of_layers
 from archai.nlp.nvidia_transformer_xl import data_utils
 
-from gather_results import get_metrics
+from gather_results import get_metrics, process_parameters
 from zero_cost_utils import compute_synflow_per_weight
 
 
@@ -138,10 +139,6 @@ def _forward_with_output_memtransformer(self, dec_inp, mems=None):
   return core_out, new_mems
 
 def forward_with_output_memtransformer(self, data, target, mems):
-    # nn.DataParallel does not allow size(0) tensors to be broadcasted.
-    # So, have to initialize size(0) mems inside the model forward.
-    # Moreover, have to return new_mems to allow nn.DataParallel to piece
-    # them together.
     if mems is None:
         mems = self.init_mems()
 
@@ -151,7 +148,6 @@ def forward_with_output_memtransformer(self, data, target, mems):
     pred_hid = hidden[-tgt_len:]
     return pred_hid.view(-1, pred_hid.size(-1))
 
-    # print('pred_hid', pred_hid.size())
     # logits = None
     # if self.sample_softmax > 0 and self.training:
     #     assert self.tie_weight
@@ -227,14 +223,11 @@ def get_scores(args):
                       'same_length','attn_type','clamp_len','sample_softmax']
   
   yaml_file = os.path.join(args.results_dir, 'synflow_scores_seed_{}.yaml'.format(args.seed))
-  if os.path.exists(yaml_file):
-    with open(yaml_file, 'r') as f:
-      scores = yaml.safe_load(f)
-  
-  else:
+  if not os.path.exists(yaml_file):
     jobs = os.listdir(args.results_dir)
     device = torch.device("cpu")
     scores = {}
+    nparams = {}
     for j in jobs:
       j_path = os.path.join(args.results_dir, j)
       if not os.path.isdir(j_path):
@@ -278,18 +271,67 @@ def get_scores(args):
             grads_abs = compute_synflow_per_weight(model, inp, tgt)
             score = np.sum([torch.sum(g).detach().numpy() for g in grads_abs])    
             break
+          curr_n_all_param, params_adaptive_embedding, params_adaptive_softmax, params_attention, params_ff = process_parameters(model)
           
           scores[config_name] = score.tolist()
-          print(config_name, score)
+          nparams[config_name] = {'AdaEmb': float(params_adaptive_embedding), 'Sftmax': float(params_adaptive_softmax), \
+                                  'Attn': float(params_attention), 'FFN': float(params_ff), 'total': float(curr_n_all_param)} 
+          
+          print(config_name, scores[config_name], nparams[config_name])
 
     with open(yaml_file, 'w') as f:
         yaml.dump(scores, f)
+    with open(os.path.join(args.results_dir, 'synflow_params.yaml'), 'w') as f:
+      yaml.dump(nparams, f)
+
+def get_statistics(seed, results_gt, scores, nparams_dict, topk_list):
+  common_configs = np.intersect1d(list(results_gt.keys()), list(scores[seed].keys()))
+  print('analyzing {} architectures'.format(len(common_configs)))
+
+  # fear_stage_1 results:
+  val_ppl_list_gt = []
+  for k in common_configs:
+    val_ppl_list_gt.append(results_gt[k]['valid_perplexity'])
+  sorted_ground_truth = np.argsort(val_ppl_list_gt)
+
+  # zero-cost score results:
+  target_scores = []
+  for k in common_configs:
+    param_count = (nparams_dict[k]['Attn'] + nparams_dict[k]['FFN'])
+    target_scores.append(-scores[seed][k])#*1./param_count)   # the higher the score, the better the architecture (reversely correlated with ppl)
+  sorted_target = np.argsort(target_scores)
+
+  # parameters
+  nparams = {}
+  for k in common_configs:
+    for param_type in nparams_dict[k].keys():
+      try:
+        nparams[param_type].append(nparams_dict[k][param_type])
+      except:
+        nparams[param_type] = [nparams_dict[k][param_type]]
+  param_corr = {}
+  for param_type, target_params in nparams.items():
+    param_corr[param_type], _ = spearmanr((-np.asarray(target_scores)).tolist(), target_params)
+
+  common_ratios = []
+  spr_ranks = []
+  # extract common ratio and spearmanrank
+  for topk in topk_list:
+    common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth, sorted_target=sorted_target, \
+                                          val_ppl_list_gt=val_ppl_list_gt, val_ppl_list_target=target_scores)
+    common_ratios.append(common_ratio)
+    spr_ranks.append(spr_rank)
+
+  return common_ratios, spr_ranks, param_corr
 
 def plot(args):
   # load the ground-truth rankings
   yaml_file = os.path.join(args.results_dir, 'result_summary.yaml')
   with open(yaml_file, 'r') as f:
     results_gt = collections.OrderedDict(yaml.safe_load(f))
+
+  with open(os.path.join(args.results_dir, 'synflow_params.yaml'), 'r') as f:
+    nparams_dict = collections.OrderedDict(yaml.safe_load(f))
 
   scores = {}
   for file in os.listdir(args.results_dir):
@@ -301,31 +343,31 @@ def plot(args):
   
   common_ratios = {}
   spr_ranks = {}
-  for seed in scores.keys():
-    common_configs = np.intersect1d(list(results_gt.keys()), list(scores[seed].keys()))
-    print('analyzing {} architectures'.format(len(common_configs)))
-
-    # fear_stage_1 results:
-    val_ppl_list_gt = []
-    for k in common_configs:
-      val_ppl_list_gt.append(results_gt[k]['valid_perplexity'])
-    sorted_ground_truth = np.argsort(val_ppl_list_gt)
-
-    # zero-cost score results:
-    target_scores = []
-    for k in common_configs:
-      target_scores.append(-scores[seed][k])   # the higher the score, the better the architecture (reversely correlated with ppl)
-    sorted_target = np.argsort(target_scores)
-
-    common_ratios[seed] = []
-    spr_ranks[seed] = []
-    # extract common ratio and spearmanrank
-    topk_list = range(10,101,10)
-    for topk in topk_list:
-      common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth, sorted_target=sorted_target, \
-                                            val_ppl_list_gt=val_ppl_list_gt, val_ppl_list_target=target_scores)
-      common_ratios[seed].append(common_ratio)
-      spr_ranks[seed].append(spr_rank)
+  param_corrs = {}
+  topk_list = range(10,101,10)
+  if args.cross_seed:
+    for seed in scores.keys():
+      common_ratio, spr_rank, param_corr = get_statistics(seed, results_gt, scores, nparams_dict, topk_list)
+      common_ratios[seed] = common_ratio
+      spr_ranks[seed] = spr_rank
+      param_corrs[seed] = param_corr
+  else:
+    common_ratio, spr_rank, param_corr = get_statistics(str(args.seed), results_gt, scores, nparams_dict, topk_list)
+    common_ratios[str(args.seed)] = common_ratio
+    spr_ranks[str(args.seed)] = spr_rank
+    param_corrs[str(args.seed)] = param_corr
+    
+  plt.figure()
+  param_types = param_corr.keys()
+  for seed in common_ratios.keys():
+    for i, k in enumerate(param_types):
+      print(param_corrs[seed][k])
+      plt.scatter(i+1, param_corrs[seed][k], label='seed_'+seed, color='k')
+  plt.xticks(range(1, len(param_types)+1), list(param_types))
+  # plt.legend()
+  plt.ylim((0, 1))
+  plt.grid(axis='y')
+  plt.savefig('synflow_params.png', bbox_inches="tight")
 
   plt.figure()
   for seed in common_ratios.keys():
@@ -356,6 +398,7 @@ if __name__ == "__main__":
                       help='path where amulet results are downloaded')
   parser.add_argument('--seed', type=int, default=1111, help='Random seed')
   parser.add_argument('--plot', action='store_true', help='plot the spearman corr and common ratio')
+  parser.add_argument('--cross_seed', action='store_true', help='plot the spearman corr and common ratio for all evaluated seeds')
   args = parser.parse_args()
 
   np.random.seed(args.seed)
