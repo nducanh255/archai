@@ -17,53 +17,12 @@ search:
     - bash scripts/apex_install.sh
     - pip install --user -e .
     - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
-      {config} --config_file wt103_base.yaml                                         --n_layer
+      {config} --config_file wt103_base_FEAR.yaml                                         --n_layer
       {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
-      {d_inner} --d_embed {d_embed} --div_val {div_val}                                         --max_step
-      500 --experiment_name config_27_500 --scheduler constant
-    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
-      {config} --config_file wt103_base.yaml                                         --n_layer
-      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
-      {d_inner} --d_embed {d_embed} --div_val {div_val}                                         --max_step
-      1000 --experiment_name config_27_1000 --scheduler constant
-    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
-      {config} --config_file wt103_base.yaml                                         --n_layer
-      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
-      {d_inner} --d_embed {d_embed} --div_val {div_val}                                         --max_step
-      1500 --experiment_name config_27_1500 --scheduler constant
-    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
-      {config} --config_file wt103_base.yaml                                         --n_layer
-      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
-      {d_inner} --d_embed {d_embed} --div_val {div_val}                                         --max_step
-      2000 --experiment_name config_27_2000 --scheduler constant
-    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
-      {config} --config_file wt103_base.yaml                                         --n_layer
-      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
-      {d_inner} --d_embed {d_embed} --div_val {div_val}                                         --max_step
-      2500 --experiment_name config_27_2500 --scheduler constant
-    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
-      {config} --config_file wt103_base.yaml                                         --n_layer
-      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
-      {d_inner} --d_embed {d_embed} --div_val {div_val}                                         --max_step
-      3000 --experiment_name config_27_3000 --scheduler constant
-    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
-      {config} --config_file wt103_base.yaml                                         --n_layer
-      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
-      {d_inner} --d_embed {d_embed} --div_val {div_val}                                         --max_step
-      3500 --experiment_name config_27_3500 --scheduler constant
-    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
-      {config} --config_file wt103_base.yaml                                         --n_layer
-      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
-      {d_inner} --d_embed {d_embed} --div_val {div_val}                                         --max_step
-      4000 --experiment_name config_27_4000 --scheduler constant
-    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
-      {config} --config_file wt103_base.yaml                                         --n_layer
-      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
-      {d_inner} --d_embed {d_embed} --div_val {div_val}                                         --max_step
-      4500 --experiment_name config_27_4500 --scheduler constant
-    name: train_xl_config_27_500-5000
+      {d_inner} --d_embed {d_embed} --div_val {div_val}
+    name: train_xl_config_27
     sku: G4
-  max_trials: 8
+  max_trials: 2
   params:
   - name: config
     spec: discrete
@@ -72,11 +31,11 @@ search:
   - name: n_layer
     spec: discrete
     values:
-    - 7
+    - 5
   - name: n_head
     spec: discrete
     values:
-    - 2
+    - 2,8,8,8,8
   - name: d_model
     spec: discrete
     values:
@@ -84,19 +43,19 @@ search:
   - name: d_embed
     spec: discrete
     values:
-    - 256
+    - 512
   - name: div_val
     spec: discrete
     values:
-    - 1
+    - 4
   - name: d_head
     spec: discrete
     values:
-    - 32
+    - 32,8,8,8,8
   - name: d_inner
     spec: discrete
     values:
-    - 2020
+    - 1916,612,1051,787,1216
   type: grid
 storage:
   us_east:
