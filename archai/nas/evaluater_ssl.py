@@ -13,11 +13,13 @@ from torch.utils.data.dataloader import DataLoader
 
 from overrides import overrides, EnforceOverrides
 
+from archai.common import common
 from archai.common.trainer_ssl import TrainerSimClr
 from archai.common.config import Config
 from archai.common.common import logger
 from archai.datasets import data
 from archai.nas.model_desc import ModelDesc
+from archai.common.apex_utils import ApexUtils
 from archai.nas.model_desc_builder import ModelDescBuilder
 from archai.nas import nas_utils
 from archai.common import ml_utils, utils
@@ -31,9 +33,10 @@ class EvalResult:
         self.train_metrics = train_metrics
 
 class EvaluaterSimClr(EnforceOverrides):
-    def evaluate(self, conf_eval:Config, model_desc_builder:ModelDescBuilder)->EvalResult:
+    def evaluate(self, conf:Config, model_desc_builder:ModelDescBuilder)->EvalResult:
         logger.pushd('eval_arch')
-
+        conf_common = common.get_conf_common(conf)
+        conf_eval = common.get_conf_eval(conf)
         # region conf vars
         conf_checkpoint = conf_eval['checkpoint']
         resume = conf_eval['resume']
@@ -44,7 +47,26 @@ class EvaluaterSimClr(EnforceOverrides):
 
         model = self.create_model(conf_eval, model_desc_builder)
 
-        checkpoint = nas_utils.create_checkpoint(conf_checkpoint, resume)
+        checkpoint = nas_utils.create_checkpoint(conf_checkpoint, False) # Setting to False as trying to load checkpoint from different directory
+
+        apex = ApexUtils(conf_common['apex'], logger=None)
+        apex.sync_devices()
+        apex.barrier()
+
+        if conf_checkpoint['resume']:
+            resumedir = conf_checkpoint['resumedir']
+            experiment_name = conf_common['experiment_name']
+            resumedir = utils.full_path(resumedir)
+            resumedir = os.path.join(resumedir, experiment_name)
+            filename = os.path.basename(utils.full_path(conf_checkpoint['filename']))
+            filepath = os.path.join(resumedir, filename)
+            if os.path.exists(filepath):
+                print("Resuming")
+                found = checkpoint.resume(filepath)
+            else:
+                print('Resume ckpt not found')
+                conf_checkpoint['resume'] = False
+                conf_checkpoint['resumedir'] = ''
         train_metrics = self.train_model(conf_eval, model, checkpoint)
         train_metrics.save(metric_filename)
 

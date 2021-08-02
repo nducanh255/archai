@@ -49,13 +49,7 @@ class CheckPoint(UserDict):
             return True
         return False
 
-    def resume(self, conf_checkpoint:Config)->bool:
-        resumedir = conf_checkpoint['resumedir']
-        experiment_name = conf_checkpoint['experiment_name']
-        resumedir = utils.full_path(resumedir)
-        resumedir = os.path.join(resumedir, experiment_name)
-        filename = os.path.basename(utils.full_path(conf_checkpoint['filename']))
-        filepath = os.path.join(resumedir, filename)
+    def resume(self, filepath:str)->bool:
         if filepath and os.path.exists(filepath):
             d = torch.load(filepath, map_location=torch.device('cpu'))
             self.clear()

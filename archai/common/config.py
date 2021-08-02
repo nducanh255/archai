@@ -81,8 +81,8 @@ class Config(UserDict):
 
         resolved_conf = copy.deepcopy(self)
         # Let's do final overrides from args
-        self._update_from_args(param_args, resolved_conf)      # merge from params
         self._update_from_args(self.extra_args, resolved_conf) # merge from command line
+        self._update_from_args(param_args, resolved_conf)      # merge from params
 
         if resolve_redirects:
             yaml_utils.resolve_all(self)

@@ -65,8 +65,22 @@ def train_test(conf_main:Config):
     # train!
     ckpt = CheckPoint(conf_checkpoint, load_existing=False)
     if conf_checkpoint['resume']:
-        print("Resuming")
-        found = ckpt.resume(conf_checkpoint)
+        resumedir = conf_checkpoint['resumedir']
+        experiment_name = conf_checkpoint['experiment_name']
+        resumedir = utils.full_path(resumedir)
+        resumedir = os.path.join(resumedir, experiment_name)
+        filename = os.path.basename(utils.full_path(conf_checkpoint['filename']))
+        filepath = os.path.join(resumedir, filename)
+        if os.path.exists(filepath):
+            print("Resuming")
+            found = ckpt.resume(filepath)
+        else:
+            print('Resume ckpt not found')
+            # if os.path.exists(conf_common['resumedir']):
+            #     shutil.rmtree(conf_common['resumedir'])
+            conf_common['resume'] = conf_checkpoint['resume'] = conf_common['apex']['resume'] = \
+            conf_common['apex']['resume'] = conf_common['apex']['resume'] = False
+            conf_common['resumedir'] = conf_checkpoint['resumedir'] = ''
     trainer = TrainerSimClr(conf_trainer, model, ckpt)
     st = time.time()
     trainer.fit(data_loaders)
@@ -84,7 +98,7 @@ if __name__ == '__main__':
         Config.set_inst(conf)
         update_envvars(conf)
         commonstate = get_state()
-        init_from(commonstate)
+        init_from(commonstate,recreate_logger=False)
         print('Running child process')
     train_test(conf)
 

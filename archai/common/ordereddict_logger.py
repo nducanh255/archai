@@ -34,7 +34,7 @@ class OrderedDictLogger:
         
         self._save_intermediate = conf_common['save_intermediate']
         self._intermediatedir = conf_common['intermediatedir']
-        if self._save_intermediate:
+        if self._save_intermediate and utils.is_main_process():
             intermediatedir = self._intermediatedir
             experiment_name = conf_common['experiment_name']
             logdir = conf_common['logdir']
@@ -42,19 +42,11 @@ class OrderedDictLogger:
             if intermediatedir:
                 intermediatedir = utils.full_path(intermediatedir)
                 expdir = os.path.join(intermediatedir, experiment_name)
-
-                # directory for non-master replica logs
-                distdir = os.path.join(expdir, 'dist')
             else:
-                expdir = distdir = intermediatedir
+                expdir = intermediatedir
 
             log_prefix = conf_common['log_prefix']
-
-            if utils.is_main_process():
-                intermediatedir, log_suffix = expdir, ''
-            else:
-                intermediatedir, log_suffix = distdir, '_' + str(os.environ["RANK"])
-                logdir = os.path.join(logdir, 'dist')
+            intermediatedir, log_suffix = expdir, ''
 
             self._sys_log_filepath = utils.full_path(os.path.join(logdir, f'{log_prefix}{log_suffix}.log'))
             self._intermediate_sys_log_filepath = utils.full_path(os.path.join(intermediatedir, f'{log_prefix}{log_suffix}.log'))

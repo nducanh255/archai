@@ -54,6 +54,9 @@ def get_conf_dataset(conf:Optional[Config]=None)->Config:
 def get_conf_search(conf:Optional[Config]=None)->Config:
     return get_conf(conf)['nas']['search']
 
+def get_conf_eval(conf:Optional[Config]=None)->Config:
+    return get_conf(conf)['nas']['eval']
+
 def get_experiment_name(conf:Optional[Config]=None)->str:
     return get_conf_common(conf)['experiment_name']
 
@@ -175,7 +178,14 @@ def common_init(config_filepath: Optional[str]=None,
     create_dirs(conf, clean_expdir)
 
     # copy from resume dir if exists
-    copy_resume_dirs(conf)
+    is_clean = copy_resume_dirs(conf)
+
+    # if resume set to False, regenerate conf
+    if not is_clean:
+        update_resume_args(param_args)
+        conf = create_conf(config_filepath, param_args, use_args)
+        Config.set_inst(conf)
+        update_envvars(conf)
 
     # create intermediate exp dir
     create_intermediate_dirs(conf)
@@ -201,6 +211,16 @@ def common_init(config_filepath: Optional[str]=None,
 
     return conf
 
+def update_resume_args(param_args:list)->None:
+    if '--common.resume' in param_args:
+        param_args[param_args.index('--common.resume')+1] = 'false'
+    else:
+        param_args+=['--common.resume','false']
+    if '--common.resumedir' in param_args:
+        param_args[param_args.index('--common.resumedir')+1] = ''
+    else:
+        param_args+=['--common.resumedir','']
+                            
 def _create_sysinfo(conf:Config)->None:
     expdir = get_expdir(conf)
 
@@ -337,7 +357,7 @@ def create_intermediate_dirs(conf:Config)->None:
     intermediatedir = os.path.join(conf_common['intermediatedir'],get_experiment_name(conf))
     logdir = os.path.join(conf_common['logdir'],get_experiment_name(conf))
     if conf_common['save_intermediate']:
-        print(f'Copying logs and ckpts from {logdir} to {intermediatedir}')
+        print(f'Copying logs and ckpts from working directory {logdir} to intermediate directory {intermediatedir}')
         os.makedirs(conf_common['intermediatedir'], exist_ok=True)
         os.makedirs(intermediatedir, exist_ok=True)
         log_suffix = ''
@@ -358,19 +378,20 @@ def create_intermediate_dirs(conf:Config)->None:
         #     os.makedirs(os.path.join(intermediatedir,'dist'),exist_ok=True)
         #     copy_tree(os.path.join(logdir,'dist'),os.path.join(intermediatedir,'dist'))
 
-def copy_resume_dirs(conf:Config)->None:
+def copy_resume_dirs(conf:Config)->bool:
     conf_common = get_conf_common(conf)
     conf_checkpoint = conf_common['checkpoint']
     resumedir = os.path.join(conf_common['resumedir'],get_experiment_name(conf))
     logdir = os.path.join(conf_common['logdir'],get_experiment_name(conf))
     if conf_common['resume']:
         resume_ckpt_path = os.path.join(resumedir,os.path.basename(utils.full_path(conf_checkpoint['filename'])))
-        if os.path.exists(resume_ckpt_path):
-            print(f'Copying logs and ckpts from {resumedir} to {logdir}')
-            log_suffix = ''
-            log_prefix = conf_common['log_prefix']
-            resume_sys_log_filepath = utils.full_path(os.path.join(resumedir, f'{log_prefix}{log_suffix}.log'))
-            resume_logs_yaml_filepath = utils.full_path(os.path.join(resumedir, f'{log_prefix}{log_suffix}.yaml'))
+        log_suffix = ''
+        log_prefix = conf_common['log_prefix']
+        resume_sys_log_filepath = utils.full_path(os.path.join(resumedir, f'{log_prefix}{log_suffix}.log'))
+        resume_logs_yaml_filepath = utils.full_path(os.path.join(resumedir, f'{log_prefix}{log_suffix}.yaml'))
+        found, check_message = check_resume_files(resume_ckpt_path, resume_sys_log_filepath, resume_logs_yaml_filepath)
+        if found:
+            print(f'Copying logs and ckpts from resume directory {resumedir} to working directory {logdir}')
             sys_log_filepath = utils.full_path(os.path.join(logdir, f'{log_prefix}{log_suffix}.log'))
             logs_yaml_filepath = utils.full_path(os.path.join(logdir, f'{log_prefix}{log_suffix}.yaml'))
             ckpt_path = os.path.join(logdir,os.path.basename(utils.full_path(conf_checkpoint['filename'])))
@@ -380,13 +401,34 @@ def copy_resume_dirs(conf:Config)->None:
             # if os.path.exists(os.path.join(logdir,'dist')):
             #     os.makedirs(os.path.join(logdir,'dist'),exist_ok=True)
             #     copy_tree(os.path.join(resumedir,'dist'),os.path.join(logdir,'dist'))
+            return True
         else:
-            print('Resume ckpt not found')
+            print(check_message)
+            print('Resume directory not clean, disabling resume')
             # if os.path.exists(conf_common['resumedir']):
             #     shutil.rmtree(conf_common['resumedir'])
-            conf_common['resume'] = conf_checkpoint['resume'] = conf_common['apex']['resume'] = \
-            conf_common['apex']['resume'] = conf_common['apex']['resume'] = False
-            conf_common['resumedir'] = conf_checkpoint['resumedir'] = ''
+            # conf_common['resume'] = conf_checkpoint['resume'] = conf_common['apex']['resume'] = \
+            # conf_common['apex']['resume'] = conf_common['apex']['resume'] = False
+            # conf_common['resumedir'] = conf_checkpoint['resumedir'] = ''
+            return False
+    return True
+
+def check_resume_files(ckpt_path:str, log_path:str, yaml_path:str)->Tuple[bool,str]:
+    if os.path.exists(ckpt_path) and os.path.exists(log_path) and os.path.exists(yaml_path):
+        try:
+            ckpt = torch.load(ckpt_path, map_location=torch.device('cpu'))
+            with open(yaml_path, 'r') as f:
+                log_yaml = yaml.load(f, Loader=yaml.Loader)
+        except Exception as e:
+            return False, e
+        return True, 'Resume file paths found!'
+    else:
+        if not os.path.exists(ckpt_path):
+            return False, f'{ckpt_path} does not exist'
+        if not os.path.exists(log_path):
+            return False, f'{log_path} does not exist'
+        if not os.path.exists(yaml_path):
+            return False, f'{yaml_path} does not exist'
 
 def create_logger(conf:Config):
     conf_common = get_conf_common(conf)
