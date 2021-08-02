@@ -12,7 +12,7 @@ plt.rcParams.update({'font.size': 18})
 
 import torch
 
-from archai.nlp.nvidia_transformer_xl.mem_transformer import MemTransformerLM
+from archai.nlp.nvidia_transformer_xl.mem_transformer import MemTransformerLM, MemTransformerLM_flex
 from archai.nlp.nvidia_transformer_xl.mem_transformer import PositionwiseFF, MultiHeadAttn, RelMultiHeadAttn, \
                                                             RelPartialLearnableMultiHeadAttn, RelLearnableMultiHeadAttn, DecoderLayer, \
                                                             RelLearnableDecoderLayer, RelPartialLearnableDecoderLayer, AdaptiveEmbedding, ProjectedAdaptiveLogSoftmax
@@ -22,7 +22,7 @@ from archai.nlp.nvidia_transformer_xl.data_utils import get_lm_corpus
 from archai.nlp.nvidia_transformer_xl.nvidia_utils import exp_utils
 from archai.common import utils, common
 
-from gather_results import get_metrics
+from gather_results import get_metrics, get_config_name
 
 def meta_constructor_mapping(loader, node):
     value = loader.construct_mapping(node)
@@ -34,6 +34,47 @@ def meta_constructor_sequence(loader, node):
 
 yaml.add_constructor(u'tag:yaml.org,2002:python/object/apply:numpy.core.multiarray.scalar', meta_constructor_sequence)
 yaml.add_constructor(u'tag:yaml.org,2002:python/object/apply:numpy.dtype', meta_constructor_mapping)
+
+
+model_config_keys = ['n_token', 'n_layer','n_head','d_model','d_head','d_inner','dropout','dropatt', \
+                        'd_embed','div_val','pre_lnorm','tgt_len','ext_len','mem_len', \
+                        'same_length','attn_type','clamp_len','sample_softmax']
+
+def recurse_dir(args, path_to_dir):
+  results = {}
+  for j in os.listdir(path_to_dir):
+      j_path = os.path.join(path_to_dir, j)
+      if os.path.isdir(j_path):
+        results.update(recurse_dir(args, j_path))
+      else:
+        logs = None
+        if 'config.yaml' in j_path:
+          with open(os.path.join(j_path), 'r') as f:
+            config = yaml.load(f)
+            model_config = {k: config[k] for k in model_config_keys}
+            
+          cutoffs, tie_projs = [], [False]
+          if config['adaptive']:
+              assert config['dataset'] in ['wt103', 'wt2', 'lm1b']
+              if config['dataset'] in ['wt103', 'wt2']:
+                  cutoffs = [19997, 39997, 199997]
+                  tie_projs += [True] * len(cutoffs)
+              elif config['dataset'] == 'lm1b':
+                  cutoffs = [59997, 99997, 639997]
+                  tie_projs += [False] * len(cutoffs)
+          model_config['cutoffs'] = cutoffs
+          model_config['tie_projs'] = tie_projs
+          model_config['tie_weight'] = config['tied']
+          model_config['dtype'] = None
+          logs = {'config': config, 'model_config': model_config}
+        
+        if logs: 
+          config_name = get_config_name(j_path) #get_config_name(os.path.basename(os.path.dirname(j_path)))
+          print(config_name, logs)
+          results[config_name] = logs
+  
+  return results
+
 
 def forward_predict_memtransformer(self, data, target, mems):
   if mems is None:
@@ -118,140 +159,179 @@ def get_model_flops(model, inp, tgt):
   return flops
 
 
-def get_flops(args):
-  model_config_keys = ['n_token', 'n_layer','n_head','d_model','d_head','d_inner','dropout','dropatt', \
-                      'd_embed','div_val','pre_lnorm','tgt_len','ext_len','mem_len', \
-                      'same_length','attn_type','clamp_len','sample_softmax']
-
-  yaml_file = os.path.join(args.results_dir, 'flops_summary.yaml'.format(args.seed))
+def get_flops(args, exp_name):
+  path_to_results = os.path.join(args.results_dir, exp_name)
+  
+  yaml_file = os.path.join(path_to_results, 'flops_summary.yaml'.format(args.seed))
   if os.path.exists(yaml_file):
     with open(yaml_file, 'r') as f:
+      print('Loading flops summary')
       flops = yaml.safe_load(f)
   
   else:
-    jobs = os.listdir(args.results_dir)
-    device = torch.device("cpu")
     flops = {}
 
+    configs = recurse_dir(args, path_to_results)
     train_iter = None
-    for j in jobs:
-      j_path = os.path.join(args.results_dir, j)
-      if not os.path.isdir(j_path):
-        continue
+    for config_name, all_config in configs.items():
+      config = all_config['config']
+      model_config = all_config['model_config']
+
+      if len(model_config['n_head'])==1:
+        model = MemTransformerLM(**model_config)
+      else:
+        model = MemTransformerLM_flex(**model_config)
+      model = model.to(device='cpu')
+
+      # load data
+      if train_iter is None:
+        path_to_data = common.default_dataroot()
+        path_to_data = utils.full_path(os.path.join(path_to_data,'textpred', exp_utils.dataset_dir_name(config['dataset'])))
+        corpus = get_lm_corpus(path_to_data, config['dataset'], config['vocab'], max_size=config['vocab_size'])
+        train_iter = corpus.get_iterator('train', 1, config['tgt_len'], device='cpu', ext_len=config['ext_len'])
+          
+      # B = 1 #batch size 
+      # tgt_len, mem_len, ext_len = 192, 192, 0
+      # data_len = tgt_len * 10
+      # data = torch.LongTensor(data_len*B).random_(0, config['n_token']).to(device)
+      # train_iter = data_utils.LMOrderedIterator(data, B, tgt_len, device=device, ext_len=ext_len)
+
+      model.eval()
+      for idx, (inp, tgt, seqlen, _) in enumerate(train_iter):
+        curr_flops = get_model_flops(model, inp, tgt)
+        break
+      total_flops = np.sum([curr_flops[k] for k in curr_flops.keys()]).tolist()
       
-      config_name = re.search('(config_[0-9]+)', j).group(1)
-      for fname in os.listdir(j_path):
-        if 'config.yaml' in fname:
-          with open(os.path.join(j_path, fname), 'r') as f:
-            config = yaml.load(f)
-            model_config = {k: config[k] for k in model_config_keys}
-            
-          cutoffs, tie_projs = [], [False]
-          if config['adaptive']:
-              assert config['dataset'] in ['wt103', 'wt2', 'lm1b']
-              if config['dataset'] in ['wt103', 'wt2']:
-                  cutoffs = [19997, 39997, 199997]
-                  tie_projs += [True] * len(cutoffs)
-              elif config['dataset'] == 'lm1b':
-                  cutoffs = [59997, 99997, 639997]
-                  tie_projs += [False] * len(cutoffs)
-          model_config['cutoffs'] = cutoffs
-          model_config['tie_projs'] = tie_projs
-          model_config['tie_weight'] = config['tied']
-          model_config['dtype'] = None
+      flops[config_name] = curr_flops
+      flops[config_name]['total'] = total_flops
+      print(config_name, flops[config_name])
 
-          model = MemTransformerLM(**model_config)
-          model.forward = types.MethodType(forward_predict_memtransformer, model)
-          model = model.to(device)
-
-          # load data
-          if train_iter is None:
-            path_to_data = common.default_dataroot()
-            path_to_data = utils.full_path(os.path.join(path_to_data,'textpred', exp_utils.dataset_dir_name(config['dataset'])))
-            corpus = get_lm_corpus(path_to_data, config['dataset'], config['vocab'], max_size=config['vocab_size'])
-            train_iter = corpus.get_iterator('train', 1, config['tgt_len'], device='cpu', ext_len=config['ext_len'])
-          
-          # B = 1 #batch size 
-          # tgt_len, mem_len, ext_len = 192, 192, 0
-          # data_len = tgt_len * 10
-          # data = torch.LongTensor(data_len*B).random_(0, config['n_token']).to(device)
-          # train_iter = data_utils.LMOrderedIterator(data, B, tgt_len, device=device, ext_len=ext_len)
-
-          model.eval()
-          for idx, (inp, tgt, seqlen, _) in enumerate(train_iter):
-            curr_flops = get_model_flops(model, inp, tgt)
-            break
-          total_flops = np.sum([curr_flops[k] for k in curr_flops.keys()]).tolist()
-          
-          flops[config_name] = curr_flops
-          flops[config_name]['total'] = total_flops
-          print(config_name, flops[config_name])
-
+    print('summarized %d configurations' % len(flops.keys()))
     with open(yaml_file, 'w') as f:
         yaml.dump(flops, f)
 
 
 def plot(args):
-  # load the ground-truth rankings
-  yaml_file = os.path.join(args.results_dir, 'result_summary.yaml')
-  with open(yaml_file, 'r') as f:
-    results_gt = collections.OrderedDict(yaml.safe_load(f))
-
-  yaml_file = os.path.join(args.results_dir, 'flops_summary.yaml'.format(args.seed))
-  with open(yaml_file, 'r') as f:
-    flops = yaml.safe_load(f)
+  common_ratios = {}
+  spr_ranks = {}
   
-  common_configs = np.intersect1d(list(results_gt.keys()), list(flops.keys()))
-  print('analyzing {} architectures'.format(len(common_configs)))
+  common_ratios_total = {}
+  spr_ranks_total = {}
+  
+  n_flops = {}
+  n_flops_total = {}
 
-  # fear_stage_1 results:
-  val_ppl_list_gt = []
-  for k in common_configs:
-    val_ppl_list_gt.append(results_gt[k]['valid_perplexity'])
-  sorted_ground_truth = np.argsort(val_ppl_list_gt)
+  val_ppl_list_gt = {}
+  sorted_ground_truth = {}
 
-  # zero-cost score results:
-  target_flops = []
-  for k in common_configs:
-    target_flops.append(flops[k]['total'])   # the higher the score, the better the architecture (reversely correlated with ppl)
-  sorted_target = np.argsort(target_flops)
+  legend_keys = []
+  for exp_name in args.exp_name:
+    path_to_results = os.path.join(args.results_dir, exp_name)
+    legend_key = 'heterogeneous' if 'heterogeneous' in exp_name else 'homogeneous'
+    legend_keys.append(legend_key)
 
-  common_ratios = []
-  spr_ranks = []
-  # extract common ratio and spearmanrank
-  topk_list = range(10,101,10)
-  for topk in topk_list:
-    common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth, sorted_target=sorted_target, \
-                                          val_ppl_list_gt=val_ppl_list_gt, val_ppl_list_target=target_flops)
-    common_ratios.append(common_ratio)
-    spr_ranks.append(spr_rank)
+    # load the ground-truth rankings
+    yaml_file = os.path.join(path_to_results, 'result_summary.yaml')
+    with open(yaml_file, 'r') as f:
+      results_gt = collections.OrderedDict(yaml.safe_load(f))
+
+    yaml_file = os.path.join(path_to_results, 'flops_summary.yaml'.format(args.seed))
+    with open(yaml_file, 'r') as f:
+      flops = yaml.safe_load(f)
+    
+    common_configs = np.intersect1d(list(results_gt.keys()), list(flops.keys()))
+    print('analyzing {} architectures'.format(len(common_configs)))
+
+    # fear_stage_1 results:
+    val_ppl_list_gt[legend_key] = []
+    for k in common_configs:
+      val_ppl_list_gt[legend_key].append(results_gt[k]['valid_perplexity'])
+    sorted_ground_truth[legend_key] = np.argsort(val_ppl_list_gt[legend_key])
+
+    # zero-cost score results:
+    n_flops[legend_key] = []
+    n_flops_total[legend_key] = []
+    for k in common_configs:
+      n_flops[legend_key].append(-(flops[k]['FFN'] + flops[k]['Attn']))   # the higher the score, the better the architecture (reversely correlated with ppl)
+      n_flops_total[legend_key].append(-flops[k]['total'])
+    sorted_flops = np.argsort(n_flops[legend_key])
+    sorted_flops_total = np.argsort(n_flops_total[legend_key])
+
+    # extract common ratio and spearmanrank
+    common_ratios[legend_key] = []
+    spr_ranks[legend_key] = []
+    common_ratios_total[legend_key] = []
+    spr_ranks_total[legend_key] = []
+    
+    topk_list = range(10,101,10)
+    for topk in topk_list:
+      common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth[legend_key], sorted_target=sorted_flops, \
+                                            val_ppl_list_gt=val_ppl_list_gt[legend_key], val_ppl_list_target=n_flops[legend_key])
+      common_ratios[legend_key].append(common_ratio)
+      spr_ranks[legend_key].append(spr_rank)
+
+      common_ratio_total, spr_rank_total = get_metrics(topk, sorted_ground_truth=sorted_ground_truth[legend_key], sorted_target=sorted_flops_total, \
+                                            val_ppl_list_gt=val_ppl_list_gt[legend_key], val_ppl_list_target=n_flops_total[legend_key])
+      common_ratios_total[legend_key].append(common_ratio_total)
+      spr_ranks_total[legend_key].append(spr_rank_total)
   
   plt.figure()
-  plt.scatter(np.asarray(target_flops)[sorted_ground_truth], np.asarray(val_ppl_list_gt)[sorted_ground_truth])
+  for k in legend_keys:
+      plt.scatter(-np.asarray(n_flops_total[k])[sorted_ground_truth[k]], np.asarray(val_ppl_list_gt[k])[sorted_ground_truth[k]], label=k)
   plt.ylabel('Validation PPL')
   plt.xlabel('FLOPs')
   plt.title('Pareto Curve')
   plt.grid(axis='y')
+  plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
   plt.savefig('pareto_flops.png', bbox_inches="tight")
 
   plt.figure()
-  plt.scatter(topk_list, common_ratios)
+  for k in legend_keys:
+    plt.scatter(topk_list, common_ratios[k], label=k)
   plt.ylabel('Common ratio')
   plt.xlabel('Topk (%)')
   plt.xticks(topk_list)
-  plt.title('ranking based on FLOPs')
+  plt.title('ranking based on number of flops')
   plt.grid(axis='y')
-  plt.savefig('common_ratio_topk_flops.png', bbox_inches="tight")
+  plt.ylim((0,1))
+  plt.legend(loc='lower right')
+  plt.savefig('common_ratio_topk_nflops.png', bbox_inches="tight")
 
   plt.figure()
-  plt.scatter(topk_list, spr_ranks)
+  for k in legend_keys:
+    plt.scatter(topk_list, common_ratios_total[k], label=k)
+  plt.ylabel('Common ratio')
+  plt.xlabel('Topk (%)')
+  plt.xticks(topk_list)
+  plt.title('ranking based on number of flops')
+  plt.grid(axis='y')
+  plt.ylim((0,1))
+  plt.legend(loc='lower right')
+  plt.savefig('common_ratio_topk_nflops_total.png', bbox_inches="tight")
+
+  plt.figure()
+  for k in legend_keys:
+    plt.scatter(topk_list, spr_ranks[k], label=k)
   plt.ylabel('Spearman\'s Correlation')
   plt.xlabel('Topk (%)')
   plt.xticks(topk_list)
-  plt.ylim(top=1)
   plt.grid(axis='y')
-  plt.title('ranking based on FLOPs')
-  plt.savefig('spearman_topk_flops.png', bbox_inches="tight")
+  plt.ylim((0,1))
+  plt.legend(loc='lower right')
+  plt.title('ranking based on number of flops')
+  plt.savefig('spearman_topk_nflops.png', bbox_inches="tight")
+
+  plt.figure()
+  for k in legend_keys:
+    plt.scatter(topk_list, spr_ranks_total[k], label=k)
+  plt.ylabel('Spearman\'s Correlation')
+  plt.xlabel('Topk (%)')
+  plt.xticks(topk_list)
+  plt.grid(axis='y')
+  plt.ylim((0,1))
+  plt.legend(loc='lower right')
+  plt.title('ranking based on number of flops')
+  plt.savefig('spearman_topk_nflops_total.png', bbox_inches="tight")
 
   # create a box plot of parameter size variation across architectures
   fig, ax = plt.subplots()
@@ -278,6 +358,8 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Results Analysis.')
   parser.add_argument('--results_dir', type=str, default='/home/t-mojanj/logdir/nv_xformer_xl/prev_jobs/',
                       help='path where amulet results are downloaded')
+  parser.add_argument('--exp_name', type=lambda s: [item for item in s.split(',')], #required=True,
+                      help='name of maulet experiment')
   parser.add_argument('--seed', type=int, default=1111, help='Random seed')
   parser.add_argument('--plot', action='store_true', help='plot the spearman corr and common ratio')
   args = parser.parse_args()
@@ -285,9 +367,8 @@ if __name__ == "__main__":
   np.random.seed(args.seed)
   torch.manual_seed(args.seed)
 
-  args.results_dir = os.path.join(args.results_dir, 'fear_stage_1')
-  
-  get_flops(args)
+  for exp_name in args.exp_name:
+    get_flops(args, exp_name)
   
   if args.plot:
     plot(args)

@@ -20,7 +20,7 @@ import torch.nn.functional as F
 from archai.common import utils, common
 from archai.nlp.nvidia_transformer_xl.data_utils import get_lm_corpus
 from archai.nlp.nvidia_transformer_xl.nvidia_utils import exp_utils
-from archai.nlp.nvidia_transformer_xl.mem_transformer import MemTransformerLM
+from archai.nlp.nvidia_transformer_xl.mem_transformer import MemTransformerLM, MemTransformerLM_flex
 from archai.nlp.nvidia_transformer_xl.mem_transformer import PositionwiseFF, MultiHeadAttn, RelMultiHeadAttn, \
                                                             RelPartialLearnableMultiHeadAttn, RelLearnableMultiHeadAttn, DecoderLayer, \
                                                             RelLearnableDecoderLayer, RelPartialLearnableDecoderLayer, AdaptiveEmbedding, ProjectedAdaptiveLogSoftmax
@@ -39,6 +39,10 @@ def meta_constructor_sequence(loader, node):
 
 yaml.add_constructor(u'tag:yaml.org,2002:python/object/apply:numpy.core.multiarray.scalar', meta_constructor_sequence)
 yaml.add_constructor(u'tag:yaml.org,2002:python/object/apply:numpy.dtype', meta_constructor_mapping)
+
+model_config_keys = ['n_token', 'n_layer','n_head','d_model','d_head','d_inner','dropout','dropatt', \
+                        'd_embed','div_val','pre_lnorm','tgt_len','ext_len','mem_len', \
+                        'same_length','attn_type','clamp_len','sample_softmax']
 
 
 def forward_with_output_memtransformer(self, data, target, mems):
@@ -232,40 +236,92 @@ def get_info_from_json(json_file, step=[], type=None):
 
 
 def get_config_name(job):
-  idx = list(re.search('config_', job).span())[0]
-  return job[idx:]
+  # idx = list(re.search('config_', job).span())[0]
+  # return job[idx:]
+  return re.search('(config_[0-9]+)', job).group(1)
 
 
-def recurse_dir(args, exp_name, path_to_dir, read_log_file=False):
+def recurse_dir(args, exp_name, path_to_dir, filetypes='.json'):
+  if not isinstance(filetypes, list):
+    filetypes = [filetypes]
+  
   results = {}
   for j in os.listdir(path_to_dir):
       j_path = os.path.join(path_to_dir, j)
       if os.path.isdir(j_path):
         if args.n_unfreeze is not None and 'unfreeze_{}'.format(args.n_unfreeze) not in j:
           continue
-        results.update(recurse_dir(args, exp_name, j_path, read_log_file))
+        results.update(recurse_dir(args, exp_name, j_path, filetypes))
       else:
-        if '.log' in j and read_log_file:
-          logs_log = get_info_from_logs(j_path, stage_1='stage_1' in exp_name)
-          if logs_log: 
-            config_name = get_config_name(os.path.basename(os.path.dirname(j_path)))
-            print(config_name, logs_log)
-            if config_name in results.keys():
-              results[config_name].update(logs_log)
+        for ft in filetypes:
+          if ft in j:
+            if ft=='.log':
+              logs = get_info_from_logs(j_path, stage_1='stage_1' in exp_name)
+            elif ft=='.json':
+              logs = get_info_from_json(j_path, step=args.step, type=args.log_type)
+            elif ft=='config.yaml':
+              with open(os.path.join(j_path), 'r') as f:
+                config = yaml.load(f)
+                model_config = {k: config[k] for k in model_config_keys}
+                
+              cutoffs, tie_projs = [], [False]
+              if config['adaptive']:
+                  assert config['dataset'] in ['wt103', 'wt2', 'lm1b']
+                  if config['dataset'] in ['wt103', 'wt2']:
+                      cutoffs = [19997, 39997, 199997]
+                      tie_projs += [True] * len(cutoffs)
+                  elif config['dataset'] == 'lm1b':
+                      cutoffs = [59997, 99997, 639997]
+                      tie_projs += [False] * len(cutoffs)
+              model_config['cutoffs'] = cutoffs
+              model_config['tie_projs'] = tie_projs
+              model_config['tie_weight'] = config['tied']
+              model_config['dtype'] = None
+              logs = model_config
             else:
-              results[config_name] = logs_log
-
-        if '.json' in j:
-          json_logs = get_info_from_json(j_path, step=args.step, type=args.log_type)
-          if json_logs: 
-            config_name = get_config_name(os.path.basename(os.path.dirname(j_path)))
-            print(config_name, json_logs)
-            if config_name in results.keys():
-              results[config_name].update(json_logs)
-            else:
-              results[config_name] = json_logs
+              assert False, 'unsupported file type {}'.format(ft)
+            
+            if logs: 
+              config_name = get_config_name(j_path) #get_config_name(os.path.basename(os.path.dirname(j_path)))
+              print(config_name, logs)
+              if config_name in results.keys():
+                results[config_name].update(logs)
+              else:
+                results[config_name] = logs
   
   return results
+
+
+# def recurse_dir(args, exp_name, path_to_dir, read_log_file=False):
+#   results = {}
+#   for j in os.listdir(path_to_dir):
+#       j_path = os.path.join(path_to_dir, j)
+#       if os.path.isdir(j_path):
+#         if args.n_unfreeze is not None and 'unfreeze_{}'.format(args.n_unfreeze) not in j:
+#           continue
+#         results.update(recurse_dir(args, exp_name, j_path, read_log_file))
+#       else:
+#         if '.log' in j and read_log_file:
+#           logs_log = get_info_from_logs(j_path, stage_1='stage_1' in exp_name)
+#           if logs_log: 
+#             config_name = get_config_name(j_path) #get_config_name(os.path.basename(os.path.dirname(j_path)))
+#             print(config_name, logs_log)
+#             if config_name in results.keys():
+#               results[config_name].update(logs_log)
+#             else:
+#               results[config_name] = logs_log
+
+#         if '.json' in j:
+#           json_logs = get_info_from_json(j_path, step=args.step, type=args.log_type)
+#           if json_logs: 
+#             config_name = get_config_name(j_path) #get_config_name(os.path.basename(os.path.dirname(j_path)))
+#             print(config_name, json_logs)
+#             if config_name in results.keys():
+#               results[config_name].update(json_logs)
+#             else:
+#               results[config_name] = json_logs
+  
+#   return results
 
 
 def get_parser():
@@ -486,7 +542,7 @@ def main():
       path_to_results = os.path.join(args.results_dir, exp_name)
 
       results = {}
-      results = recurse_dir(args, exp_name, path_to_results, read_log_file=False)
+      results = recurse_dir(args, exp_name, path_to_results, filetypes='.json')
         
       print('found %d configurations'%len(results.keys()))
       if 'stage_2' in exp_name:
@@ -785,13 +841,9 @@ def main():
 
 
   elif args.analyze_params: # creates a .yaml file containing config names and corresponding parameter sizes
-    model_config_keys = ['n_token', 'n_layer','n_head','d_model','d_head','d_inner','dropout','dropatt', \
-                        'd_embed','div_val','pre_lnorm','tgt_len','ext_len','mem_len', \
-                        'same_length','attn_type','clamp_len','sample_softmax']
-
     for exp_name in args.exp_name:
       path_to_results = os.path.join(args.results_dir, exp_name)
-      jobs = os.listdir(path_to_results)
+      model_configs = recurse_dir(args, exp_name, path_to_results, filetypes='config.yaml')
 
       params_adaptive_embedding_list = []
       params_adaptive_softmax_list = []
@@ -799,49 +851,25 @@ def main():
       params_ff_list = []
       
       n_all_params = {}
-      for j in jobs:
-        if args.n_unfreeze is not None and 'unfreeze_{}'.format(args.n_unfreeze) not in j:
-          continue
-        j_path = os.path.join(path_to_results, j)
-        if os.path.isdir(j_path):
-          for fname in os.listdir(j_path):
-            if 'config.yaml' in fname:
-              with open(os.path.join(j_path, fname), 'r') as f:
-                config = yaml.load(f)
-                model_config = {k: config[k] for k in model_config_keys}
+      for config_name, model_config in model_configs.items():
+        if len(model_config['n_head'])==1:
+          model = MemTransformerLM(**model_config)
+        else:
+          model = MemTransformerLM_flex(**model_config)
+        model = model.to(device='cpu')
                 
-                cutoffs, tie_projs = [], [False]
-                if config['adaptive']:
-                    assert config['dataset'] in ['wt103', 'wt2', 'lm1b']
-                    if config['dataset'] in ['wt103', 'wt2']:
-                        cutoffs = [19997, 39997, 199997]
-                        tie_projs += [True] * len(cutoffs)
-                    elif config['dataset'] == 'lm1b':
-                        cutoffs = [59997, 99997, 639997]
-                        tie_projs += [False] * len(cutoffs)
-                model_config['cutoffs'] = cutoffs
-                model_config['tie_projs'] = tie_projs
-                model_config['tie_weight'] = config['tied']
-                model_config['dtype'] = None
+        curr_n_all_param, params_adaptive_embedding, params_adaptive_softmax, params_attention, params_ff = process_parameters(model)
 
-                model = MemTransformerLM(**model_config)
-                model = model.to(device='cpu')
-                
-                curr_n_all_param, params_adaptive_embedding, params_adaptive_softmax, params_attention, params_ff = process_parameters(model)
+        n_all_params[config_name] = {'AdaEmb': float(params_adaptive_embedding), 'Sftmax': float(params_adaptive_softmax), \
+                          'Attn': float(params_attention), 'FFN': float(params_ff), 'total': float(curr_n_all_param)}
+        print(config_name, n_all_params[config_name])    
 
-                config_name = re.search('(config_[0-9]+)', j).group(1)
-                n_all_params[config_name] = {'AdaEmb': float(params_adaptive_embedding), 'Sftmax': float(params_adaptive_softmax), \
-                                  'Attn': float(params_attention), 'FFN': float(params_ff), 'total': float(curr_n_all_param)}
-                
-                params_adaptive_embedding_list.append(params_adaptive_embedding*100./curr_n_all_param)
-                params_adaptive_softmax_list.append(params_adaptive_softmax*100./curr_n_all_param)
-                params_attention_list.append(params_attention*100./curr_n_all_param)
-                params_ff_list.append(params_ff*100./curr_n_all_param)
-
-                # n_all_params[config_name] = int(curr_n_all_param)    
-                
-                print(config_name, n_all_params[config_name])        
+        params_adaptive_embedding_list.append(params_adaptive_embedding*100./curr_n_all_param)
+        params_adaptive_softmax_list.append(params_adaptive_softmax*100./curr_n_all_param)
+        params_attention_list.append(params_attention*100./curr_n_all_param)
+        params_ff_list.append(params_ff*100./curr_n_all_param)
       
+      print('summarized %d configurations' % len(n_all_params.keys()))
       yaml_file = os.path.join(path_to_results, 'params_summary.yaml')
       with open(yaml_file, 'w') as f:
           yaml.dump(n_all_params, f)
@@ -861,73 +889,127 @@ def main():
 
       ax.grid(axis='y')
       plt.xticks(range(1, 5), ['AdaEmb', 'Sftmax', 'Attn', 'FFN'])
-      plt.savefig('parameter_breakdown.png', bbox_inches="tight")
+      plt.savefig('parameter_breakdown_{}.png'.format(exp_name), bbox_inches="tight")
   
-  
+
   elif args.param_ranking: # 3 plots: 1,2) common_ratio and spearman correlation versus topk for ranking based on parameter size 3) ppl versus parameter size pareto curve
-    exp_name = 'fear_stage_1'
-    path_to_results = os.path.join(args.results_dir, exp_name)
-    yaml_file = os.path.join(path_to_results, 'result_summary.yaml')
-    with open(yaml_file, 'r') as f:
-      results_gt = collections.OrderedDict(yaml.safe_load(f))
+    common_ratios = {}
+    spr_ranks = {}
+    
+    common_ratios_total = {}
+    spr_ranks_total = {}
+    
+    n_params = {}
+    n_params_total = {}
 
-    yaml_file = os.path.join(path_to_results, 'params_summary.yaml')
-    with open(yaml_file, 'r') as f:
-        n_all_params = yaml.safe_load(f)
+    sorted_ground_truth = {}
+    val_ppl_list_gt = {}
+    
+    legend_keys = []
+    for exp_name in args.exp_name:
+      legend_key = 'heterogeneous' if 'heterogeneous' in exp_name else 'homogeneous'
+      legend_keys.append(legend_key)
+      
+      path_to_results = os.path.join(args.results_dir, exp_name)
+      yaml_file = os.path.join(path_to_results, 'result_summary.yaml')
+      with open(yaml_file, 'r') as f:
+        results_gt = collections.OrderedDict(yaml.safe_load(f))
 
-    common_configs = np.intersect1d(list(results_gt.keys()), list(n_all_params.keys()))
-    print('analyzing {} architectures'.format(len(common_configs)))
+      yaml_file = os.path.join(path_to_results, 'params_summary.yaml')
+      with open(yaml_file, 'r') as f:
+          n_all_params = yaml.safe_load(f)
 
-    # fear_stage_1 results:
-    val_ppl_list_gt = []
-    for k in common_configs:
-      val_ppl_list_gt.append(results_gt[k]['valid_perplexity'])
-    sorted_ground_truth = np.argsort(val_ppl_list_gt)
+      common_configs = np.intersect1d(list(results_gt.keys()), list(n_all_params.keys()))
+      print('analyzing {} architectures'.format(len(common_configs)))
 
-    # n_param results:
-    n_params = []
-    n_params_total = []
-    for k in common_configs:
-      n_params.append(-(n_all_params[k]['FFN'] + n_all_params[k]['Attn']))
-      n_params_total.append(n_all_params[k]['total'])
-    sorted_fear = np.argsort(n_params)
+      # fear_stage_1 results:
+      val_ppl_list_gt[legend_key] = []
+      for k in common_configs:
+        val_ppl_list_gt[legend_key].append(results_gt[k]['valid_perplexity'])
+      sorted_ground_truth[legend_key] = np.argsort(val_ppl_list_gt[legend_key])
 
-    common_ratios = []
-    spr_ranks = []
-    # extract common ratio and spearmanrank
-    topk_list = range(10,101,10)
-    for topk in topk_list:
-      common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth, sorted_target=sorted_fear, \
-                                            val_ppl_list_gt=val_ppl_list_gt, val_ppl_list_target=n_params)
-      common_ratios.append(common_ratio)
-      spr_ranks.append(spr_rank)
+      # n_param results:
+      n_params[legend_key] = []
+      n_params_total[legend_key] = []
+      for k in common_configs:
+        n_params[legend_key].append(-(n_all_params[k]['FFN'] + n_all_params[k]['Attn']))
+        n_params_total[legend_key].append(-n_all_params[k]['total'])
+      sorted_nparams = np.argsort(n_params[legend_key])
+      sorted_nparams_total = np.argsort(n_params_total[legend_key])
+
+      # extract common ratio and spearmanrank
+      common_ratios[legend_key] = []
+      spr_ranks[legend_key] = []
+      common_ratios_total[legend_key] = []
+      spr_ranks_total[legend_key] = []
+     
+      topk_list = range(10,101,10)
+      for topk in topk_list:
+        common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth[legend_key], sorted_target=sorted_nparams, \
+                                              val_ppl_list_gt=val_ppl_list_gt[legend_key], val_ppl_list_target=n_params[legend_key])
+        common_ratios[legend_key].append(common_ratio)
+        spr_ranks[legend_key].append(spr_rank)
+
+        common_ratio_total, spr_rank_total = get_metrics(topk, sorted_ground_truth=sorted_ground_truth[legend_key], sorted_target=sorted_nparams_total, \
+                                              val_ppl_list_gt=val_ppl_list_gt[legend_key], val_ppl_list_target=n_params_total[legend_key])
+        common_ratios_total[legend_key].append(common_ratio_total)
+        spr_ranks_total[legend_key].append(spr_rank_total)
 
     plt.figure()
-    plt.scatter(np.asarray(n_params_total)[sorted_ground_truth], np.asarray(val_ppl_list_gt)[sorted_ground_truth])
+    for k in legend_keys:
+      plt.scatter(-np.asarray(n_params_total[k])[sorted_ground_truth[k]], np.asarray(val_ppl_list_gt[k])[sorted_ground_truth[k]], label=k)
     plt.ylabel('Validation PPL')
     plt.xlabel('nParams')
     plt.title('Pareto Curve')
     plt.grid(axis='y')
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     plt.savefig('pareto_params.png', bbox_inches="tight")
     
     plt.figure()
-    plt.scatter(topk_list, common_ratios)
+    for k in legend_keys:
+      plt.scatter(topk_list, common_ratios[k], label=k)
     plt.ylabel('Common ratio')
     plt.xlabel('Topk (%)')
     plt.xticks(topk_list)
     plt.title('ranking based on number of parameters')
     plt.grid(axis='y')
+    plt.legend(loc='lower right')
     plt.savefig('common_ratio_topk_nparams.png', bbox_inches="tight")
 
     plt.figure()
-    plt.scatter(topk_list, spr_ranks)
+    for k in legend_keys:
+      plt.scatter(topk_list, common_ratios_total[k], label=k)
+    plt.ylabel('Common ratio')
+    plt.xlabel('Topk (%)')
+    plt.xticks(topk_list)
+    plt.title('ranking based on number of parameters')
+    plt.grid(axis='y')
+    plt.legend(loc='lower right')
+    plt.savefig('common_ratio_topk_nparams_total.png', bbox_inches="tight")
+
+    plt.figure()
+    for k in legend_keys:
+      plt.scatter(topk_list, spr_ranks[k], label=k)
     plt.ylabel('Spearman\'s Correlation')
     plt.xlabel('Topk (%)')
     plt.xticks(topk_list)
     plt.ylim(top=1)
     plt.grid(axis='y')
+    plt.legend(loc='lower right')
     plt.title('ranking based on number of parameters')
     plt.savefig('spearman_topk_nparams.png', bbox_inches="tight")
+
+    plt.figure()
+    for k in legend_keys:
+      plt.scatter(topk_list, spr_ranks_total[k], label=k)
+    plt.ylabel('Spearman\'s Correlation')
+    plt.xlabel('Topk (%)')
+    plt.xticks(topk_list)
+    plt.ylim(top=1)
+    plt.grid(axis='y')
+    plt.legend(loc='upper right')
+    plt.title('ranking based on number of parameters')
+    plt.savefig('spearman_topk_nparams_total.png', bbox_inches="tight")
 
 
   elif args.cross_step:
@@ -1102,7 +1184,7 @@ def main():
     for exp_name in args.exp_name:
       path_to_results = os.path.join(args.results_dir, exp_name)
 
-      results = recurse_dir(args, exp_name, path_to_results, read_log_file=True)
+      results = recurse_dir(args, exp_name, path_to_results, filetypes=['.json', '.log'])
       
       if 'stage_2' in exp_name:
         fname = 'result_summary_unfreeze_{}.yaml'.format('2' if args.n_unfreeze is None else args.n_unfreeze)
