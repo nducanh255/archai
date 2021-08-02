@@ -25,7 +25,7 @@ from torch.nn.parallel import DistributedDataParallel
 
 from archai.nlp.nvidia_transformer_xl import lamb
 from archai.nlp.nvidia_transformer_xl.data_utils import get_lm_corpus
-from archai.nlp.nvidia_transformer_xl.mem_transformer import MemTransformerLM
+from archai.nlp.nvidia_transformer_xl.mem_transformer import MemTransformerLM, MemTransformerLM_flex
 from archai.nlp.nvidia_transformer_xl.nvidia_utils import distributed as nv_distributed
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.data_parallel import BalancedDataParallel
 from archai.nlp.nvidia_transformer_xl.nvidia_utils import exp_utils
@@ -128,15 +128,15 @@ def parse_args():
     model = parser.add_argument_group('model setup - defaults are for base model')
     model.add_argument('--n_layer', type=int, default=16,
                        help='Number of total layers')
-    model.add_argument('--n_head', type=int, default=8,
+    model.add_argument('--n_head', type=lambda s: [int(item) for item in s.split(',')], default=[8],
                        help='Number of heads')
-    model.add_argument('--d_head', type=int, default=64,
+    model.add_argument('--d_head', type=lambda s: [int(item) for item in s.split(',')], default=[64],
                        help='Head dimension')
     model.add_argument('--d_embed', type=int, default=-1, # will be set from d_model
                        help='Embedding dimension')
     model.add_argument('--d_model', type=int, default=512,
                        help='Model dimension')
-    model.add_argument('--d_inner', type=int, default=2048,
+    model.add_argument('--d_inner', type=lambda s: [int(item) for item in s.split(',')], default=[2048],
                        help='Inner dimension in feedforward layer')
     model.add_argument('--dropout', type=float, default=0.1,
                        help='Global dropout rate')
@@ -421,13 +421,29 @@ def weights_init(m, args):
             init_bias(m.bias)
     elif classname.find('TransformerLM') != -1:
         if hasattr(m, 'r_emb'):
-            init_weight(m.r_emb, args)
+            if isinstance(m.r_emb, list):
+                for r_emb in m.r_emb:
+                    init_weight(r_emb, args)
+            else:
+                init_weight(m.r_emb, args)
         if hasattr(m, 'r_w_bias'):
-            init_weight(m.r_w_bias, args)
+            if isinstance(m.r_w_bias, list):
+                for r_w_bias in m.r_w_bias:
+                    init_weight(r_w_bias, args)
+            else:
+                init_weight(m.r_w_bias, args)
         if hasattr(m, 'r_r_bias'):
-            init_weight(m.r_r_bias, args)
+            if isinstance(m.r_r_bias, list):
+                for r_r_bias in m.r_r_bias:
+                    init_weight(r_r_bias, args)
+            else:
+                init_weight(m.r_r_bias, args)
         if hasattr(m, 'r_bias'):
-            init_bias(m.r_bias)
+            if isinstance(m.r_bias, list):
+                for r_bias in m.r_bias:
+                    init_weight(r_bias, args)
+            else:
+                init_weight(m.r_bias, args)
 
 
 def update_dropout(m, args):
@@ -873,7 +889,11 @@ def main():
         'sample_softmax': args.sample_softmax,
         }
 
-    model = MemTransformerLM(**model_config)
+    if len(args.n_head)==1:
+        model = MemTransformerLM(**model_config)
+    else:
+        model = MemTransformerLM_flex(**model_config)
+    print(model)
 
     model.apply(functools.partial(weights_init, args=args))
     # ensure embedding init is not overridden by out_layer in case of weight sharing
@@ -925,6 +945,22 @@ def main():
         optimizer_sparse = None
 
     model = model.to(device)
+    if hasattr(model, 'r_emb'):
+        if isinstance(model.r_emb, list):
+            for idx, _ in enumerate(model.r_emb):
+                model.r_emb[idx] = model.r_emb[idx].to(device)
+    if hasattr(model, 'r_w_bias'):
+        if isinstance(model.r_w_bias, list):
+            for idx, _ in enumerate(model.r_w_bias):
+                model.r_w_bias[idx] = model.r_w_bias[idx].to(device)
+    if hasattr(model, 'r_r_bias'):
+        if isinstance(model.r_r_bias, list):
+            for idx, _ in enumerate(model.r_r_bias):
+                model.r_r_bias[idx] = model.r_r_bias[idx].to(device)
+    if hasattr(model, 'r_bias'):
+        if isinstance(model.r_bias, list):
+            for idx, _ in enumerate(model.r_bias):
+                model.r_bias[idx] = model.r_bias[idx].to(device)
 
     scaler = None
     if args.fp16:
