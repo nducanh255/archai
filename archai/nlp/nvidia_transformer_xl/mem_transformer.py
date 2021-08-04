@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import types 
 import numpy as np
 
@@ -1110,44 +1111,28 @@ class MemTransformerLM_flex(nn.Module):
         return (loss, new_mems)
 
 
-def forward_with_output_memtransformer(self, data, target, mems):
+def forward_onnx_memtransformer(self, data):
     # nn.DataParallel does not allow size(0) tensors to be broadcasted.
     # So, have to initialize size(0) mems inside the model forward.
     # Moreover, have to return new_mems to allow nn.DataParallel to piece
     # them together.
-    if mems is None:
-        mems = self.init_mems()
+    mems = self.init_mems()
 
-    tgt_len = target.size(0)
+    tgt_len = data.size(0)
     hidden, new_mems = self._forward(data, mems=mems)
 
     pred_hid = hidden[-tgt_len:]
-    logits = None
-    if self.sample_softmax > 0 and self.training:
-        raise NotImplemented
-        # assert self.tie_weight
-        # logit = sample_logits(self.word_emb, self.out_layer.bias, target,
-        #                         pred_hid, self.sampler)
-        # loss = -F.log_softmax(logit, -1)[:, :, 0]
-    else:
-        out, logits = self.crit(pred_hid.view(-1, pred_hid.size(-1)), target.view(-1))
-        out = out.view(tgt_len, -1)
+    out = self.crit(pred_hid.view(-1, pred_hid.size(-1)))
+    out = out.view(tgt_len, -1)
     
-    if logits is not None:
-        return (out, new_mems, logits)
-    else:
-        return (out, new_mems)
-
+    return out
 
 # provides a full log probability over the entire vocab
-def predict(self, hidden, target, keep_order=False):
+def predict(self, hidden):
     '''
         hidden :: [len*bsz x d_proj]
-        target :: [len*bsz]
     '''
-    if hidden.size(0) != target.size(0):
-        raise RuntimeError('Input and target should have the same size '
-                            'in the batch dimension.')
+    self.flops = 0
 
     if self.n_clusters == 0:
         logit = self._compute_logit(hidden, self.out_layers_weights[0], self.out_layers_biases[0], self.get_out_proj(0))
@@ -1176,23 +1161,22 @@ def predict(self, hidden, target, keep_order=False):
         head_logit = self._compute_logit(hidden, head_weight, head_bias, head_proj)
         
         log_prob = self._get_full_log_prob(hidden, head_logit, weights[1:], biases[1:], projs[1:])
+        # print('####', log_prob.size())
         
         output = torch.argmax(head_logit, dim=1)
         not_in_shortlist = (output >= self.shortlist_size)
         all_in_shortlist = not (not_in_shortlist.any()) 
         
         if all_in_shortlist:
-            pass
-            # return output
+            # pass
+            return output
         elif not_in_shortlist.all():
             # log_prob = self._get_full_log_prob(hidden, head_logit, weights[1:], biases[1:], projs[1:])
-            output = torch.argmax(log_prob, dim=1)   
+            return torch.argmax(log_prob, dim=1)   
         else:
             # log_prob = self._get_full_log_prob(hidden[not_in_shortlist], head_logit[not_in_shortlist], weights[not_in_shortlist], biases[not_in_shortlist], projs[not_in_shortlist])
             output[not_in_shortlist] = torch.argmax(log_prob[not_in_shortlist], dim=1)
-            # return output
-
-    return output, log_prob
+            return output
 
 
 if __name__ == '__main__':
@@ -1252,15 +1236,24 @@ if __name__ == '__main__':
     device = torch.device("cuda" if args.cuda else "cpu")
     model.to(device)
 
-    model.forward = types.MethodType(forward_with_output_memtransformer, model)
-    model.crit.forward = types.MethodType(predict, model.crit)
-
-    B = 4 # batch size
+    B = 1 # batch size
     data_len = tgt_len
     data = torch.LongTensor(data_len*B).random_(0, args.n_token).to(device)
     diter = data_utils.LMOrderedIterator(data, B, tgt_len, device=device, ext_len=ext_len)
 
-    mems = None
+    # model.forward = types.MethodType(forward_with_output_memtransformer, model)
+    # model.crit.forward = types.MethodType(predict, model.crit)
+    # model.eval()
+    # mems = None
+    # for idx, (inp, tgt, seqlen, _) in enumerate(diter):
+    #     print('batch {}'.format(idx))
+    #     _, mems, logits = model(inp, tgt, mems)
+
+    # convert to onnx
+    model.eval()
+    model.forward = types.MethodType(forward_onnx_memtransformer, model)
+    model.crit.forward = types.MethodType(predict, model.crit)
     for idx, (inp, tgt, seqlen, _) in enumerate(diter):
-        print('batch {}'.format(idx))
-        _, mems, logits = model(inp, tgt, mems)
+        output = model(inp)
+        # torch.onnx.export(model, inp, os.path.join('onnx_models', 'memformer.onnx'), opset_version=13)
+        break

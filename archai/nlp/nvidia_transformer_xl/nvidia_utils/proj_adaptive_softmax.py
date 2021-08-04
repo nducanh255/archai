@@ -260,11 +260,9 @@ class ProjectedAdaptiveLogSoftmax(nn.Module):
                 # pass
                 return output
             elif not_in_shortlist.all():
-                print('################# here 1')
                 # log_prob = self._get_full_log_prob(hidden, head_logit, weights[1:], biases[1:], projs[1:])
                 return torch.argmax(log_prob, dim=1)   
             else:
-                print('################# here 2')
                 # log_prob = self._get_full_log_prob(hidden[not_in_shortlist], head_logit[not_in_shortlist], weights[not_in_shortlist], biases[not_in_shortlist], projs[not_in_shortlist])
                 output[not_in_shortlist] = torch.argmax(log_prob[not_in_shortlist], dim=1)
                 return output

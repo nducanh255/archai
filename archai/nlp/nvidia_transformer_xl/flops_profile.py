@@ -177,10 +177,10 @@ def get_flops(args, exp_name):
       config = all_config['config']
       model_config = all_config['model_config']
 
-      if len(model_config['n_head'])==1:
-        model = MemTransformerLM(**model_config)
-      else:
+      if isinstance(model_config['n_head'], list) and len(model_config['n_head'])>1:
         model = MemTransformerLM_flex(**model_config)
+      else:
+        model = MemTransformerLM(**model_config)
       model = model.to(device='cpu')
 
       # load data

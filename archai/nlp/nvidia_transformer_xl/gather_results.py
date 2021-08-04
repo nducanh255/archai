@@ -238,7 +238,11 @@ def get_info_from_json(json_file, step=[], type=None):
 def get_config_name(job):
   # idx = list(re.search('config_', job).span())[0]
   # return job[idx:]
-  return re.search('(config_[0-9]+)', job).group(1)
+  if not 'baseline' in job:
+    re.search('(config_[0-9]+)', job).group(1)
+  else:
+    dir_name = os.path.basename(os.path.dirname(job))
+    return re.search('(config_[0-9]+_[0-9]+)', dir_name).group(1)
 
 
 def recurse_dir(args, exp_name, path_to_dir, filetypes='.json'):
@@ -564,14 +568,26 @@ def main():
     topk_list = [10,20,30,40,50,100]
     
     # load groundtruth results 
-    path_to_results = os.path.join(args.results_dir, 'fear_stage_1')
+    for exp_name in args.exp_name:
+      if 'fear_stage_1' in exp_name:
+        ref_exp_name = exp_name
+        print('reference experiment name is {}'.format(ref_exp_name))
+        break
+    path_to_results = os.path.join(args.results_dir, ref_exp_name)
     yaml_file = os.path.join(path_to_results, 'result_summary.yaml')
     with open(yaml_file, 'r') as f:
       results['fear_stage_1'] = collections.OrderedDict(yaml.safe_load(f))
 
     scores = None
-    yaml_file = os.path.join(path_to_results, 'synflow_scores.yaml')
-    if os.path.exists(yaml_file):
+    files = os.listdir(path_to_results)
+    found_synflow = False
+    for f in files:
+      if 'synflow_scores' in f:
+        found_synflow = True
+        break
+    yaml_file = os.path.join(path_to_results, f)
+    if found_synflow:
+      print('analyzing metrics for synflow')
       with open(yaml_file, 'r') as f:
         scores = yaml.safe_load(f)
       
@@ -600,6 +616,8 @@ def main():
         spr_ranks_synflow[topk] = spr_rank
 
     for exp_name in args.exp_name:
+      if 'stage_1' in exp_name:
+        continue
       path_to_results = os.path.join(args.results_dir, exp_name)
 
       if 'stage_2' in exp_name:
@@ -714,7 +732,8 @@ def main():
       plt.xlabel('Time (s)')
       plt.title('Topk = %d %%' % topk)
       plt.grid(axis='y')
-      plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+      plt.ylim((0,1))
+      # plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
       plt.savefig('common_ratio_topk_{}.png'.format(topk), bbox_inches="tight")
 
       plt.figure()
@@ -725,9 +744,9 @@ def main():
       plt.ylabel('Spearman\'s Correlation')
       plt.xlabel('Time (s)')
       plt.title('Topk = %d %%' % topk)
-      plt.ylim(top=1)
+      plt.ylim((0,1))
       plt.grid(axis='y')
-      plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+      # plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
       plt.savefig('spearman_topk_{}.png'.format(topk), bbox_inches="tight")
 
     # results = {}
@@ -852,10 +871,10 @@ def main():
       
       n_all_params = {}
       for config_name, model_config in model_configs.items():
-        if len(model_config['n_head'])==1:
-          model = MemTransformerLM(**model_config)
-        else:
+        if isinstance(model_config['n_head'], list) and len(model_config['n_head'])>1:
           model = MemTransformerLM_flex(**model_config)
+        else:
+          model = MemTransformerLM(**model_config)
         model = model.to(device='cpu')
                 
         curr_n_all_param, params_adaptive_embedding, params_adaptive_softmax, params_attention, params_ff = process_parameters(model)

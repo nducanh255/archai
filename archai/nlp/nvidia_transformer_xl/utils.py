@@ -1,3 +1,4 @@
+import os
 import math
 
 from archai.nlp.nvidia_transformer_xl.mem_transformer import AdaptiveEmbedding, DecoderLayer, MultiHeadAttn, PositionwiseFF, ProjectedAdaptiveLogSoftmax
@@ -24,6 +25,7 @@ def get_list_of_layers(module, layerType=None):
         
         return list_of_layers
 
+
 def get_parameter_breakdown(model, layerType=None):
     layers = get_list_of_layers(model, layerType)
     print('found {} layers for parameter computation.'.format(len(layers)))
@@ -49,3 +51,15 @@ def get_parameter_breakdown(model, layerType=None):
     #         p_sum += p
 
     return all_params, params_decoder
+
+
+def recurse_dir(pth, filename='config.yaml', path_to_ref=None):
+  content = os.listdir(pth) 
+  for c in content:
+    curr_pth = os.path.join(pth, c)
+    if os.path.isfile(curr_pth) and filename in c:
+        path_to_ref = curr_pth
+    elif os.path.isdir(curr_pth):
+      path_to_ref = recurse_dir(curr_pth, filename, path_to_ref)
+  
+  return path_to_ref

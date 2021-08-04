@@ -8,6 +8,8 @@ import random
 import collections
 import re
 
+from archai.nlp.nvidia_transformer_xl.utils import recurse_dir
+
 _mapping_tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
 
 def meta_constructor_mapping(loader, node):
@@ -25,12 +27,12 @@ generation_seed = 1111
 np.random.seed(generation_seed)
 random.seed(generation_seed)
 
-fear_stage = 1   #3: baseline
+fear_stage = 3   #3: baseline
 n_unfreeze = 3
 different_seeds = None #[1111,1009,1200,1234,1302,1562,2222,3334,3425,4567]
 max_step = 500
 
-targets = ['itpeastusv100cl', 'itpeastusv100cl2', 'itpseasiav100cl', 'itpscusv100cl']  # amulet targets
+targets = ['itpseasiav100cl', 'itpscusv100cl', 'itpeastusv100cl', 'itpeastusv100cl2']  # amulet targets
 gpu_config = ['dgx1_4gpu_fp32'] # dgx1_8gpu_fp16, dgx1_1gpu_fp16, toy, default, dgx1_4gpu_fp16
 n_gpus = 4
 
@@ -52,7 +54,7 @@ d_inners = [512, 2048]
 
 #TODO: add this to fear stage 2 and 3
 def generate_bash_files(path_to_configs, f_name, exp_name=None):
-  assert exp_name is not None, 'provide and experiment name for amulet jobs'
+  assert exp_name is not None, 'provide an experiment name for amulet jobs'
   
   bash_idx = 0
   while True:
@@ -66,10 +68,11 @@ def generate_bash_files(path_to_configs, f_name, exp_name=None):
           print(job_idx)
           if job_idx >= n_configs:
             break
-          if different_seeds:
-            f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/{} {} -t {}\n'.format('nv_train_{}.yaml'.format(job_idx), exp_name, targets[t]))
-          else:
-            f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/{} {} -t {}\n'.format('nv_train_{}.yaml'.format(job_idx), exp_name, targets[t]))          
+          f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/{} {} -t {}\n'.format('nv_train_{}.yaml'.format(job_idx), exp_name, targets[t]))
+          # if different_seeds:
+          #   f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/{} {} -t {}\n'.format('nv_train_{}.yaml'.format(job_idx), exp_name, targets[t]))
+          # else:
+          #   f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/{} {} -t {}\n'.format('nv_train_{}.yaml'.format(job_idx), exp_name, targets[t]))          
         if job_idx >= n_configs:
             break      
     if job_idx >= n_configs:
@@ -82,7 +85,7 @@ def get_run_command(max_step, config_num, seed=None):
   if seed:
     assert config_num
     command = 'python -m torch.distributed.launch --nproc_per_node="%s" archai/nlp/nvidia_transformer_xl/train.py \
-                                        --config {config} --config_file wt103_base_FEAR.yaml \
+                                        --config {config} --config_file wt103_base.yaml \
                                         --n_layer {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head} \
                                         --d_inner {d_inner} --d_embed {d_embed} --div_val {div_val} \
                                         --max_step %d --seed %d --experiment_name config_%s_seed_%d' % (str(n_gpus), max_step, seed, config_num, seed)
@@ -189,6 +192,15 @@ def generate_params_heterogeneous(n_configs):
   
   values['d_inner'] = [np.random.randint(low=max(int(2*values['d_model'][i]), d_inners[0]), high=d_inners[-1]+1, size=values['n_layer'][i]).tolist() for i in range(n_configs)]
   return values
+
+  
+def mismatch(value_1, value_2):
+  if isinstance(value_1, list):
+    value_1 = get_yaml_values(value_1)
+  if value_1 != value_2:
+    return True
+  else:
+    return False
 
 
 if __name__ == '__main__':
@@ -299,26 +311,27 @@ if __name__ == '__main__':
       
   else:
     files = os.listdir(path_to_configs)
-    ref_exp_name = 'fear_stage_1' # name of the amlt experiment with full runs to use as the ground-truth configutation
+    ref_exp_name = 'fear_stage_1_heterogeneous' # name of the amlt experiment with full runs to use as the ground-truth configutation
     for f in files:
       if re.search('(nv_train_[0-9]+.yaml)', f):
         with open(os.path.join(path_to_configs, f), 'r') as file:
           prev_config = yaml.load(file)
 
         job_name = 'train_xl_config_' + f.replace('.yaml','').split('_')[-1]
-        gt_config_path = os.path.join('/home/t-mojanj/logdir/nv_xformer_xl/prev_jobs/{}'.format(ref_exp_name), job_name, 'config.yaml')
-        if os.path.isfile(gt_config_path):
-          with open(gt_config_path, 'r') as file:
-            gt_config = yaml.load(file)
-          
+        gt_config_path = os.path.join('/home/t-mojanj/logdir/nv_xformer_xl/prev_jobs/{}'.format(ref_exp_name), job_name)
+        path_to_gt_config = recurse_dir(gt_config_path, filename='config.yaml', path_to_ref=None)
+        if path_to_gt_config:
+          with open(path_to_gt_config, 'r') as f2:
+            gt_config = yaml.load(f2)
+
           config_dict = ['n_layer', 'n_head', 'd_model', 'd_head', 'd_inner', 'd_embed', 'div_val']
           for k in config_dict:
             for param in prev_config['search']['params']:
               if param['name'] == k:
-                if gt_config[k] != param['values'][0]:
-                  print('mismatch found in {} inside config {}'.format(k, f))
+                if mismatch(gt_config[k], param['values'][0]):
+                  print('mismatch found in {} inside config {}'.format(k, path_to_gt_config))
                 break
-          print('{} and {} checked'.format(f, job_name))
+          print('{} checked'.format(job_name))
         else:
           print('##### job {} previously did not run'.format(job_name))
         
@@ -339,29 +352,13 @@ if __name__ == '__main__':
           if param['name'] == 'max_step':
             del prev_config['search']['params'][idx]
         
-        # prev_config['search']['job_template']['name'] = 'train_xl_config_%s_{max_step}' % (f.replace('.yaml','').split('_')[-1])
-        # prev_config['search']['max_trials'] = 8
-        # prev_config['search']['job_template']['command'][3] = 'python -m torch.distributed.launch --nproc_per_node="%s" archai/nlp/nvidia_transformer_xl/train.py \
-        #                                 --config {config} --config_file wt103_base_FEAR.yaml \
-        #                                 --n_layer {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head} \
-        #                                 --d_inner {d_inner} --d_embed {d_embed} --div_val {div_val} --max_step {max_step}' % (str(n_gpus)) #--vocab_size {vocab_size} --attn_type 2 
-
-        # already_has_max_step = False
-        # for idx, param in enumerate(prev_config['search']['params']):  
-        #   if param['name'] == 'max_step':
-        #     prev_config['search']['params'][idx] = [{'name':'max_step',
-        #                                             'spec':'discrete',
-        #                                             'values': [5000*i for i in range(1,8)]}]
-        #     already_has_max_step = True
-        #     break
-        # if not already_has_max_step:
-        #   prev_config['search']['params'].append({'name':'max_step',
-        #                                     'spec':'discrete',
-        #                                     'values': [5000*i for i in range(1,8)]})
         with open(os.path.join(path_to_configs, f), 'w') as file:
           yaml.dump(prev_config, file)
 
-    exp_name = 'fear_baseline_{}_step'.format(max_step)
-    # exp_name = 'fear_baseline_constLR'
+    exp_name_base = 'fear_baseline' + ('_heterogeneous' if 'heterogeneous' in ref_exp_name else '')
+    if different_seeds:
+      exp_name = exp_name_base + '_{}_step'.format(max_step)
+    else:
+      exp_name = exp_name_base + '_constLR'
 
-    generate_bash_files(path_to_configs, f_name='amlt_run_fear_baseline', exp_name=None)
+    generate_bash_files(path_to_configs, f_name='amlt_run_fear_baseline', exp_name=exp_name)
