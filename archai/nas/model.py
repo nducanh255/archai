@@ -18,7 +18,6 @@ from archai.nas.model_desc import ModelDesc, AuxTowerDesc, CellDesc
 from archai.common.common import logger
 from archai.common import utils, ml_utils
 from archai.nas.arch_module import ArchModule
-from archai.networks_ssl.simclr import Projection
 
 class Model(ArchModule):
     def __init__(self, model_desc:ModelDesc, droppath:bool, affine:bool):

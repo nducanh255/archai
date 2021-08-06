@@ -9,6 +9,7 @@ import os
 
 import torch
 from torch import nn, Tensor
+import torch.nn.functional as F
 from overrides import overrides
 
 from archai.nas.arch_params import ArchParams
@@ -19,10 +20,32 @@ from archai.common.common import logger
 from archai.common import utils, ml_utils
 from archai.nas.finalizers import Finalizers
 from archai.nas.arch_module import ArchModule
-from archai.networks_ssl.simclr import Projection
+
+
+class Projection(nn.Module):
+
+    def __init__(self, in_features_dim:int = 2048, hidden_dim:int = 2048, out_features_dim:int = 128):
+        super().__init__()
+        self.out_features_dim = out_features_dim
+        self.in_features_dim = in_features_dim
+        self.hidden_dim = hidden_dim
+
+        self.model = nn.Sequential(
+            nn.Linear(self.in_features_dim, self.hidden_dim, bias=True), 
+            nn.BatchNorm1d(self.hidden_dim), 
+            nn.ReLU(),
+            nn.Linear(self.hidden_dim, self.out_features_dim, bias=False),
+            nn.BatchNorm1d(self.out_features_dim, affine=False), 
+        )
+
+    def forward(self, x):
+        out = self.model(x)
+        out = F.normalize(out, dim=1)
+        return out
 
 class ModelSimClr(ArchModule):
-    def __init__(self, model_desc:ModelDesc, hidden_dim:int, out_features:int, droppath:bool, affine:bool, finalizers:Finalizers = None):
+    def __init__(self, model_desc:ModelDesc, hidden_dim:int, out_features:int, droppath:bool, affine:bool, 
+                finalizers:Finalizers = None, disable_projection:bool = False):
         super().__init__()
 
         # some of these fields are public as finalizer needs access to them
@@ -49,6 +72,7 @@ class ModelSimClr(ArchModule):
         input_dim = model_desc.logits_op.params['conv'].ch_out
         self.projection = Projection(input_dim, hidden_dim, out_features)
         self.finalizers = finalizers
+        self.disable_projection = disable_projection
 
         # for i,cell in enumerate(self.cells):
         #     print(i, ml_utils.param_size(cell))
@@ -109,7 +133,10 @@ class ModelSimClr(ArchModule):
         #print(-1, 'out', out.shape)
         #print(-1, 'logits', logits.shape)
 
-        return self.projection(logits)
+        if self.disable_projection:
+            return [logits]
+        else:
+            return self.projection(logits)
 
     def device_type(self)->str:
         return next(self.parameters()).device.type
@@ -147,3 +174,17 @@ class AuxTower(nn.Module):
         x = self.features(x)
         x = self.logits_op(x.view(x.size(0), -1))
         return x
+
+
+class ModelSimCLRDarts(nn.Module):
+    
+    def __init__(self, model_desc: ModelDesc, hidden_dim: int, out_features:int, **kwargs: Any):
+        super(ModelSimCLRDarts, self).__init__()
+        self.backbone = ModelSimClr(model_desc, hidden_dim, out_features, droppath=True, affine=True, disable_projection=True)
+        input_dim = model_desc.logits_op.params['conv'].ch_out
+        self.projection = Projection(input_dim, hidden_dim, out_features)
+
+    def forward(self, x):
+        h = self.backbone(x)[-1]
+        z = self.projection(h)
+        return z

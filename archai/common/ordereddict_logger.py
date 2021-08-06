@@ -34,7 +34,7 @@ class OrderedDictLogger:
         
         self._save_intermediate = conf_common['save_intermediate']
         self._intermediatedir = conf_common['intermediatedir']
-        if self._save_intermediate and utils.is_main_process():
+        if utils.is_main_process() and self._save_intermediate:
             intermediatedir = self._intermediatedir
             experiment_name = conf_common['experiment_name']
             logdir = conf_common['logdir']
@@ -101,13 +101,13 @@ class OrderedDictLogger:
 
         if level is not None and self._logger:
             self._logger.log(msg=self.path() + ' ' + msg, level=level)
-            if self._save_intermediate and os.path.exists(self._intermediatedir) and utils.is_main_process():
+            if utils.is_main_process() and self._save_intermediate and os.path.exists(self._intermediatedir):
                 shutil.copy(self._sys_log_filepath, self._intermediate_sys_log_filepath)
 
         if self._save_delay is not None and \
                 time.time() - self._last_save > self._save_delay:
             self.save()
-            if self._save_intermediate and os.path.exists(self._intermediatedir) and utils.is_main_process():
+            if utils.is_main_process() and self._save_intermediate and os.path.exists(self._intermediatedir):
                 shutil.copy(self._filepath, self._intermediate_logs_yaml_filepath)
             self._last_save = time.time()
 

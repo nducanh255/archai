@@ -6,6 +6,9 @@ from archai.networks_ssl.vggnet import _vggnet
 from archai.networks_ssl.vit import _vit
 from typing import Type, Any, Callable, Union, List, Optional
 
+from archai.nas.model_desc import ModelDesc
+from archai.nas.model_ssl import ModelSimClr
+
 class Projection(nn.Module):
 
     def __init__(self, in_features_dim:int = 2048, hidden_dim:int = 2048, out_features_dim:int = 128):
