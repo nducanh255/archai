@@ -77,8 +77,9 @@ def recurse_dir(args, path_to_dir):
 
 
 def forward_predict_memtransformer(self, data, target, mems):
-  if mems is None:
-      mems = self.init_mems()
+  # if mems is None:
+  #     mems = self.init_mems()
+  mems = None
 
   tgt_len = target.size(0)
   hidden, new_mems = self._forward(data, mems=mems)
@@ -277,9 +278,10 @@ def plot(args):
   
   plt.figure()
   for k in legend_keys:
-      plt.scatter(-np.asarray(n_flops_total[k])[sorted_ground_truth[k]], np.asarray(val_ppl_list_gt[k])[sorted_ground_truth[k]], label=k)
+      # plt.scatter(-np.asarray(n_flops_total[k])[sorted_ground_truth[k]], np.asarray(val_ppl_list_gt[k])[sorted_ground_truth[k]], label=k)
+      plt.scatter(-np.asarray(n_flops[k])[sorted_ground_truth[k]], np.asarray(val_ppl_list_gt[k])[sorted_ground_truth[k]], label=k)
   plt.ylabel('Validation PPL')
-  plt.xlabel('FLOPs')
+  plt.xlabel('Decoder FLOPs')
   plt.title('Pareto Curve')
   plt.grid(axis='y')
   plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))

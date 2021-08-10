@@ -7,6 +7,7 @@ import collections
 import argparse
 import json
 import re
+import pprint
 import types
 from functools import partial
 from scipy.stats import spearmanr
@@ -72,25 +73,16 @@ def get_metrics(topk, sorted_ground_truth, sorted_target, val_ppl_list_gt, val_p
   sorted_ground_truth_binned = sorted_ground_truth[:idx].astype(np.int32)
   sorted_target_binned = sorted_target[:idx].astype(np.int32)
 
-  # print('Calculating common ratio ...')
-  # print('ground truth:', np.asarray(val_ppl_list_gt)[sorted_ground_truth_binned])
-  # print('topk ground truth configs:', common_configs[sorted_ground_truth_binned])
-  # print('baseline:', np.asarray(val_ppl_list_target)[sorted_target_binned])
-  # print('topk baseline configs:', common_configs[sorted_target_binned])
-
   correct = len(np.intersect1d(sorted_target_binned, sorted_ground_truth_binned))
   total = len(sorted_target_binned)
   common_ratio = correct*1./total
   print('Correctly ranked top %d %% (%d) with %.2f accuracy'%(topk, total, correct*1./total))
 
-  # print('Calculating Spearman Corr ...')
-  # selected_configs = [common_configs[i] for i in range(len(common_configs)) if i in sorted_ground_truth_binned]
-  # print('configs:', selected_configs)
   topk_val_ppl_list_gt = [val_ppl_list_gt[i] for i in range(len(val_ppl_list_gt)) if i in sorted_ground_truth_binned]
   topk_val_ppl_list_target = [val_ppl_list_target[i] for i in range(len(val_ppl_list_target)) if i in sorted_ground_truth_binned]
+  # topk_val_ppl_list_gt = [val_ppl_list_gt[i] for i in range(len(val_ppl_list_gt)) if i in sorted_target_binned]
+  # topk_val_ppl_list_target = [val_ppl_list_target[i] for i in range(len(val_ppl_list_target)) if i in sorted_target_binned]
   spr_rank, _ = spearmanr(topk_val_ppl_list_gt, topk_val_ppl_list_target)
-  # print('ground truth:', topk_val_ppl_list_gt)
-  # print('baseline:', topk_val_ppl_list_target)
   print('Spearman Correlation on top %d %% (%d): %.3f'%(topk, len(topk_val_ppl_list_gt), spr_rank))
 
   return common_ratio, spr_rank
@@ -192,6 +184,11 @@ def get_info_from_json(json_file, step=[], type=None):
   
   with open(json_file, 'r', encoding='utf-8') as f:
     lines = f.readlines()[::-1]
+    job_desc = re.search('DLLL \{(.+?)\}', lines[-1])
+    job_desc = '{'+job_desc.group(1)+'}}'
+    work_dir = json.loads(job_desc)['data']['work_dir']
+    idx_start = re.search('amlt-results', work_dir).span()[-1] + 1
+    amlt_job = work_dir[idx_start:].split('/')[0]
   
     for line in lines:
       str = re.search('DLLL \{(.+?)\}', line)
@@ -228,7 +225,8 @@ def get_info_from_json(json_file, step=[], type=None):
                 out_dict[k] = final_train_log['data'][k]
           elif key in final_train_log['data'].keys():
             out_dict[key] = final_train_log['data'][key]
-          break       
+          out_dict['amlt_job'] = amlt_job
+          break
         except:
           return None
   
@@ -239,7 +237,7 @@ def get_config_name(job):
   # idx = list(re.search('config_', job).span())[0]
   # return job[idx:]
   if not 'baseline' in job:
-    re.search('(config_[0-9]+)', job).group(1)
+    return re.search('(config_[0-9]+)', job).group(1)
   else:
     dir_name = os.path.basename(os.path.dirname(job))
     return re.search('(config_[0-9]+_[0-9]+)', dir_name).group(1)
@@ -361,8 +359,7 @@ def get_parser():
   return args
 
 
-def main():
-  args = get_parser()
+def main(args):
   if args.analyze:    # provides 2 plots: 1) common ratio versus topk and 2) spearman corr versus topk
     results = {}
     common_ratios = {}
@@ -926,7 +923,10 @@ def main():
     
     legend_keys = []
     for exp_name in args.exp_name:
-      legend_key = 'heterogeneous' if 'heterogeneous' in exp_name else 'homogeneous'
+      idx = re.search('(fear_stage_1)', exp_name).span()[-1]
+      legend_key = exp_name[idx+1:].split('_')[-1]
+      if len(legend_key)==0:
+        legend_key = 'homogeneous'
       legend_keys.append(legend_key)
       
       path_to_results = os.path.join(args.results_dir, exp_name)
@@ -956,6 +956,17 @@ def main():
       sorted_nparams = np.argsort(n_params[legend_key])
       sorted_nparams_total = np.argsort(n_params_total[legend_key])
 
+      if exp_name=='fear_stage1_similar_params':
+        common_configs = np.append(common_configs, 'config_12')
+        print(common_configs)
+        n_params[legend_key].append(-2598391)
+        n_params_total[legend_key].append(-7519752)
+        val_ppl_list_gt[legend_key].append(45.9)
+        sorted_ground_truth[legend_key] = np.argsort(val_ppl_list_gt[legend_key])
+        sorted_nparams = np.argsort(n_params[legend_key])
+        sorted_nparams_total = np.argsort(n_params_total[legend_key])
+
+
       # extract common ratio and spearmanrank
       common_ratios[legend_key] = []
       spr_ranks[legend_key] = []
@@ -974,15 +985,39 @@ def main():
         common_ratios_total[legend_key].append(common_ratio_total)
         spr_ranks_total[legend_key].append(spr_rank_total)
 
+    if exp_name=='fear_stage1_similar_params':
+      plt.figure()
+      colors = ['b', 'g', 'r', 'm', 'y', 'c', 'k']
+      markers = ['s', 'o', '*', '^']
+      for idx in range(len(common_configs)):
+        i = np.where(common_configs=='config_'+str(idx))[0][0]
+        plt.scatter(-np.asarray(n_params[legend_key][i]), np.asarray(val_ppl_list_gt[legend_key][i]), label='config_'+str(idx), color=colors[idx//4], marker=markers[idx%4])
+      plt.ylabel('Validation PPL')
+      plt.xlabel('Total nParams')
+      plt.title('Pareto Curve')
+      plt.grid(axis='y')
+      plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+      plt.savefig('pareto_similar_params.png', bbox_inches="tight")
+
     plt.figure()
     for k in legend_keys:
-      plt.scatter(-np.asarray(n_params_total[k])[sorted_ground_truth[k]], np.asarray(val_ppl_list_gt[k])[sorted_ground_truth[k]], label=k)
+      plt.scatter(-np.asarray(n_params[k])[sorted_ground_truth[k]], np.asarray(val_ppl_list_gt[k])[sorted_ground_truth[k]], label=k)
     plt.ylabel('Validation PPL')
-    plt.xlabel('nParams')
+    plt.xlabel('Total nParams')
     plt.title('Pareto Curve')
     plt.grid(axis='y')
     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     plt.savefig('pareto_params.png', bbox_inches="tight")
+
+    plt.figure()
+    for k in legend_keys:
+      plt.scatter(-np.asarray(n_params_total[k])[sorted_ground_truth[k]], np.asarray(val_ppl_list_gt[k])[sorted_ground_truth[k]], label=k)
+    plt.ylabel('Validation PPL')
+    plt.xlabel('Total nParams')
+    plt.title('Pareto Curve')
+    plt.grid(axis='y')
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    plt.savefig('pareto_params_total.png', bbox_inches="tight")
     
     plt.figure()
     for k in legend_keys:
@@ -1254,4 +1289,19 @@ def main():
         print('ratio of good architectures:', ratio_good)
 
 if __name__ == "__main__":
-    main()
+    args = get_parser()
+    main(args)
+
+    # for exp_name in args.exp_name:
+    #   path_to_results = os.path.join(args.results_dir, exp_name)
+    #   yaml_file = os.path.join(path_to_results, 'result_summary.yaml')
+    #   with open(yaml_file, 'r') as f:
+    #     results_gt = collections.OrderedDict(yaml.safe_load(f))
+
+    #   yaml_file = os.path.join(path_to_results, 'params_summary.yaml')
+    #   with open(yaml_file, 'r') as f:
+    #       n_all_params = yaml.safe_load(f)
+
+    #   for k in results_gt.keys():
+    #     results_gt[k].update(n_all_params[k])
+    #     print(k, results_gt[k])

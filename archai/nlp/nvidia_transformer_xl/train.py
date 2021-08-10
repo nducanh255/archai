@@ -295,6 +295,11 @@ def parse_args():
     if args.debug is None:
         args.debug = utils.is_debugging()
 
+    if len(args.n_head)==1:
+        args.n_head = args.n_head[0]
+        args.d_head = args.d_head[0]
+        args.d_inner = args.d_inner[0]
+
     return args
 
 
@@ -889,10 +894,10 @@ def main():
         'sample_softmax': args.sample_softmax,
         }
 
-    if len(args.n_head)==1:
-        model = MemTransformerLM(**model_config)
-    else:
+    if isinstance(args.n_head, list):
         model = MemTransformerLM_flex(**model_config)
+    else:
+        model = MemTransformerLM(**model_config)
     print(model)
 
     model.apply(functools.partial(weights_init, args=args))

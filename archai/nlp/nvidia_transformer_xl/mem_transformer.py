@@ -23,6 +23,10 @@ import torch.nn.functional as F
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.log_uniform_sampler import LogUniformSampler
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.log_uniform_sampler import sample_logits
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.proj_adaptive_softmax import ProjectedAdaptiveLogSoftmax
+from archai.nlp.nvidia_transformer_xl.data_utils import get_lm_corpus
+from archai.nlp.nvidia_transformer_xl.nvidia_utils import exp_utils
+from archai.nlp.nvidia_transformer_xl import data_utils
+from archai.common import utils, common
 
 
 @torch.jit.script
@@ -1111,15 +1115,13 @@ class MemTransformerLM_flex(nn.Module):
         return (loss, new_mems)
 
 
-def forward_onnx_memtransformer(self, data):
+def forward_predict_memtransformer(self, data):
     # nn.DataParallel does not allow size(0) tensors to be broadcasted.
     # So, have to initialize size(0) mems inside the model forward.
     # Moreover, have to return new_mems to allow nn.DataParallel to piece
     # them together.
-    mems = self.init_mems()
-
     tgt_len = data.size(0)
-    hidden, new_mems = self._forward(data, mems=mems)
+    hidden, _ = self._forward(data, mems=None)
 
     pred_hid = hidden[-tgt_len:]
     out = self.crit(pred_hid.view(-1, pred_hid.size(-1)))
@@ -1159,22 +1161,22 @@ def predict(self, hidden):
 
         head_weight, head_bias, head_proj = weights[0], biases[0], projs[0]
         head_logit = self._compute_logit(hidden, head_weight, head_bias, head_proj)
-        
-        log_prob = self._get_full_log_prob(hidden, head_logit, weights[1:], biases[1:], projs[1:])
-        # print('####', log_prob.size())
-        
         output = torch.argmax(head_logit, dim=1)
         not_in_shortlist = (output >= self.shortlist_size)
         all_in_shortlist = not (not_in_shortlist.any()) 
+        
+        # log_prob = self._get_full_log_prob(hidden, head_logit, weights[1:], biases[1:], projs[1:])
         
         if all_in_shortlist:
             # pass
             return output
         elif not_in_shortlist.all():
-            # log_prob = self._get_full_log_prob(hidden, head_logit, weights[1:], biases[1:], projs[1:])
+            print('option 2')
+            log_prob = self._get_full_log_prob(hidden, head_logit, weights[1:], biases[1:], projs[1:])
             return torch.argmax(log_prob, dim=1)   
         else:
-            # log_prob = self._get_full_log_prob(hidden[not_in_shortlist], head_logit[not_in_shortlist], weights[not_in_shortlist], biases[not_in_shortlist], projs[not_in_shortlist])
+            print('option 3')
+            log_prob = self._get_full_log_prob(hidden[not_in_shortlist], head_logit[not_in_shortlist], weights[not_in_shortlist], biases[not_in_shortlist], projs[not_in_shortlist])
             output[not_in_shortlist] = torch.argmax(log_prob[not_in_shortlist], dim=1)
             return output
 
@@ -1184,76 +1186,72 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='unit test')
 
-    parser.add_argument('--n_layer', type=int, default=4, help='')
+    parser.add_argument('--n_layer', type=int, default=6, help='')
     parser.add_argument('--n_token', type=int, default=267735, help='')
-    parser.add_argument('--n_head', type=lambda s: [int(item) for item in s.split(',')], default=[8], help='')
-    parser.add_argument('--d_head', type=lambda s: [int(item) for item in s.split(',')], default=[64], help='')
-    parser.add_argument('--d_model', type=int, default=512, help='')
-    parser.add_argument('--d_embed', type=int, default=512, help='')
-    parser.add_argument('--d_inner', type=lambda s: [int(item) for item in s.split(',')], default=[2048], help='')
-    parser.add_argument('--div_val', type=int, default=1, help='') # Dividend value for adaptive input and softmax
+    parser.add_argument('--n_head', type=lambda s: [int(item) for item in s.split(',')], default=[4], help='')
+    parser.add_argument('--d_head', type=lambda s: [int(item) for item in s.split(',')], default=[32], help='')
+    parser.add_argument('--d_model', type=int, default=128, help='')
+    parser.add_argument('--d_embed', type=int, default=256, help='')
+    parser.add_argument('--d_inner', type=lambda s: [int(item) for item in s.split(',')], default=[1204], help='')
+    parser.add_argument('--div_val', type=int, default=4, help='') # Dividend value for adaptive input and softmax
     parser.add_argument('--dropout', type=float, default=0.1, help='')
     parser.add_argument('--cuda', action='store_true', help='')
     parser.add_argument('--seed', type=int, default=42, help='')
     parser.add_argument('--multi_gpu', action='store_true', help='')
+    parser.add_argument('--setup_only', action='store_true', help='')
 
     args = parser.parse_args()
 
-
-    tgt_len, mem_len, ext_len = 192, 192, 0
+    tgt_len, mem_len, ext_len = 192, 0, 0
     cutoffs = [19997, 39997, 199997] #[args.n_token // 2]
     tie_projs = [False] + [True] * len(cutoffs)
 
-    if len(args.n_head)==1:
-        model = MemTransformerLM(args.n_token, args.n_layer, args.n_head[0],
-                                    args.d_model, args.d_head[0], args.d_inner[0],
-                                    args.dropout, dropatt=args.dropout,
-                                    tie_weight=True, d_embed=args.d_embed,
-                                    div_val=args.div_val, tie_projs=tie_projs,
-                                    pre_lnorm=True, tgt_len=tgt_len,
-                                    ext_len=ext_len, mem_len=mem_len,
-                                    cutoffs=cutoffs, attn_type=0,
-                                    dtype=None)
-    else:
-        model = MemTransformerLM_flex(args.n_token, args.n_layer, args.n_head,
-                                    args.d_model, args.d_head, args.d_inner,
-                                    args.dropout, dropatt=args.dropout,
-                                    tie_weight=True, d_embed=args.d_embed,
-                                    div_val=args.div_val, tie_projs=tie_projs,
-                                    pre_lnorm=True, tgt_len=tgt_len,
-                                    ext_len=ext_len, mem_len=mem_len,
-                                    cutoffs=cutoffs, attn_type=0,
-                                    dtype=None)
-    print(model)
+    if not args.setup_only:
+        if len(args.n_head)==1:
+            model = MemTransformerLM(args.n_token, args.n_layer, args.n_head[0],
+                                        args.d_model, args.d_head[0], args.d_inner[0],
+                                        args.dropout, dropatt=args.dropout,
+                                        tie_weight=True, d_embed=args.d_embed,
+                                        div_val=args.div_val, tie_projs=tie_projs,
+                                        pre_lnorm=True, tgt_len=tgt_len,
+                                        ext_len=ext_len, mem_len=mem_len,
+                                        cutoffs=cutoffs, attn_type=0,
+                                        dtype=None)
+        else:
+            model = MemTransformerLM_flex(args.n_token, args.n_layer, args.n_head,
+                                        args.d_model, args.d_head, args.d_inner,
+                                        args.dropout, dropatt=args.dropout,
+                                        tie_weight=True, d_embed=args.d_embed,
+                                        div_val=args.div_val, tie_projs=tie_projs,
+                                        pre_lnorm=True, tgt_len=tgt_len,
+                                        ext_len=ext_len, mem_len=mem_len,
+                                        cutoffs=cutoffs, attn_type=0,
+                                        dtype=None)
+        model.forward = types.MethodType(forward_predict_memtransformer, model)
+        model.crit.forward = types.MethodType(predict, model.crit)
+        # print(model)
 
-    print('# total params', sum(p.numel() for p in model.parameters()))
-    print('# embd params', sum(p.numel() for p in model.word_emb.parameters()))
-    print('# layer params', sum(p.numel() for p in model.layers[0].parameters()))
+        device = torch.device("cuda" if args.cuda else "cpu")
+        model.to(device)
+        model.eval()
 
-    # sample run
-    from archai.nlp.nvidia_transformer_xl import data_utils
+        print('# total params', sum(p.numel() for p in model.parameters()))
+        print('# embd params', sum(p.numel() for p in model.word_emb.parameters()))
+        print('# layer params', sum(p.numel() for p in model.layers[0].parameters()))
 
-    device = torch.device("cuda" if args.cuda else "cpu")
-    model.to(device)
-
-    B = 1 # batch size
-    data_len = tgt_len
-    data = torch.LongTensor(data_len*B).random_(0, args.n_token).to(device)
-    diter = data_utils.LMOrderedIterator(data, B, tgt_len, device=device, ext_len=ext_len)
-
-    # model.forward = types.MethodType(forward_with_output_memtransformer, model)
-    # model.crit.forward = types.MethodType(predict, model.crit)
-    # model.eval()
-    # mems = None
-    # for idx, (inp, tgt, seqlen, _) in enumerate(diter):
-    #     print('batch {}'.format(idx))
-    #     _, mems, logits = model(inp, tgt, mems)
-
-    # convert to onnx
-    model.eval()
-    model.forward = types.MethodType(forward_onnx_memtransformer, model)
-    model.crit.forward = types.MethodType(predict, model.crit)
-    for idx, (inp, tgt, seqlen, _) in enumerate(diter):
-        output = model(inp)
+        # sample run
+        B = 1 # batch size
+        data_len = tgt_len
+        data = torch.LongTensor(data_len*B).random_(0, args.n_token).unsqueeze(-1).to(device)
+        output = model(data)
         # torch.onnx.export(model, inp, os.path.join('onnx_models', 'memformer.onnx'), opset_version=13)
-        break
+        print('done')
+
+        # path_to_data = common.default_dataroot()
+        # path_to_data = utils.full_path(os.path.join(path_to_data,'textpred', exp_utils.dataset_dir_name('wt103')))
+        # corpus = get_lm_corpus(path_to_data, 'wt103', 'word', max_size=None)
+        # diter = corpus.get_iterator('train', 256, 192, device='cpu', ext_len=0)
+        # for idx, (inp, tgt, seqlen, _) in enumerate(diter):
+        #     output = model(inp)
+        #     torch.onnx.export(model, inp, os.path.join('onnx_models', 'memformer.onnx'), opset_version=13)
+        #     break
