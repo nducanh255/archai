@@ -10,53 +10,24 @@ environment:
   - set -e -o xtrace
   - sudo apt-get -y install git
   - pip install --user tensorboard
-search:
-  job_template:
-    command:
-    - set -e -o xtrace
-    - bash scripts/apex_install.sh
-    - pip install --user -e .
-    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
-      {config} --config_file wt103_base_FEAR.yaml                                         --n_layer
-      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
-      {d_inner} --d_embed {d_embed} --div_val {div_val}
-    name: train_xl_config_17
-    sku: G4
-  max_trials: 2
-  params:
-  - name: config
-    spec: discrete
-    values:
-    - dgx1_4gpu_fp32
-  - name: n_layer
-    spec: discrete
-    values:
-    - 7
-  - name: n_head
-    spec: discrete
-    values:
-    - 8,8,2,8,4,4,2
-  - name: d_model
-    spec: discrete
-    values:
-    - 512
-  - name: d_embed
-    spec: discrete
-    values:
-    - 512
-  - name: div_val
-    spec: discrete
-    values:
-    - 4
-  - name: d_head
-    spec: discrete
-    values:
-    - 128,128,256,128,64,256,128
-  - name: d_inner
-    spec: discrete
-    values:
-    - 1923,1334,1596,1351,1339,1100,1176
-  type: grid
+jobs:
+- command: 'export CUDA_VISIBLE_DEVICES=0,1,2,3 &&                 python -m torch.distributed.launch
+    --master_port=1234 --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py
+    --config {config}                 --config_file wt103_base.yaml --n_layer 6 --n_head
+    2,4,2,2,4,4 --d_model 256 --d_head 64,32,64,64,32,32                 --d_inner
+    1229,1618,1901,952,1496,987 --d_embed 128 --div_val 4 --experiment_name job_0
+    &
+
+    export CUDA_VISIBLE_DEVICES=4,5,6,7 &&                 python -m torch.distributed.launch
+    --master_port=2222 --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py
+    --config {config}                 --config_file wt103_base.yaml --n_layer 6 --n_head
+    2,4,2,2,4,4 --d_model 128 --d_head 64,32,64,64,32,32                 --d_inner
+    2778,3556,4122,2224,3312,2294 --d_embed 128 --div_val 4 --experiment_name job_1
+    &
+
+    wait'
+  name: train_xl_config_18
+  sku: G8
 storage:
   us_east:
     container_name: phillytools

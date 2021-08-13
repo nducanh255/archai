@@ -1,3 +1,5 @@
+# This code requires installation of Syrupy from https://github.com/jeetsukumaran/Syrupy
+
 import os
 from pickle import TRUE
 import numpy as np
@@ -212,7 +214,7 @@ def forward_with_output_memtransformer(self, data, target, mems):
 
 def measure_memory(args, run_command):
   os.system(run_command)
-  df = pd.read_csv('test.ps.log')
+  df = pd.read_csv('test.ps.log', sep=';')
   mems = df[args.mem_type]
   os.system('rm *.log')
   return mems.max()
@@ -220,9 +222,8 @@ def measure_memory(args, run_command):
 
 def get_memories(args, exp_name):
   path_to_results = os.path.join(args.results_dir, exp_name)
-  print(path_to_results)
   
-  yaml_file = os.path.join(args.results_dir, 'memory_{}.yaml'.format(args.mem_type))
+  yaml_file = os.path.join(path_to_results, 'memory_{}.yaml'.format(args.mem_type))
   if False: #os.path.exists(yaml_file):
     with open(yaml_file, 'r') as f:
       memories = yaml.safe_load(f)
@@ -235,15 +236,16 @@ def get_memories(args, exp_name):
 
       for k, v in model_config.items():
         model_config[k] = get_yaml_values(v)
+
+      print(model_config)
       
       print('=> Running', config_name)
-      command = 'syrupy.py -i 0.0001 --title test -C --no-raw-process-log --separator=, --no-align python archai/nlp/nvidia_transformer_xl/mem_transformer.py --n_layer {n_layer} --n_token {n_token} --n_head {n_head}\
+      command = 'syrupy.py -i 0.0001 --title test -C --no-raw-process-log --separator=";" --no-align python archai/nlp/nvidia_transformer_xl/mem_transformer.py --n_layer {n_layer} --n_token {n_token} --n_head {n_head}\
                   --d_head {d_head} --d_model {d_model} --d_embed {d_embed} --d_inner {d_inner} --div_val {div_val}'.format(**model_config)
       curr_peak_memories = []
       for iter in range(5):
         curr_setup_mem = measure_memory(args, run_command=(command + ' --setup_only'))
         curr_model_mem = measure_memory(args, run_command=command)
-        # print(curr_model_mem, curr_setup_mem)
         
         if curr_model_mem < curr_setup_mem:
           iter -=1 
@@ -258,70 +260,79 @@ def get_memories(args, exp_name):
     with open(yaml_file, 'w') as f:
         yaml.dump(peak_memories, f)
 
-def plot(args):
-  # load the ground-truth rankings
-  yaml_file = os.path.join(args.results_dir, 'result_summary.yaml')
-  with open(yaml_file, 'r') as f:
-    results_gt = collections.OrderedDict(yaml.safe_load(f))
 
-  scores = {}
-  for file in os.listdir(args.results_dir):
-    if 'synflow_scores_seed' in file:
-      seed = re.search('seed_([0-9]+)', file).group(1)
-      with open(os.path.join(args.results_dir, file), 'r') as f:
-        print('loading scores for seed ', seed)
-        scores[seed] = yaml.safe_load(f)
-  
-  common_ratios = {}
-  spr_ranks = {}
-  for seed in scores.keys():
-    common_configs = np.intersect1d(list(results_gt.keys()), list(scores[seed].keys()))
+def plot(args):
+  peak_memories = {}
+  n_params = {}
+  val_ppl_list_gt = {}
+  sorted_ground_truth = {}
+
+  legend_keys = []
+  for exp_name in args.exp_name:
+    path_to_results = os.path.join(args.results_dir, exp_name)
+    idx = re.search('(fear_stage_1)', exp_name).span()[-1]
+    legend_key = exp_name[idx+1:].split('_')[-1]
+    if len(legend_key)==0:
+      legend_key = 'homogeneous'
+    legend_keys.append(legend_key)
+
+    # load the ground-truth rankings
+    yaml_file = os.path.join(path_to_results, 'result_summary.yaml')
+    with open(yaml_file, 'r') as f:
+      results_gt = collections.OrderedDict(yaml.safe_load(f))
+
+    yaml_file = os.path.join(path_to_results, 'memory_{}.yaml'.format(args.mem_type))
+    with open(yaml_file, 'r') as f:
+      memories = yaml.safe_load(f)
+
+    yaml_file = os.path.join(path_to_results, 'params_summary.yaml'.format(args.mem_type))
+    with open(yaml_file, 'r') as f:
+      n_all_params = yaml.safe_load(f)
+    
+    common_configs = np.intersect1d(list(results_gt.keys()), list(memories.keys()))
     print('analyzing {} architectures'.format(len(common_configs)))
 
     # fear_stage_1 results:
-    val_ppl_list_gt = []
+    val_ppl_list_gt[legend_key] = []
     for k in common_configs:
-      val_ppl_list_gt.append(results_gt[k]['valid_perplexity'])
-    sorted_ground_truth = np.argsort(val_ppl_list_gt)
+      val_ppl_list_gt[legend_key].append(results_gt[k]['valid_perplexity'])
+    sorted_ground_truth[legend_key] = np.argsort(val_ppl_list_gt[legend_key])
 
-    # zero-cost score results:
-    target_scores = []
+    # memory profiling results:
+    peak_memories[legend_key] = []
     for k in common_configs:
-      target_scores.append(-scores[seed][k])   # the higher the score, the better the architecture (reversely correlated with ppl)
-    sorted_target = np.argsort(target_scores)
+      peak_memories[legend_key].append(memories[k]/1024)   # the higher the score, the better the architecture (reversely correlated with ppl)
+    sorted_memories = np.argsort(peak_memories[legend_key])
 
-    common_ratios[seed] = []
-    spr_ranks[seed] = []
-    # extract common ratio and spearmanrank
-    topk_list = range(10,101,10)
-    for topk in topk_list:
-      common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth, sorted_target=sorted_target, \
-                                            val_ppl_list_gt=val_ppl_list_gt, val_ppl_list_target=target_scores)
-      common_ratios[seed].append(common_ratio)
-      spr_ranks[seed].append(spr_rank)
+    # nparams
+    n_params[legend_key] = []
+    for k in common_configs:
+        n_params[legend_key].append(n_all_params[k]['total'])
+    sorted_nparams = np.argsort(n_params[legend_key])
+  
+  import plotly.graph_objects as go
+
+  traces = []
+  for k in legend_keys:
+    trace = go.Scatter3d(x=np.asarray(peak_memories[k])[sorted_ground_truth[k]],
+                      y=np.asarray(n_params[k])[sorted_ground_truth[k]],
+                      z=np.asarray(val_ppl_list_gt[k])[sorted_ground_truth[k]], mode='markers',
+                      name=k, marker=go.Marker(size=6))
+    traces.append(trace)
+  data = go.Data(traces)
+  fig = go.Figure(data=data)
+  fig.update_scenes(xaxis_title_text="Memory (MB)", yaxis_title_text="nparams", zaxis_title_text='val ppl')   
+  fig.write_html('pareto_memory{}_params.html'.format(args.mem_type))        
 
   plt.figure()
-  for seed in common_ratios.keys():
-    plt.scatter(topk_list, common_ratios[seed], label='seed_'+seed)
-  plt.ylabel('Common ratio')
-  plt.xlabel('Topk (%)')
-  plt.xticks(topk_list)
-  plt.title('ranking based on Synflow')
-  plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+  for k in legend_keys:
+    plt.scatter(np.asarray(peak_memories[k])[sorted_ground_truth[k]], np.asarray(val_ppl_list_gt[k])[sorted_ground_truth[k]], label=k)
+  plt.ylabel('Validation PPL')
+  plt.xlabel('Peak Memory (MBytes)')
+  plt.title('Pareto Curve')
   plt.grid(axis='y')
-  plt.savefig('common_ratio_topk_synflow.png', bbox_inches="tight")
-
-  plt.figure()
-  for seed in common_ratios.keys():
-    plt.scatter(topk_list, spr_ranks[seed], label='seed_'+seed)
-  plt.ylabel('Spearman\'s Correlation')
-  plt.xlabel('Topk (%)')
-  plt.xticks(topk_list)
-  plt.ylim(top=1)
-  plt.grid(axis='y')
-  plt.title('ranking based on Synflow')
   plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-  plt.savefig('spearman_topk_synflow.png', bbox_inches="tight")
+  plt.savefig('pareto_memory_{}.png'.format(args.mem_type), bbox_inches="tight")
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Results Analysis.')

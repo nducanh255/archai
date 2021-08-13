@@ -9,53 +9,63 @@ environment:
   setup:
   - set -e -o xtrace
   - pip install --user tensorboard
-search:
-  job_template:
-    command:
-    - set -e -o xtrace
-    # - bash scripts/apex_install.sh
-    - pip install --user -e .
-    - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py                                       --config
-      {config} --config_file wt103_base_FEAR.yaml                                       --n_layer
-      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                       --d_inner
-      {d_inner} --d_embed {d_embed} --div_val {div_val}
-    name: train_xl_config_12
+jobs:
+  - name: train_xl_config_12_onejob
     sku: G8
-  max_trials: 2
-  params:
-  - name: config
-    spec: discrete
-    values:
-    - dgx1_4gpu_fp32
-  - name: n_layer
-    spec: discrete
-    values:
-    - 6
-  - name: n_head
-    spec: discrete
-    values:
-    - 2,4,2,2,4,4
-  - name: d_model
-    spec: discrete
-    values:
-    - 128
-  - name: d_embed
-    spec: discrete
-    values:
-    - 128
-  - name: div_val
-    spec: discrete
-    values:
-    - 4
-  - name: d_head
-    spec: discrete
-    values:
-    - 64,32,64,64,32,32
-  - name: d_inner
-    spec: discrete
-    values:
-    - 1229,1618,1901,952,1496,987
-  type: grid
+    command:
+      - set -e -o xtrace
+      - pip install --user -e .
+      - export CUDA_VISIBLE_DEVICES=0,1,2,3 && python -m torch.distributed.launch --master_port=2222 --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py --config dgx1_4gpu_fp32 --config_file wt103_base_FEAR.yaml --n_layer 6 --n_head 2,4,2,2,4,4 --d_model 128 --d_head 64,32,64,64,32,32 --d_inner 1229,1618,1901,952,1496,987 --d_embed 128 --div_val 4 --experiment_name job_1 &
+        export CUDA_VISIBLE_DEVICES=4,5,6,7 && python -m torch.distributed.launch --master_port=1234 --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py --config dgx1_4gpu_fp32 --config_file wt103_base_FEAR.yaml --n_layer 4 --n_head 2,4,2,2 --d_model 128 --d_head 64,32,64,64 --d_inner 1229,1618,1901,952 --d_embed 128 --div_val 4 --experiment_name job_2 &
+        wait
+      # - bash archai/nlp/nvidia_transformer_xl/configs/run_code_1.sh #& bash archai/nlp/nvidia_transformer_xl/configs/run_code_2.sh
+# search:
+#   job_template:
+#     command:
+#     - set -e -o xtrace
+#     # - bash scripts/apex_install.sh
+#     - pip install --user -e .
+#     - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py                                       --config
+#       {config} --config_file wt103_base_FEAR.yaml                                       --n_layer
+#       {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                       --d_inner
+#       {d_inner} --d_embed {d_embed} --div_val {div_val}
+#     name: train_xl_config_12
+#     sku: G8
+#   max_trials: 2
+#   params:
+#   - name: config
+#     spec: discrete
+#     values:
+#     - dgx1_4gpu_fp32
+#   - name: n_layer
+#     spec: discrete
+#     values:
+#     - 6
+#   - name: n_head
+#     spec: discrete
+#     values:
+#     - 2,4,2,2,4,4
+#   - name: d_model
+#     spec: discrete
+#     values:
+#     - 128
+#   - name: d_embed
+#     spec: discrete
+#     values:
+#     - 128
+#   - name: div_val
+#     spec: discrete
+#     values:
+#     - 4
+#   - name: d_head
+#     spec: discrete
+#     values:
+#     - 64,32,64,64,32,32
+#   - name: d_inner
+#     spec: discrete
+#     values:
+#     - 1229,1618,1901,952,1496,987
+#   type: grid
 storage:
   us_east:
     container_name: phillytools

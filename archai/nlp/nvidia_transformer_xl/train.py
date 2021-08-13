@@ -823,6 +823,7 @@ def main():
     dllogger.log(step='PARAMETER', data=vars(args))
 
     logging.info(f'world size: {nv_distributed.get_world_size()}')
+    logging.info(f'Training on {torch.cuda.device_count()} GPUs')
 
     if not args.debug and not args.no_env:
         log_env_info()

@@ -139,7 +139,10 @@ def plot(args):
   legend_keys = []
   for exp_name in args.exp_name:
     path_to_results = os.path.join(args.results_dir, exp_name)
-    legend_key = 'heterogeneous' if 'heterogeneous' in exp_name else 'homogeneous'
+    idx = re.search('(fear_stage_1)', exp_name).span()[-1]
+    legend_key = exp_name[idx+1:].split('_')[-1]
+    if len(legend_key)==0:
+      legend_key = 'homogeneous'
     legend_keys.append(legend_key)
 
     # load the ground-truth rankings

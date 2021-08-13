@@ -1193,7 +1193,7 @@ if __name__ == '__main__':
     parser.add_argument('--d_model', type=int, default=128, help='')
     parser.add_argument('--d_embed', type=int, default=256, help='')
     parser.add_argument('--d_inner', type=lambda s: [int(item) for item in s.split(',')], default=[1204], help='')
-    parser.add_argument('--div_val', type=int, default=4, help='') # Dividend value for adaptive input and softmax
+    parser.add_argument('--div_val', type=int, default=1, help='') # Dividend value for adaptive input and softmax
     parser.add_argument('--dropout', type=float, default=0.1, help='')
     parser.add_argument('--cuda', action='store_true', help='')
     parser.add_argument('--seed', type=int, default=42, help='')
@@ -1232,7 +1232,7 @@ if __name__ == '__main__':
         # print(model)
 
         device = torch.device("cuda" if args.cuda else "cpu")
-        model.to(device)
+        model = model.to(device)
         model.eval()
 
         print('# total params', sum(p.numel() for p in model.parameters()))
@@ -1243,6 +1243,7 @@ if __name__ == '__main__':
         B = 1 # batch size
         data_len = tgt_len
         data = torch.LongTensor(data_len*B).random_(0, args.n_token).unsqueeze(-1).to(device)
+        # for _ in range(1000):
         output = model(data)
         # torch.onnx.export(model, inp, os.path.join('onnx_models', 'memformer.onnx'), opset_version=13)
         print('done')

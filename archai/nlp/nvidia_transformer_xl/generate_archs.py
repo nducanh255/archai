@@ -81,6 +81,25 @@ def generate_bash_files(path_to_configs, f_name, exp_name=None):
     bash_idx += 1
 
 
+def get_bundle_run_command(configs):
+  for k in configs.keys():
+    configs[k] = [str(get_yaml_values(v)) for v in configs[k]]
+  print(configs)
+
+  command = ''
+  master_ports = [1234, 2222, 2345, 1342]
+  for i in range(len(configs['n_layer'])):
+    gpu_range = ','.join([str(x) for x in range(i*n_gpus, (i+1)*n_gpus)])
+    
+    command += 'export CUDA_VISIBLE_DEVICES=%s && \
+                python -m torch.distributed.launch --master_port=%d --nproc_per_node="%s" archai/nlp/nvidia_transformer_xl/train.py --config {config} \
+                --config_file wt103_base.yaml --n_layer %s --n_head %s --d_model %s --d_head %s \
+                --d_inner %s --d_embed %s --div_val %s --experiment_name job_%d &\n' \
+                % (gpu_range, master_ports[i], str(n_gpus), configs['n_layer'][i], configs['n_head'][i], configs['d_model'][i], configs['d_head'][i], configs['d_inner'][i], configs['d_embed'][i], configs['div_val'][i], i)
+
+  command += 'wait'
+  return command
+
 def get_run_command(max_step, config_num, seed=None):
   if seed:
     assert config_num
@@ -367,8 +386,8 @@ if __name__ == '__main__':
     # d_inners = [512, 700]
     homogeneous_layers = False
     
-    start_config = 12
-    n_gpus = 8
+    start_config = 16
+    n_gpus = 4
     targets = ['NLX-NDv2']
 
     '''proxy for n_params:
@@ -412,35 +431,29 @@ if __name__ == '__main__':
     n_configs = len(param_values['n_layer'])
 
     # create corresponding yaml files for amulet jobs
-    for c in range(n_configs): 
+    c = 0
+    idx = 0
+    while c < n_configs: 
       with open('/home/t-mojanj/Projects/archaiphilly/nv_train.yaml') as file:
         amlt_config = yaml.load(file)
-        if c==0:
-          pprint.pprint(amlt_config)
+        # if c==0:
+        #   pprint.pprint(amlt_config)
 
-      amlt_config['search']['job_template']['sku']= 'G'+str(n_gpus)
-      amlt_config['search']['job_template']['name']= 'train_xl_config_'+str(c + start_config)
-      # TODO: add vocab_size when there is support for it
-      amlt_config['search']['job_template']['command'] = ['set -e -o xtrace',  'pip install --user -e .']
-      amlt_config['search']['job_template']['command'].append('python -m torch.distributed.launch --nproc_per_node="%s" archai/nlp/nvidia_transformer_xl/train.py \
-                                      --config {config} --config_file wt103_base_FEAR.yaml \
-                                      --n_layer {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head} \
-                                      --d_inner {d_inner} --d_embed {d_embed} --div_val {div_val}' % (str(n_gpus))) #--vocab_size {vocab_size} --attn_type 2 
-      amlt_config['search']['params'][0]['values'] = gpu_config
-      amlt_config['environment']['image'] = 'debadeepta/pytorch:1.8.1-cuda11.1-cudnn8-devel-archai'
-      amlt_config['environment']['setup'] = ['set -e -o xtrace', 'pip install --user tensorboard']
-      
-      names = list(param_values.keys())   #['n_layer', 'n_head', 'd_model', 'd_head', 'd_inner', 'd_embed', 'div_val']
-      for n in names:
-        values = get_yaml_values(param_values[n][c])
-        try:
-          amlt_config['search']['params'].append({'name':n, 'spec':'discrete', 'values': [values]})
-        except:
-          amlt_config['search']['params'] = [{'name':n, 'spec':'discrete', 'values': [values]}]
+      bundle_count = 8//n_gpus
+      curr_configs = {k:param_values[k][c:c+bundle_count] for k in param_values.keys()}
 
-      config_file = 'nv_train_'+str(int(start_config + c))+'.yaml'
+      del amlt_config['search']
+      amlt_config['jobs'] = [{}]
+      amlt_config['jobs'][0]['name'] = 'train_xl_config_'+str(c+start_config)
+      amlt_config['jobs'][0]['sku'] = 'G8'
+      amlt_config['jobs'][0]['command'] = get_bundle_run_command(curr_configs)
+
+      config_file = 'nv_train_'+str(int(start_config + idx))+'.yaml'
       f_name = os.path.join(path_to_configs, config_file)
       with open(f_name, 'w') as file:
           yaml.dump(amlt_config, file)
+
+      c += bundle_count
+      idx += 1
 
     generate_bash_files(path_to_configs, f_name='amlt_run_fear_stage1_similar_params', exp_name='fear_stage1_similar_params')

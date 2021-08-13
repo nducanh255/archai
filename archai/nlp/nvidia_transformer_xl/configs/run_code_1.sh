@@ -1,0 +1,3 @@
+export CUDA_VISIBLE_DEVICES=0,1,2,3 && python -m torch.distributed.launch --master_port=2222 --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py --config dgx1_4gpu_fp32 --config_file wt103_base_FEAR.yaml --n_layer 6 --n_head 2,4,2,2,4,4 --d_model 128 --d_head 64,32,64,64,32,32 --d_inner 1229,1618,1901,952,1496,987 --d_embed 128 --div_val 4 --experiment_name job_1 &
+export CUDA_VISIBLE_DEVICES=4,5,6,7 && python -m torch.distributed.launch --master_port=1234 --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py --config dgx1_4gpu_fp32 --config_file wt103_base_FEAR.yaml --n_layer 4 --n_head 2,4,2,2 --d_model 128 --d_head 64,32,64,64 --d_inner 1229,1618,1901,952 --d_embed 128 --div_val 4 --experiment_name job_2 &
+wait
