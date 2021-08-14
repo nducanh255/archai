@@ -157,6 +157,7 @@ class DenseNet(nn.Module):
     def __init__(
         self,
         dataset: str,
+        compress: bool,
         growth_rate: int = 32,
         block_config: Tuple[int, int, int, int] = (6, 12, 24, 16),
         num_init_features: int = 64,
@@ -168,10 +169,9 @@ class DenseNet(nn.Module):
         super(DenseNet, self).__init__()
 
         self.dataset = dataset
-        self.small_datasets = ['cifar10', 'cifar100', 'aircraft', 'mnist', 'fashion_mnist', 'food101', 'svhn', 'imagenet32', 'imagenet64']
         # First convolution
         in_dim = 1 if 'mnist' in self.dataset else 3
-        if self.dataset in self.small_datasets:
+        if compress:
             self.features = nn.Sequential(OrderedDict([
                 ('conv0', nn.Conv2d(in_dim, num_init_features, kernel_size=3, stride=1,
                                     padding=1, bias=False)),
@@ -230,6 +230,7 @@ class DenseNet(nn.Module):
 
 def _densenet(
     dataset: str,
+    compress: bool, 
     growth_rate: int,
     block_config: Tuple[int, int, int, int],
     num_init_features: int,
@@ -237,13 +238,13 @@ def _densenet(
     progress: bool = False,
     **kwargs: Any
 ) -> DenseNet:
-    model = DenseNet(dataset, growth_rate, block_config, num_init_features, **kwargs)
+    model = DenseNet(dataset, compress, growth_rate, block_config, num_init_features, **kwargs)
     # if pretrained:
     #     _load_state_dict(model, model_urls[arch], progress)
     return model
 
 
-def densenet121(dataset:str, pretrained: bool = False, progress: bool = True, **kwargs: Any) -> DenseNet:
+def densenet121(dataset:str, compress: bool, pretrained: bool = False, progress: bool = True, **kwargs: Any) -> DenseNet:
     r"""Densenet-121 model from
     `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_.
     The required minimum input size of the model is 29x29.
@@ -254,11 +255,11 @@ def densenet121(dataset:str, pretrained: bool = False, progress: bool = True, **
         memory_efficient (bool) - If True, uses checkpointing. Much more memory efficient,
           but slower. Default: *False*. See `"paper" <https://arxiv.org/pdf/1707.06990.pdf>`_.
     """
-    return _densenet(dataset, 32, (6, 12, 24, 16), 64, pretrained, progress,
+    return _densenet(dataset, compress, 32, (6, 12, 24, 16), 64, pretrained, progress,
                      **kwargs)
 
 
-def densenet161(dataset:str, pretrained: bool = False, progress: bool = True, **kwargs: Any) -> DenseNet:
+def densenet161(dataset:str, compress: bool, pretrained: bool = False, progress: bool = True, **kwargs: Any) -> DenseNet:
     r"""Densenet-161 model from
     `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_.
     The required minimum input size of the model is 29x29.
@@ -269,11 +270,11 @@ def densenet161(dataset:str, pretrained: bool = False, progress: bool = True, **
         memory_efficient (bool) - If True, uses checkpointing. Much more memory efficient,
           but slower. Default: *False*. See `"paper" <https://arxiv.org/pdf/1707.06990.pdf>`_.
     """
-    return _densenet(dataset, 48, (6, 12, 36, 24), 96, pretrained, progress,
+    return _densenet(dataset, compress, 48, (6, 12, 36, 24), 96, pretrained, progress,
                      **kwargs)
 
 
-def densenet169(dataset:str, pretrained: bool = False, progress: bool = True, **kwargs: Any) -> DenseNet:
+def densenet169(dataset:str, compress: bool, pretrained: bool = False, progress: bool = True, **kwargs: Any) -> DenseNet:
     r"""Densenet-169 model from
     `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_.
     The required minimum input size of the model is 29x29.
@@ -284,11 +285,11 @@ def densenet169(dataset:str, pretrained: bool = False, progress: bool = True, **
         memory_efficient (bool) - If True, uses checkpointing. Much more memory efficient,
           but slower. Default: *False*. See `"paper" <https://arxiv.org/pdf/1707.06990.pdf>`_.
     """
-    return _densenet(dataset, 32, (6, 12, 32, 32), 64, pretrained, progress,
+    return _densenet(dataset, compress, 32, (6, 12, 32, 32), 64, pretrained, progress,
                      **kwargs)
 
 
-def densenet201(dataset:str, pretrained: bool = False, progress: bool = True, **kwargs: Any) -> DenseNet:
+def densenet201(dataset:str, compress: bool, pretrained: bool = False, progress: bool = True, **kwargs: Any) -> DenseNet:
     r"""Densenet-201 model from
     `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_.
     The required minimum input size of the model is 29x29.
@@ -299,5 +300,5 @@ def densenet201(dataset:str, pretrained: bool = False, progress: bool = True, **
         memory_efficient (bool) - If True, uses checkpointing. Much more memory efficient,
           but slower. Default: *False*. See `"paper" <https://arxiv.org/pdf/1707.06990.pdf>`_.
     """
-    return _densenet(dataset, 32, (6, 12, 48, 32), 64, pretrained, progress,
+    return _densenet(dataset, compress, 32, (6, 12, 48, 32), 64, pretrained, progress,
                      **kwargs)

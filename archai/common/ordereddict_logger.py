@@ -107,8 +107,8 @@ class OrderedDictLogger:
         if self._save_delay is not None and \
                 time.time() - self._last_save > self._save_delay:
             self.save()
-            if utils.is_main_process() and self._save_intermediate and os.path.exists(self._intermediatedir):
-                shutil.copy(self._filepath, self._intermediate_logs_yaml_filepath)
+            # if utils.is_main_process() and self._save_intermediate and os.path.exists(self._intermediatedir):
+            #     shutil.copy(self._filepath, self._intermediate_logs_yaml_filepath)
             self._last_save = time.time()
 
     def _root(self)->OrderedDict:

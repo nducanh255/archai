@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 from archai.common import utils
 from archai.algos.darts.darts_model_desc_builder_ssl import DartsModelDescBuilderSimClr
-from archai.networks_ssl.simclr import ModelSimCLRResNet, ModelSimCLRVGGNet, ModelSimCLRViT
+from archai.networks_ssl.simclr import ModelSimCLRResNet, ModelSimCLRVGGNet, ModelSimCLRViT, ModelSimCLRDenseNet, ModelSimCLREfficientNet
 from archai.common.trainer import TrainerLinear
 from archai.common.config import Config
 from archai.common.common import _create_sysinfo, common_init, create_conf, get_state, init_from, update_envvars
@@ -60,6 +60,12 @@ def train_test(conf:Config):
     elif "vit" in conf_trainer['model']:
         with open('confs/algos/simclr_vits.yaml', 'r') as f:    
             conf_models = yaml.load(f, Loader=yaml.Loader)
+    elif "densenet" in conf_trainer['model']:
+        with open('confs/algos/simclr_densenets.yaml', 'r') as f:
+            conf_models = yaml.load(f, Loader=yaml.Loader)
+    elif "efficientnet" in conf_trainer['model']:
+        with open('confs/algos/simclr_efficientnets.yaml', 'r') as f:
+            conf_models = yaml.load(f, Loader=yaml.Loader)
     elif "darts" in conf_trainer['model']:
         model_desc_builder = DartsModelDescBuilderSimClr()
         model, model_desc = create_model(config_train['nas']['eval'], conf, model_desc_builder, config_train['nas']['eval']['full_desc_filename'])
@@ -67,6 +73,12 @@ def train_test(conf:Config):
         raise Exception(f"Not implemented SimCLR for model {conf_trainer['model']}")
     if "darts" not in conf_trainer['model']:
         conf_model = conf_models[conf_trainer['model']]
+
+    if "efficientnet" in conf_trainer['model']:
+        conf_loader['dataset']['input_height'] = conf_model['res']
+    # small_datasets = ['cifar10', 'cifar100', 'aircraft', 'mnist', 'fashion_mnist', 'food101', 'svhn', 'imagenet32', 'imagenet64']
+    if 'darts' not in conf_trainer['model'] and 'compress' not in conf_model:
+        conf_model['compress'] = conf_loader['dataset']['input_height']<=64
 
     _create_sysinfo(conf)
     # create model
@@ -83,13 +95,22 @@ def train_test(conf:Config):
                 depth = conf_model["depth"], heads = conf_model["heads"], mlp_dim = conf_model["mlp_dim"], pool = conf_model["pool"],
                 channels = conf_model["channels"], dim_head = conf_model["dim_head"], dropout = conf_model["dropout"],
                 emb_dropout = conf_model["emb_dropout"], hidden_dim = conf_model["hidden_dim"], out_features = conf_model["out_features"])
+    elif "densenet" in conf_trainer['model']:
+        model = ModelSimCLRDenseNet(config_train['loader']['dataset']['name'], conf_model['compress'], growth_rate = conf_model['growth_rate'],
+                block_config=conf_model['block_config'], num_init_features = conf_model['num_init_features'], 
+                hidden_dim = conf_model["hidden_dim"], out_features = conf_model["out_features"])
+    elif "efficientnet" in conf_trainer['model']:
+        model = ModelSimCLREfficientNet(conf_trainer['model'], hidden_dim = conf_model["hidden_dim"], out_features = conf_model["out_features"],
+                load_pretrained = False, width_coefficient = conf_model['width'], depth_coefficient = conf_model['depth'],
+                image_size = conf_model['res'], dropout_rate = conf_model['dropout']
+                )
     model = model.to(torch.device('cuda', 0))
     ckpt = torch.load(conf['common']['load_checkpoint'])
     print(ckpt['trainer']['last_epoch']+1)
     if "darts" in conf['common']['load_checkpoint']:
         if ckpt['trainer']['last_epoch'] +1 != config_train['nas']['eval']['trainer']['epochs']:
             raise Exception("Model training not finished, exiting evaluation...")
-    elif ckpt['trainer']['last_epoch'] +1 != ['trainer']['epochs']:
+    elif ckpt['trainer']['last_epoch'] +1 != config_train['trainer']['epochs']:
         raise Exception("Model training not finished, exiting evaluation...")
     print("Loading model from epoch {}".format(ckpt['trainer']['last_epoch']+1))
     model_state_dict = ckpt['trainer']['model']
@@ -115,6 +136,10 @@ def train_test(conf:Config):
         input_dim = conf_model['out_features_vgg']
     elif "vit" in conf_trainer['model']:
         input_dim = conf_model['dim']
+    elif "densenet" in conf_trainer['model']:
+        input_dim = model.backbone.output_features
+    elif "efficientnet" in conf_trainer['model']:
+        input_dim = model.backbone.output_features
     elif 'darts' in conf_trainer['model']:
         input_dim = model_desc.logits_op.params['conv'].ch_out
 

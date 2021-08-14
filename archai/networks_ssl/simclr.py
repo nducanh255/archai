@@ -4,10 +4,11 @@ from archai.networks_ssl.resnet import _resnet
 from archai.networks_ssl.densenet import _densenet
 from archai.networks_ssl.vggnet import _vggnet
 from archai.networks_ssl.vit import _vit
+from archai.networks_ssl.efficientnet import EfficientNet
 from typing import Type, Any, Callable, Union, List, Optional
 
-from archai.nas.model_desc import ModelDesc
-from archai.nas.model_ssl import ModelSimClr
+# from archai.nas.model_desc import ModelDesc
+# from archai.nas.model_ssl import ModelSimClr
 
 class Projection(nn.Module):
 
@@ -37,10 +38,7 @@ class ModelSimCLRResNet(nn.Module):
         compress:bool, hidden_dim: int, out_features:int, **kwargs: Any):
         super(ModelSimCLRResNet, self).__init__()
         self.backbone = _resnet(dataset, depth, layers, bottleneck, compress, **kwargs)
-        if dataset in self.backbone.small_datasets:
-            input_dim = (64 if compress else 512)*(4 if bottleneck else 1)
-        else:
-            input_dim = 512*(4 if bottleneck else 1)
+        input_dim = 512*(4 if bottleneck else 1)
         self.projection = Projection(input_dim, hidden_dim, out_features)
 
     def forward(self, x):
@@ -76,12 +74,11 @@ class ModelSimCLRViT(nn.Module):
         return z
 
 
-
 class ModelSimCLRDenseNet(nn.Module):
     
-    def __init__(self, dataset: str, hidden_dim: int, out_features:int, **kwargs: Any):
+    def __init__(self, dataset: str, compress:bool, hidden_dim: int, out_features:int, **kwargs: Any):
         super(ModelSimCLRDenseNet, self).__init__()
-        self.backbone = _densenet(dataset, **kwargs)
+        self.backbone = _densenet(dataset, compress, **kwargs)
         input_dim = self.backbone.output_features
         self.projection = Projection(input_dim, hidden_dim, out_features)
 
@@ -95,6 +92,19 @@ class ModelSimCLRMobileNet(nn.Module):
     def __init__(self, dataset: str, hidden_dim: int, out_features:int, **kwargs: Any):
         super(ModelSimCLRMobileNet, self).__init__()
         self.backbone = _densenet(dataset, **kwargs)
+        input_dim = self.backbone.output_features
+        self.projection = Projection(input_dim, hidden_dim, out_features)
+
+    def forward(self, x):
+        h = self.backbone(x)[-1]
+        z = self.projection(h)
+        return z
+
+class ModelSimCLREfficientNet(nn.Module):
+    
+    def __init__(self, model_name: str, hidden_dim: int, out_features:int, **kwargs: Any):
+        super(ModelSimCLREfficientNet, self).__init__()
+        self.backbone = EfficientNet._efficientnet(model_name, **kwargs)
         input_dim = self.backbone.output_features
         self.projection = Projection(input_dim, hidden_dim, out_features)
 

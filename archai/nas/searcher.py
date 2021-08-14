@@ -132,7 +132,7 @@ class Searcher(EnforceOverrides):
         conf_trainer = conf_search['trainer']
         conf_loader = conf_search['loader']
 
-        model = Model(model_desc, droppath=False, affine=False)
+        model = Model(model_desc, droppath=False, affine=False, finalizers=finalizers)
 
         # get data
         data_loaders = self.get_data(conf_loader)

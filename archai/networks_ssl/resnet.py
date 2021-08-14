@@ -158,7 +158,6 @@ class ResNet(nn.Module):
         self.compress = compress
         self.dataset = dataset
         self.return_feats_layers = return_feats_layers
-        self.small_datasets = ['cifar10', 'cifar100', 'aircraft', 'mnist', 'fashion_mnist', 'food101', 'svhn', 'imagenet32', 'imagenet64']
 
         self.inplanes = 64
         self.dilation = 1
@@ -173,60 +172,25 @@ class ResNet(nn.Module):
         self.base_width = width_per_group
 
         block = Bottleneck if bottleneck else BasicBlock
-        if self.dataset in self.small_datasets:
-            if compress:
-                self.inplanes = 16
-                #logger.info(bottleneck)
-                if bottleneck == True:
-                    n = int((depth - 2) / 9)
-                else:
-                    n = int((depth - 2) / 6)
-
-                if "mnist" in self.dataset:
-                    self.conv1 = nn.Conv2d(1, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False)
-                else:
-                    self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False)
-
-                self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False)
-                self.bn1 = norm_layer(self.inplanes)
-                self.relu = nn.ReLU(inplace=True)
-                self.layer1 = self._make_layer(block, 16, n)
-                self.layer2 = self._make_layer(block, 32, n, stride=2)
-                self.layer3 = self._make_layer(block, 64, n, stride=2)
-                # self.avgpool = nn.AvgPool2d(8)
-                self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-            else:
-                if "mnist" in self.dataset:
-                    self.conv1 = nn.Conv2d(1, self.inplanes, kernel_size=3, stride=1, padding=1,
-                                        bias=False)
-                else:
-                    self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=1,
-                                        bias=False)
-                self.bn1 = norm_layer(self.inplanes)
-                self.relu = nn.ReLU(inplace=True)
-                self.layer1 = self._make_layer(block, 64, layers[0])
-                self.layer2 = self._make_layer(block, 128, layers[1], stride=2,
-                                            dilate=replace_stride_with_dilation[0])
-                self.layer3 = self._make_layer(block, 256, layers[2], stride=2,
-                                            dilate=replace_stride_with_dilation[1])
-                self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
-                                            dilate=replace_stride_with_dilation[2])
-                self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-
-        else:
-            self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
+        in_channels = 1 if "mnist" in self.dataset else 3
+        if compress:
+            self.conv1 = nn.Conv2d(in_channels, self.inplanes, kernel_size=3, stride=1, padding=1,
                                 bias=False)
-            self.bn1 = norm_layer(self.inplanes)
-            self.relu = nn.ReLU(inplace=True)
+        else:
+            self.conv1 = nn.Conv2d(in_channels, self.inplanes, kernel_size=7, stride=2, padding=3,
+                                bias=False)
             self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-            self.layer1 = self._make_layer(block, 64, layers[0])
-            self.layer2 = self._make_layer(block, 128, layers[1], stride=2,
-                                        dilate=replace_stride_with_dilation[0])
-            self.layer3 = self._make_layer(block, 256, layers[2], stride=2,
-                                        dilate=replace_stride_with_dilation[1])
-            self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
-                                        dilate=replace_stride_with_dilation[2])
-            self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+
+        self.bn1 = norm_layer(self.inplanes)
+        self.relu = nn.ReLU(inplace=True)
+        self.layer1 = self._make_layer(block, 64, layers[0])
+        self.layer2 = self._make_layer(block, 128, layers[1], stride=2,
+                                    dilate=replace_stride_with_dilation[0])
+        self.layer3 = self._make_layer(block, 256, layers[2], stride=2,
+                                    dilate=replace_stride_with_dilation[1])
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
+                                    dilate=replace_stride_with_dilation[2])
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -272,41 +236,23 @@ class ResNet(nn.Module):
 
     def _forward_impl(self, x: Tensor) -> Tensor:
         out = []
-        if self.dataset in self.small_datasets:
-            x = self.conv1(x)
-            x = self.bn1(x)
-            x = self.relu(x)
-
-            x = self.layer1(x)
-            out.append(x)
-            x = self.layer2(x)
-            out.append(x)
-            x = self.layer3(x)
-            out.append(x)
-            if not self.compress:
-                x = self.layer4(x)
-                out.append(x)
-
-            x = self.avgpool(x)
-            x = x.view(x.size(0), -1)
-
-        else:
-            x = self.conv1(x)
-            x = self.bn1(x)
-            x = self.relu(x)
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        if not self.compress:
             x = self.maxpool(x)
 
-            x = self.layer1(x)
-            out.append(x)
-            x = self.layer2(x)
-            out.append(x)
-            x = self.layer3(x)
-            out.append(x)
-            x = self.layer4(x)
-            out.append(x)
+        x = self.layer1(x)
+        out.append(x)
+        x = self.layer2(x)
+        out.append(x)
+        x = self.layer3(x)
+        out.append(x)
+        x = self.layer4(x)
+        out.append(x)
 
-            x = self.avgpool(x)
-            x = x.view(x.size(0), -1)
+        x = self.avgpool(x)
+        x = x.view(x.size(0), -1)
 
         return (out if self.return_feats_layers else [x])
 

@@ -39,7 +39,6 @@ class DartsExperimentRunnerSimClr(ExperimentRunner):
     @overrides
     def run_eval(self, conf:Config)->EvalResult:
         evaler = self.evaluater()
-        evaler.expdirname = self.get_expname(False)
         return evaler.evaluate(conf,
                                model_desc_builder=self.model_desc_builder())
 

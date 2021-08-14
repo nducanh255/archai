@@ -20,7 +20,7 @@ from archai.common import utils, ml_utils
 from archai.nas.arch_module import ArchModule
 
 class Model(ArchModule):
-    def __init__(self, model_desc:ModelDesc, droppath:bool, affine:bool):
+    def __init__(self, model_desc:ModelDesc, droppath:bool, affine:bool, finalizers = None):
         super().__init__()
 
         # some of these fields are public as finalizer needs access to them
@@ -41,6 +41,7 @@ class Model(ArchModule):
 
         # adaptive pooling output size to 1x1
         self.pool_op = Op.create(model_desc.pool_op, affine=affine)
+        self.finalizers = finalizers
         # since ch_p records last cell's output channels
         # it indicates the input channel number
         self.logits_op = Op.create(model_desc.logits_op, affine=affine)

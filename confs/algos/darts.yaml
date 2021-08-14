@@ -138,6 +138,10 @@ nas:
     search_iters: 1
     full_desc_filename: '$expdir/full_model_desc.yaml' # arch before it was finalized
     final_desc_filename: '$expdir/final_model_desc.yaml' # final arch is saved in this file
+    epoch_model_desc: # whether to save model desc during search epochs
+      freq: -1 # epoch frequency for saving, -1 or 0 is for no saving
+      savedir: '$expdir/epoch_model_desc' # root dir for dumping all epoch model descs
+      filename: 'model_desc' # not adding full filename with yaml extension as name changes by appending epoch number to it
     metrics_dir: '$expdir/models/{reductions}/{cells}/{nodes}/{search_iter}' # where metrics and model stats would be saved from each pareto iteration
     seed_train:
       trainer:
@@ -204,6 +208,8 @@ nas:
       dataset:
         _copy: '/dataset'
     trainer:
+      epoch_model_desc:
+        _copy: '/nas/search/epoch_model_desc'
       apex:
         _copy: '/common/apex'
       aux_weight: '_copy: /nas/search/model_desc/aux_weight'
