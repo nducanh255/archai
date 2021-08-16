@@ -41,6 +41,10 @@ from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import benchmark
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import create_exp_dir
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import l2_promote
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import log_env_info
+from archai import common
+
+# import distiller
+from functools import partial
 
 
 def parse_args():
@@ -66,6 +70,8 @@ def parse_args():
 
     parser.add_argument('--work_dir', default='~/logdir', type=str,
                          help='Directory for the results')
+    parser.add_argument('--experiment_name', default='nv_xformer_xl', type=str,
+                         help='Directory for the results')
     parser.add_argument('--debug', action='store_true',
                         help='run in debug mode (do not create exp dir)')
     parser.add_argument('--data', type=str, default=None,
@@ -78,7 +84,7 @@ def parse_args():
     parser.add_argument('--dataset', type=str, default='wt103',
                         choices=['wt103', 'lm1b', 'enwik8', 'text8'],
                         help='dataset name')
-    parser.add_argument('--split', type=str, default='all',
+    parser.add_argument('--split', type=str, default='test',
                         choices=['all', 'valid', 'test'],
                         help='which split to evaluate')
     parser.add_argument('--affinity', type=str,
@@ -258,6 +264,84 @@ def evaluate(eval_iter, model, meters, log_interval, max_size=None, repeat=1):
     return avg_loss
 
 
+def evaluate_sensitivity(eval_iter, model, log_interval, max_size=None, repeat=1):
+    total_len, total_loss = 0, 0.
+    eval_step = 0
+
+    log_throughput = 0
+    log_latency = 0
+    log_loss = 0
+
+    torch.cuda.synchronize()
+    start_time = time.time()
+    with torch.no_grad():
+        mems = None
+        for _ in range(repeat):
+            for idx, (data, target, seq_len, warm) in enumerate(eval_iter):
+                if max_size and idx >= max_size:
+                    break
+                eval_step += 1
+
+                torch.cuda.synchronize()
+                start_iter = time.time()
+                loss, mems = model(data, target, mems)
+                torch.cuda.synchronize()
+                elapsed = time.time() - start_iter
+
+                loss = loss.float().mean()
+                log_loss += loss.item()
+                if warm:
+                    total_loss += seq_len * loss.item()
+                    total_len += seq_len
+
+                log_latency += elapsed
+
+                target_tokens = target.numel()
+                throughput = target_tokens / elapsed
+                throughput = nvidia_utils.distributed.all_reduce_item(throughput, op='sum')
+                log_throughput += throughput
+
+                if eval_step % log_interval == 0:
+                    log_throughput /= log_interval
+                    log_latency /= log_interval
+                    log_loss /= log_interval
+                    log_ppl = math.exp(log_loss)
+
+                    log_str = '| step {:>8d} | batches {:>6d} / {:d} ' \
+                        '| ms/batch {:5.2f} | tok/s {:7.0f} | loss {:5.2f} | ppl {:5.2f}'.format(
+                            eval_step,
+                            idx+1,
+                            eval_iter.n_batch,
+                            log_latency * 1000,
+                            log_throughput,
+                            log_loss,
+                            log_ppl,
+                            )
+                    logging.info(log_str)
+
+                    dllogger_data = {
+                        'eval_latency': log_latency * 1000,
+                        'eval_throughput': log_throughput,
+                        'eval_loss': log_loss,
+                        'eval_perplexity': log_ppl,
+                        }
+                    dllogger.log(step=tuple([eval_step]), data=dllogger_data)
+
+                    log_throughput = 0
+                    log_latency = 0
+                    log_loss = 0
+
+    nvidia_utils.distributed.barrier()
+    torch.cuda.synchronize()
+    total_time = time.time() - start_time
+    logging.info('Time : {:.2f}s, {:.2f}ms/segment'.format(
+            total_time, 1000 * total_time / (idx+1)))
+
+    avg_loss = total_loss / total_len
+    avg_loss = nvidia_utils.distributed.all_reduce_item(avg_loss, op='mean')
+    return np.exp(avg_loss), np.exp(avg_loss), avg_loss
+
+
 def compile_model(model, device, args):
     inp = torch.randint(0, 1000, (args.tgt_len, args.batch_size)).to(device)
     tgt = torch.randint(0, 1000, (args.tgt_len, args.batch_size)).to(device)
@@ -273,14 +357,14 @@ def compile_model(model, device, args):
 
 def main():
     args = parse_args()
-    if args.affinity != 'disabled':
-        nproc_per_node = torch.cuda.device_count()
-        affinity = nvidia_utils.gpu_affinity.set_affinity(
-            args.local_rank,
-            nproc_per_node,
-            args.affinity
-        )
-        print(f'{args.local_rank}: thread affinity: {affinity}')
+    # if args.affinity != 'disabled':
+    #     nproc_per_node = torch.cuda.device_count()
+    #     affinity = nvidia_utils.gpu_affinity.set_affinity(
+    #         args.local_rank,
+    #         nproc_per_node,
+    #         args.affinity
+    #     )
+    #     print(f'{args.local_rank}: thread affinity: {affinity}')
 
     if args.type == 'pytorch':
         from mem_transformer import MemTransformerLM
@@ -296,9 +380,11 @@ def main():
         exp_utils.get_create_dirs(args.data, args.dataset, args.experiment_name,
                                   args.work_dir, args.cache_dir)
 
-    with nvidia_utils.distributed.sync_workers() as rank:
-        if rank == 0:
-            create_exp_dir(args.work_dir, debug=args.debug)
+    # with nvidia_utils.distributed.sync_workers() as rank:
+    #     if rank == 0:
+    #         create_exp_dir(args.work_dir, debug=args.debug)
+
+    # args.work_dir = common.utils.full_path(args.work_dir)
 
     # Setup logging
     if args.log_all_ranks:
@@ -313,11 +399,11 @@ def main():
         log_file = os.devnull
         dllog_file = os.devnull
 
-    archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils.setup_logging(log_all_ranks=args.log_all_ranks,
+    exp_utils.setup_logging(log_all_ranks=args.log_all_ranks,
                                   filename=log_file,
                                   filemode='a',
                                   )
-    archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils.setup_dllogger(enabled=True, filename=dllog_file)
+    exp_utils.setup_dllogger(enabled=True, filename=dllog_file)
 
     if args.profile:
         try:
@@ -345,6 +431,7 @@ def main():
     if not args.manual_config:
         checkpoint = load_checkpoint(model_path)
         vocab_type = checkpoint['args'].vocab
+        vocab_size = checkpoint['args'].vocab_size
     else:
         checkpoint = None
         vocab_type = args.manual_vocab
@@ -365,7 +452,8 @@ def main():
                                             ext_len=args.ext_len, warmup=False)
     else:
         # Load dataset
-        corpus = get_lm_corpus(args.data, args.cachedir, args.dataset, vocab_type)
+        corpus = get_lm_corpus(args.data, args.cache_dir, args.dataset, vocab_type, vocab_size)
+        # corpus = get_lm_corpus(args.data, args.cache_dir, args.dataset, args.vocab, max_size=args.vocab_size)
 
         if args.split == 'valid' or args.split == 'test':
             iter = corpus.get_iterator(args.split, args.batch_size, args.tgt_len,
@@ -456,6 +544,29 @@ def main():
                  f'bsz {args.batch_size} tgt_len {args.tgt_len} '
                  f'ext_len {args.ext_len} mem_len {args.mem_len} '
                  f'clamp_len {args.clamp_len}')
+
+
+    n_all_param = sum([p.nelement() for p in model.parameters()])
+
+    for param_name, param in model.named_parameters():
+        nel = param.nelement()
+        perc_el = (nel / n_all_param) * 100.0
+        print(f'Name: {param_name}, Size: {perc_el:{3}.{3}} % ({nel}) -- {param.shape}')
+
+    # sparsities = [0.5]
+    # sparsities = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95]
+    # # sparsities = [0.8, 0.9]
+    # test_fnc = partial(evaluate_sensitivity, eval_iter = iter, log_interval = args.log_interval, max_size = 100, repeat = args.repeat)
+
+    # which_params = [param_name for param_name, _ in model.named_parameters()]
+    # sensitivity = distiller.perform_sensitivity_analysis(model,
+    #                                                      net_params=which_params,
+    #                                                      sparsities=sparsities,
+    #                                                      test_func=test_fnc,
+    #                                                      group='element')
+
+    # distiller.sensitivities_to_png(sensitivity, os.path.join(args.work_dir, 'sensitivity.png'))
+    # distiller.sensitivities_to_csv(sensitivity, os.path.join(args.work_dir, 'sensitivity.csv'))
 
     meters = {}
     warmup = args.mem_len // args.tgt_len + 2
