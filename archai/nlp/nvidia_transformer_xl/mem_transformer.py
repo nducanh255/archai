@@ -458,7 +458,8 @@ class AdaptiveEmbedding(nn.Module):
         self.n_token = n_token
         self.d_embed = d_embed
 
-        self.cutoffs = cutoffs + [n_token]
+        #self.cutoffs = cutoffs + [n_token]
+        self.cutoffs = cutoffs
         self.div_val = div_val
         self.d_proj = d_proj
 
@@ -776,7 +777,7 @@ class MemTransformerLM(nn.Module):
 
         return core_out, new_mems
 
-    def forward(self, data, target, mems):
+    def forward(self, data, target, soft_target, mems):
         # nn.DataParallel does not allow size(0) tensors to be broadcasted.
         # So, have to initialize size(0) mems inside the model forward.
         # Moreover, have to return new_mems to allow nn.DataParallel to piece
@@ -794,10 +795,26 @@ class MemTransformerLM(nn.Module):
                                   pred_hid, self.sampler)
             loss = -F.log_softmax(logit, -1)[:, :, 0]
         else:
-            loss = self.crit(pred_hid.view(-1, pred_hid.size(-1)), target.view(-1))
+            nll, loss = self.crit(pred_hid.view(-1, pred_hid.size(-1)), target.view(-1), soft_target)
+            # loss = self.crit(pred_hid.view(-1, pred_hid.size(-1)), target.view(-1))
             loss = loss.view(tgt_len, -1)
+            nll = nll.view(tgt_len, -1)
 
-        return (loss, new_mems)
+        return (nll, loss, new_mems)
+
+    def proba(self, data, mems):
+        # nn.DataParallel does not allow size(0) tensors to be broadcasted.
+        # So, have to initialize size(0) mems inside the model forward.
+        # Moreover, have to return new_mems to allow nn.DataParallel to piece
+        # them together.
+        if mems is None:
+            mems = self.init_mems()
+
+        hidden, new_mems = self._forward(data, mems=mems.half())
+
+        proba = self.crit.proba(hidden.view(-1, hidden.size(-1)))
+
+        return (proba, new_mems)
 
 
 if __name__ == '__main__':

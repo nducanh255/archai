@@ -248,6 +248,17 @@ def parse_args():
                       default=os.getenv('LOCAL_RANK', 0),
                       help='Used for multi-process training.')
 
+    kd = parser.add_argument_group('distillation')
+    kd.add_argument('--teacher_path',  type=str,
+                      default=None,
+                      help='Teacher full path.')
+    kd.add_argument('--temperature',  type=float,
+                      default=2,
+                      help='Softmax temperature.')
+    kd.add_argument('--kd_weight',  type=float,
+                      default=0.5,
+                      help='KD loss weight.')
+
     parser.set_defaults(**config)
     args, _ = parser.parse_known_args()
 
@@ -443,7 +454,7 @@ def evaluate(eval_iter, model, args):
         for i, (data, target, seq_len, warm) in enumerate(eval_iter):
             if args.eval_max_steps > 0 and i >= args.eval_max_steps:
                 break
-            loss, mems = model(data, target, mems)
+            loss, _, mems = model(data, target, None, mems)
             loss = loss.float().mean()
             if warm:
                 # assert (mems is None) or mems.size(1) == model.mem_len
@@ -460,7 +471,7 @@ def evaluate(eval_iter, model, args):
     return total_loss / total_len
 
 
-def train_iteration(model, i, mems, data_chunks, target_chunks, scaler,
+def train_iteration(model, teacher_model, i, mems, teacher_mems, data_chunks, target_chunks, scaler,
                     optimizer, device, delay_unscale, args):
     # trains a given chunk
     cpu = torch.device('cpu')
@@ -471,9 +482,35 @@ def train_iteration(model, i, mems, data_chunks, target_chunks, scaler,
         mems[i] = mems[i].to(device, non_blocking=True)
 
     enable_autocast = args.fp16 and args.amp == 'pytorch'
-    with torch.cuda.amp.autocast(enable_autocast):
-        loss, mems[i] = model(data_i, target_i, mems[i])
-        loss = loss.float().mean().type_as(loss) / args.batch_chunk
+    #with torch.cuda.amp.autocast(enable_autocast):
+
+    # model.eval()
+    proba = None
+    if teacher_model:
+        with torch.no_grad():
+            proba, teacher_mems[i] = teacher_model.proba(data_i, teacher_mems[i])
+
+    # target_flat = target_i.view(-1)
+    # cc = 0
+    # for s in range(target_flat.size(0)):
+    #     if target_flat[s] in proba[1][s]:
+    #         cc += 1
+
+    # print(f'Matches: {cc}/{target_flat.size(0)}.')
+    # import random 
+    # cc = 0
+    # for s in range(target_flat.size(0)):
+    #     random_s = random.randint(0, target_flat.size(0)-1)
+    #     if target_flat[s] in proba[1][random_s]:
+    #         cc += 1
+
+    # print(f'Random Matches: {cc}/{target_flat.size(0)}.')
+
+    # model.train()
+    nll, loss, mems[i] = model(data_i, target_i, proba, mems[i])
+    loss = loss.float().mean().type_as(loss) / args.batch_chunk
+    nll = nll.float().mean().type_as(nll) / args.batch_chunk
+    # print(loss)
 
     if args.swap_mem and mems[i] is not None:
         mems[i] = mems[i].to(cpu, non_blocking=True)
@@ -489,11 +526,11 @@ def train_iteration(model, i, mems, data_chunks, target_chunks, scaler,
     else:
         loss.backward()
 
-    train_loss = loss.float().item()
+    train_loss = nll.float().item()
     return train_loss
 
 
-def train(tr_iter, va_iter, model, para_model, model_config, optimizer,
+def train(tr_iter, va_iter, model, teacher_model, para_model, model_config, optimizer,
           optimizer_sparse, scheduler, scheduler_sparse, scaler, vocab, epoch,
           last_batch, last_iter, train_step, best_val_loss, meters,
           device, args):
@@ -506,6 +543,8 @@ def train(tr_iter, va_iter, model, para_model, model_config, optimizer,
     log_start_time = time.time()
 
     mems = [None for _ in range(args.batch_chunk)]
+    teacher_mems = [None for _ in range(args.batch_chunk)]
+
     if args.varlen:
         train_iter = tr_iter.get_varlen_iter(start=last_iter)
     else:
@@ -528,12 +567,12 @@ def train(tr_iter, va_iter, model, para_model, model_config, optimizer,
             if i < args.batch_chunk - 1 and isinstance(para_model, DistributedDataParallel):
                 with para_model.no_sync():
                     train_loss_chunk = train_iteration(
-                        para_model, i, mems, data_chunks, target_chunks, scaler,
+                        para_model, teacher_model, i, mems, teacher_mems, data_chunks, target_chunks, scaler,
                         optimizer, device, True, args
                     )
             else:
                 train_loss_chunk = train_iteration(
-                    para_model, i, mems, data_chunks, target_chunks, scaler,
+                    para_model, teacher_model, i, mems, teacher_mems, data_chunks, target_chunks, scaler,
                     optimizer, device, False, args
                 )
 
@@ -780,7 +819,7 @@ def main():
     if args.adaptive:
         assert args.dataset in ['wt103', 'wt2', 'lm1b']
         if args.dataset in ['wt103', 'wt2']:
-            cutoffs = [19997, 39997, 199997]
+            cutoffs = [19997, 39997, ntokens]
             tie_projs += [True] * len(cutoffs)
         elif args.dataset == 'lm1b':
             cutoffs = [59997, 99997, 639997]
@@ -815,6 +854,27 @@ def main():
         }
 
     model = MemTransformerLM(**model_config)
+
+    ## Load teacher
+    teacher_model = None
+    if args.teacher_path:
+        teacher_checkpoint = load_checkpoint(args.teacher_path)
+        teacher_model = MemTransformerLM(**teacher_checkpoint['model_config'])
+        teacher_model.load_state_dict(teacher_checkpoint['model_state'])
+
+        if args.fp16:
+            dtype = torch.float16
+            math_str = 'fp16'
+        else:
+            dtype = torch.float32
+            math_str = 'fp32'
+
+        teacher_model = teacher_model.eval()
+        teacher_model = teacher_model.to(device)
+        teacher_model = teacher_model.to(dtype)
+        print(dtype)
+        print(teacher_checkpoint['model_config'])
+        print(model_config)
 
     model.apply(functools.partial(weights_init, args=args))
     # ensure embedding init is not overridden by out_layer in case of weight sharing
@@ -1002,7 +1062,7 @@ def main():
             if args.roll: # enable random shifts in datasets
                 tr_iter.roll(seed=args.seed + epoch)
             train_step, best_val_loss = train(
-                tr_iter, va_iter, model, para_model, model_config,
+                tr_iter, va_iter, model, teacher_model, para_model, model_config,
                 optimizer, optimizer_sparse, scheduler,
                 scheduler_sparse, scaler, vocab, epoch, last_batch,
                 last_iter, train_step, best_val_loss, meters,
