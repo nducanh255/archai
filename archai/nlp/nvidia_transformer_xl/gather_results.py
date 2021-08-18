@@ -26,7 +26,7 @@ from archai.nlp.nvidia_transformer_xl.mem_transformer import PositionwiseFF, Mul
                                                             RelPartialLearnableMultiHeadAttn, RelLearnableMultiHeadAttn, DecoderLayer, \
                                                             RelLearnableDecoderLayer, RelPartialLearnableDecoderLayer, AdaptiveEmbedding, ProjectedAdaptiveLogSoftmax
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.log_uniform_sampler import sample_logits
-from archai.nlp.nvidia_transformer_xl.utils import get_parameter_breakdown, get_list_of_layers
+from archai.nlp.nvidia_transformer_xl.utils import process_parameters
 
 from profiler import get_model_profile
 
@@ -86,30 +86,6 @@ def get_metrics(topk, sorted_ground_truth, sorted_target, val_ppl_list_gt, val_p
   print('Spearman Correlation on top %d %% (%d): %.3f'%(topk, len(topk_val_ppl_list_gt), spr_rank))
 
   return common_ratio, spr_rank
-
-
-def process_parameters(model):
-  params_adaptive_embedding, _ = get_parameter_breakdown(model, layerType=[AdaptiveEmbedding])
-  params_adaptive_softmax, _ = get_parameter_breakdown(model, layerType=[ProjectedAdaptiveLogSoftmax])
-  params_attention, _ = get_parameter_breakdown(model, layerType=[MultiHeadAttn, RelMultiHeadAttn, RelPartialLearnableMultiHeadAttn, RelLearnableMultiHeadAttn])
-  params_ff, _ = get_parameter_breakdown(model, layerType=[PositionwiseFF])
-
-  params_adaptive_embedding = np.sum(list(params_adaptive_embedding.values()))
-  params_adaptive_softmax = np.sum(list(params_adaptive_softmax.values()))
-  params_attention = np.sum(list(params_attention.values()))
-  params_ff = np.sum(list(params_ff.values()))
-
-  n_all_param = np.sum(params_adaptive_embedding) + np.sum(params_adaptive_softmax) + np.sum(params_attention) + np.sum(params_ff)
-  n_nonemb_param = np.sum(params_attention) + np.sum(params_ff)
-  print('total parameter size:', n_all_param)
-  print('nonemb parameter size:', n_nonemb_param)
-
-  # n_all_param_gt = sum([p.nelement() for p in model.parameters()])
-  n_nonemb_param_gt = sum([p.nelement() for p in model.layers.parameters()])
-  # assert n_all_param_gt == n_all_param, print(n_all_param_gt, n_all_param)
-  assert n_nonemb_param_gt == n_nonemb_param, print(n_nonemb_param_gt, n_nonemb_param)
-
-  return n_all_param, params_adaptive_embedding, params_adaptive_softmax, params_attention, params_ff
                           
 
 def extract_date_time(log_str):

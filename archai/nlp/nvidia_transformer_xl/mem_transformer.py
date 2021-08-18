@@ -852,8 +852,8 @@ class MemTransformerLM_flex(nn.Module):
         self.d_embed = d_embed
         self.d_model = d_model
         self.n_heads = n_head
-        self.d_heads = [d_model//n_head for n_head in n_head] #d_heads
-        assert (np.multiply(self.d_heads, self.n_heads)==[self.d_model]*len(self.n_heads)).all(), "d_model must be divisible by sampled num_heads"
+        self.d_heads = [d_model//n_head for n_head in n_head] if d_head is None else d_head
+        # assert (np.multiply(self.d_heads, self.n_heads)==[self.d_model]*len(self.n_heads)).all(), "d_model must be divisible by sampled num_heads"
 
         self.word_emb = AdaptiveEmbedding(n_token, d_embed, d_model, cutoffs, div_val=div_val)
 
@@ -1193,7 +1193,7 @@ if __name__ == '__main__':
     parser.add_argument('--d_model', type=int, default=128, help='')
     parser.add_argument('--d_embed', type=int, default=256, help='')
     parser.add_argument('--d_inner', type=lambda s: [int(item) for item in s.split(',')], default=[1204], help='')
-    parser.add_argument('--div_val', type=int, default=1, help='') # Dividend value for adaptive input and softmax
+    parser.add_argument('--div_val', type=int, default=4, help='') # Dividend value for adaptive input and softmax
     parser.add_argument('--dropout', type=float, default=0.1, help='')
     parser.add_argument('--cuda', action='store_true', help='')
     parser.add_argument('--seed', type=int, default=42, help='')
@@ -1243,7 +1243,7 @@ if __name__ == '__main__':
         B = 1 # batch size
         data_len = tgt_len
         data = torch.LongTensor(data_len*B).random_(0, args.n_token).unsqueeze(-1).to(device)
-        # for _ in range(1000):
+        # for _ in range(10000):
         output = model(data)
         # torch.onnx.export(model, inp, os.path.join('onnx_models', 'memformer.onnx'), opset_version=13)
         print('done')

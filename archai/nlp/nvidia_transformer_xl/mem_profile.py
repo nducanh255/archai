@@ -224,7 +224,7 @@ def get_memories(args, exp_name):
   path_to_results = os.path.join(args.results_dir, exp_name)
   
   yaml_file = os.path.join(path_to_results, 'memory_{}.yaml'.format(args.mem_type))
-  if False: #os.path.exists(yaml_file):
+  if os.path.exists(yaml_file):
     with open(yaml_file, 'r') as f:
       memories = yaml.safe_load(f)
   
@@ -255,7 +255,7 @@ def get_memories(args, exp_name):
         
       peak_memories[config_name] = np.mean(curr_peak_memories).tolist()
       print(config_name, peak_memories[config_name])
-    
+
     print('summarized %d configurations' % len(peak_memories.keys()))
     with open(yaml_file, 'w') as f:
         yaml.dump(peak_memories, f)
