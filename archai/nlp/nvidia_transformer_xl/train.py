@@ -8,6 +8,7 @@ import shutil
 import sys
 import time
 import warnings
+import pathlib as pl
 
 import dllogger
 import numpy as np
@@ -121,7 +122,7 @@ def parse_args():
                          help='Dataset name')
     dataset.add_argument('--vocab', type=str, default='word', choices=['word', 'bpe'],
                          help='Type of vocabulary')
-    dataset.add_argument('--vocab_size', type=int, default=5000,
+    dataset.add_argument('--vocab_size', type=int, default=None,
                          help='Size of vocabulary')
 
     model = parser.add_argument_group('model setup - defaults are for base model')
@@ -152,7 +153,7 @@ def parse_args():
                        help='Use the same pos embeddings after clamp_len')
     model.add_argument('--adaptive', action='store_true',
                        help='Use adaptive softmax')
-    model.add_argument('--div_val', type=int, default=1,
+    model.add_argument('--div_val', type=int, default=4,
                        help='Dividend value for adaptive input and softmax')
     model.add_argument('--sample_softmax', type=int, default=-1,
                        help='Number of samples in sampled softmax')
@@ -249,15 +250,21 @@ def parse_args():
                       help='Used for multi-process training.')
 
     kd = parser.add_argument_group('distillation')
-    kd.add_argument('--teacher_path',  type=str,
+    kd.add_argument('--teacher_name',  type=str,
                       default=None,
-                      help='Teacher full path.')
-    kd.add_argument('--temperature',  type=float,
-                      default=2,
+                      help='Teachers folder name.')
+    kd.add_argument('--kd_temperature',  type=float,
+                      default=1,
                       help='Softmax temperature.')
-    kd.add_argument('--kd_weight',  type=float,
+    kd.add_argument('--kd_alpha',  type=float,
                       default=0.5,
                       help='KD loss weight.')
+    kd.add_argument('--kd_annealing',  type=exp_utils.str2bool,
+                      default=True,
+                      help='KD Alpha annealing.')
+    kd.add_argument('--kd_topk',  type=int,
+                      default=30,
+                      help='Top K probabilities to use for KD.')
 
     parser.set_defaults(**config)
     args, _ = parser.parse_known_args()
@@ -472,7 +479,7 @@ def evaluate(eval_iter, model, args):
 
 
 def train_iteration(model, teacher_model, i, mems, teacher_mems, data_chunks, target_chunks, scaler,
-                    optimizer, device, delay_unscale, args):
+                    optimizer, device, delay_unscale, args, train_step):
     # trains a given chunk
     cpu = torch.device('cpu')
     data_i = data_chunks[i].contiguous()
@@ -482,32 +489,13 @@ def train_iteration(model, teacher_model, i, mems, teacher_mems, data_chunks, ta
         mems[i] = mems[i].to(device, non_blocking=True)
 
     enable_autocast = args.fp16 and args.amp == 'pytorch'
-    #with torch.cuda.amp.autocast(enable_autocast):
-
-    # model.eval()
     proba = None
     if teacher_model:
         with torch.no_grad():
-            proba, teacher_mems[i] = teacher_model.proba(data_i, teacher_mems[i])
+            proba, teacher_mems[i] = teacher_model(data_i, None, None, teacher_mems[i], proba=True)
 
-    # target_flat = target_i.view(-1)
-    # cc = 0
-    # for s in range(target_flat.size(0)):
-    #     if target_flat[s] in proba[1][s]:
-    #         cc += 1
-
-    # print(f'Matches: {cc}/{target_flat.size(0)}.')
-    # import random 
-    # cc = 0
-    # for s in range(target_flat.size(0)):
-    #     random_s = random.randint(0, target_flat.size(0)-1)
-    #     if target_flat[s] in proba[1][random_s]:
-    #         cc += 1
-
-    # print(f'Random Matches: {cc}/{target_flat.size(0)}.')
-
-    # model.train()
-    nll, loss, mems[i] = model(data_i, target_i, proba, mems[i])
+    with torch.cuda.amp.autocast(enable_autocast):
+        nll, loss, mems[i] = model(data_i, target_i, proba, mems[i], current_step=train_step)
     loss = loss.float().mean().type_as(loss) / args.batch_chunk
     nll = nll.float().mean().type_as(nll) / args.batch_chunk
     # print(loss)
@@ -568,12 +556,12 @@ def train(tr_iter, va_iter, model, teacher_model, para_model, model_config, opti
                 with para_model.no_sync():
                     train_loss_chunk = train_iteration(
                         para_model, teacher_model, i, mems, teacher_mems, data_chunks, target_chunks, scaler,
-                        optimizer, device, True, args
+                        optimizer, device, True, args, train_step
                     )
             else:
                 train_loss_chunk = train_iteration(
                     para_model, teacher_model, i, mems, teacher_mems, data_chunks, target_chunks, scaler,
-                    optimizer, device, False, args
+                    optimizer, device, False, args, train_step
                 )
 
             train_loss += train_loss_chunk
@@ -819,7 +807,7 @@ def main():
     if args.adaptive:
         assert args.dataset in ['wt103', 'wt2', 'lm1b']
         if args.dataset in ['wt103', 'wt2']:
-            cutoffs = [19997, 39997, ntokens]
+            cutoffs = [19997, 39997]
             tie_projs += [True] * len(cutoffs)
         elif args.dataset == 'lm1b':
             cutoffs = [59997, 99997, 639997]
@@ -851,28 +839,37 @@ def main():
         'attn_type': args.attn_type,
         'clamp_len': args.clamp_len,
         'sample_softmax': args.sample_softmax,
+        'kd_alpha': args.kd_alpha,
+        'kd_temperature': args.kd_temperature,
+        'kd_topk': args.kd_topk,
+        'kd_annealing': args.kd_annealing,
+        'max_step': args.max_step,
         }
 
     model = MemTransformerLM(**model_config)
 
     ## Load teacher
     teacher_model = None
-    if args.teacher_path:
-        teacher_checkpoint = load_checkpoint(args.teacher_path)
+    if args.teacher_name:
+        teacher_path = pl.Path(args.data).parent / 'teacher_models' /args.teacher_name / 'checkpoint_best.pt'
+        teacher_checkpoint = load_checkpoint(teacher_path)
+        teacher_checkpoint['model_config']['kd_topk'] = args.kd_topk
+        teacher_checkpoint['model_config']['kd_temperature'] = args.kd_temperature
         teacher_model = MemTransformerLM(**teacher_checkpoint['model_config'])
         teacher_model.load_state_dict(teacher_checkpoint['model_state'])
 
-        if args.fp16:
-            dtype = torch.float16
-            math_str = 'fp16'
-        else:
-            dtype = torch.float32
-            math_str = 'fp32'
-
         teacher_model = teacher_model.eval()
         teacher_model = teacher_model.to(device)
-        teacher_model = teacher_model.to(dtype)
-        print(dtype)
+
+        # Some teachers need fp32 otherwise they will produce NaNs
+        teacher_model = teacher_model.to(torch.float32)
+        if args.multi_gpu == 'ddp' and torch.distributed.is_initialized():
+            teacher_model = DistributedDataParallel(teacher_model,
+                                                device_ids=[args.local_rank],
+                                                output_device=args.local_rank,
+                                                broadcast_buffers=False,
+                                                find_unused_parameters=False,
+                                                )
         print(teacher_checkpoint['model_config'])
         print(model_config)
 

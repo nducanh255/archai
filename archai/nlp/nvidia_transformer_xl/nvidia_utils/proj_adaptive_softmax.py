@@ -34,15 +34,15 @@ class OptionalParameterList(nn.ParameterList):
 class ProjectedAdaptiveLogSoftmax(nn.Module):
     def __init__(self, n_token, d_embed, d_proj, cutoffs, div_val=1,
                  tie_projs=None, out_layers_weights=None, out_projs=None,
-                 keep_order=False):
+                 keep_order=False, kd_alpha=0.5, kd_annealing=True, 
+                 kd_temperature=2, kd_topk=30, max_step=40000):
         super().__init__()
 
         self.n_token = n_token
         self.d_embed = d_embed
         self.d_proj = d_proj
 
-        #self.cutoffs = cutoffs + [n_token]
-        self.cutoffs = cutoffs
+        self.cutoffs = cutoffs + [n_token]
         self.cutoff_ends = [0] + self.cutoffs
         self.div_val = div_val
 
@@ -51,6 +51,14 @@ class ProjectedAdaptiveLogSoftmax(nn.Module):
         self.head_size = self.shortlist_size + self.n_clusters
 
         self.tie_projs = tie_projs
+
+        self.kd_alpha = kd_alpha
+        self.kd_temperature = kd_temperature
+        self.kd_annealing = kd_annealing
+        self.kd_topk = kd_topk
+        self.max_step = max_step
+        self.n_sample_chunks = 2
+
 
         if self.n_clusters > 0:
             self.cluster_weight = nn.Parameter(torch.zeros(self.n_clusters, self.d_embed))
@@ -291,15 +299,126 @@ class ProjectedAdaptiveLogSoftmax(nn.Module):
 
         return nll
 
-    def forward(self, hidden, target, soft_target, keep_order=False):
+    def forward(self, hidden, target, soft_target, current_step=0, keep_order=False):
 
-        if soft_target:
-            return self._forward_kd(hidden, target, soft_target, keep_order)
-        else:
+        if soft_target is not None:
+            nll = self._forward_std(hidden, target, True)
+            loss = self._forward_kd(hidden, target, soft_target, nll, current_step, keep_order)
+            return (nll, loss)
+        elif target is not None:
             nll = self._forward_std(hidden, target, keep_order)
-            return nll, nll
+            return (nll, nll)
+        else:
+            return self._foward_proba(hidden)
 
-    def _forward_kd(self, hidden, target, soft_target, keep_order=False):
+    def _forward_kd(self, hidden, target, soft_target, nll, current_step, keep_order=False):
+        '''
+            hidden :: [len*bsz x d_proj]
+            target :: [len*bsz]
+            soft_target :: (values, indices): ([len*bsz, k], [len*bsz, k])
+        '''
+
+        if hidden.size(0) != target.size(0):
+            raise RuntimeError('Input and target should have the same size '
+                               'in the batch dimension.')
+
+        if self.n_clusters == 0:
+            logit = self._compute_logit(hidden, self.out_layers_weights[0],
+                                        self.out_layers_biases[0], self.get_out_proj(0))
+            nll = -F.log_softmax(logit, dim=-1) \
+                    .gather(1, target.unsqueeze(1)).squeeze(1)
+        else:
+            # construct weights and biases
+            weights, biases = [], []
+            for i in range(len(self.cutoffs)):
+                if self.div_val == 1:
+                    l_idx, r_idx = self.cutoff_ends[i], self.cutoff_ends[i + 1]
+                    weight_i = self.out_layers_weights[0][l_idx:r_idx]
+                    bias_i = self.out_layers_biases[0][l_idx:r_idx]
+                else:
+                    weight_i = self.out_layers_weights[i]
+                    bias_i = self.out_layers_biases[i]
+
+                if i == 0:
+                    weight_i = torch.cat(
+                        [weight_i, self.cluster_weight], dim=0)
+                    bias_i = torch.cat(
+                        [bias_i, self.cluster_bias], dim=0)
+
+                weights.append(weight_i)
+                biases.append(bias_i)
+
+
+            n_sample_chunks = self.n_sample_chunks
+            n_samples = hidden.size(0)
+            chunk_sizes = [n_samples // n_sample_chunks] * n_sample_chunks
+            chunk_sizes[-1] += n_samples % n_sample_chunks
+            chunk_offset = 0
+
+            # nll = torch.zeros_like(target, dtype=hidden.dtype, device=hidden.device)
+            loss = torch.zeros_like(target, dtype=hidden.dtype, device=hidden.device)
+
+            # self.kd_temperature = 1.0
+
+            for chunk_n in range(n_sample_chunks):
+                chunk_size = chunk_sizes[chunk_n]
+                hidden_chunk = hidden[chunk_offset:chunk_offset+chunk_size]
+
+                head_weight, head_bias, head_proj = weights[0], biases[0], self.get_out_proj(0)
+
+                head_logit = self._compute_logit(hidden_chunk, head_weight, head_bias, head_proj)
+                head_logprob = F.log_softmax(head_logit / self.kd_temperature, dim=1)
+                # head_logprob = head_logit
+
+                offset = head_logprob.size(1) - self.n_clusters
+                logprob = torch.zeros((hidden_chunk.size(0), self.cutoffs[-1]), dtype=hidden.dtype, device=hidden.device)
+                logprob[:, 0:offset] = head_logprob[:, 0:offset]
+
+                cutoff_values = [0] + self.cutoffs
+                for i in range(1, len(cutoff_values) - 1):
+
+                    weight_i, bias_i, proj_i = weights[i], biases[i], self.get_out_proj(i)
+
+                    tail_logit = self._compute_logit(hidden_chunk, weight_i, bias_i, proj_i)
+                    tail_logprob = F.log_softmax(tail_logit / self.kd_temperature, dim=1)
+                    # tail_logprob = tail_logit
+
+                    # Is this right?
+                    logprob_i = head_logprob[:, -i][:, None] + tail_logprob
+
+                    logprob[:, offset:offset+logprob_i.size(1)] = logprob_i
+
+                    offset += logprob_i.size(1)
+
+                # nll_chunk = -logprob.gather(1, target[chunk_offset:chunk_offset+chunk_size, None]).squeeze(1)
+                # nll[chunk_offset:chunk_offset+chunk_size] = (1.0 - alpha) * nll_chunk
+                # nll[chunk_offset:chunk_offset+chunk_size] = nll_chunk
+                nll_chunk = nll[chunk_offset:chunk_offset+chunk_size]
+
+
+                if soft_target:
+                    inds = soft_target[1][chunk_offset:chunk_offset+chunk_size]
+                    prob_kd = soft_target[0][chunk_offset:chunk_offset+chunk_size].type_as(logprob)
+                    logprob_kd = logprob.gather(1, inds)
+                    # kl_div = prob_kd * (torch.log(prob_kd) - logprob_kd)
+                    kl_div = prob_kd * logprob_kd
+                    # kl_div = F.kl_div(logprob_kd, prob_kd, reduction='none')
+                    kd_loss = -torch.sum(kl_div, dim=1)
+                    if self.kd_annealing:
+                        annealing_hard_min = 0.5
+                        annealing_hard_max = 0.95
+                        hard_ratio = annealing_hard_min + min(1, current_step / self.max_step) * (annealing_hard_max - annealing_hard_min)
+                        self.kd_alpha = 1.0 - hard_ratio
+                    loss[chunk_offset:chunk_offset+chunk_size] = self.kd_alpha * kd_loss * (self.kd_temperature*self.kd_temperature) + (nll_chunk * (1 - self.kd_alpha))
+                else:
+                    loss[chunk_offset:chunk_offset+chunk_size] = nll_chunk
+
+                chunk_offset += chunk_size
+
+        return loss
+
+
+    def _forward_kd2(self, hidden, target, soft_target, current_step, keep_order=False):
         '''
             hidden :: [len*bsz x d_proj]
             target :: [len*bsz]
@@ -346,42 +465,52 @@ class ProjectedAdaptiveLogSoftmax(nn.Module):
             nll = torch.zeros_like(target, dtype=hidden.dtype, device=hidden.device)
             loss = torch.zeros_like(target, dtype=hidden.dtype, device=hidden.device)
 
-            temp = 1
-            alpha = 0.5
+            self.kd_temperature = 1.0
 
             for chunk_n in range(n_sample_chunks):
                 chunk_size = chunk_sizes[chunk_n]
                 hidden_chunk = hidden[chunk_offset:chunk_offset+chunk_size]
-
+                logits = []
                 head_weight, head_bias, head_proj = weights[0], biases[0], self.get_out_proj(0)
 
                 head_logit = self._compute_logit(hidden_chunk, head_weight, head_bias, head_proj)
-                head_logprob = F.log_softmax(head_logit / temp, dim=1)
-                # head_logprob = head_logit
-
-                offset = head_logprob.size(1) - self.n_clusters
-                logprob = torch.zeros((hidden_chunk.size(0), self.cutoffs[-1]), dtype=hidden.dtype, device=hidden.device)
-                logprob[:, 0:offset] = head_logprob[:, 0:offset]
+                logits.append(head_logit)
 
                 cutoff_values = [0] + self.cutoffs
                 for i in range(1, len(cutoff_values) - 1):
 
                     weight_i, bias_i, proj_i = weights[i], biases[i], self.get_out_proj(i)
-
                     tail_logit = self._compute_logit(hidden_chunk, weight_i, bias_i, proj_i)
-                    tail_logprob = F.log_softmax(tail_logit / temp, dim=1)
-                    # tail_logprob = tail_logit
+                    logits.append(tail_logit)
 
-                    # Is this right?
+                logprob = torch.zeros((hidden_chunk.size(0), self.cutoffs[-1]), dtype=hidden.dtype, device=hidden.device)
+
+
+                head_logprob = F.log_softmax(logits[0], dim=1)
+                offset = head_logprob.size(1) - self.n_clusters
+                logprob[:, 0:offset] = head_logprob[:, 0:offset]
+
+                cutoff_values = [0] + self.cutoffs
+                for i in range(1, len(cutoff_values) - 1):
+                    tail_logprob = F.log_softmax(logits[i], dim=1)
                     logprob_i = head_logprob[:, -i][:, None] + tail_logprob
-
                     logprob[:, offset:offset+logprob_i.size(1)] = logprob_i
-
                     offset += logprob_i.size(1)
 
                 nll_chunk = -logprob.gather(1, target[chunk_offset:chunk_offset+chunk_size, None]).squeeze(1)
-                # nll[chunk_offset:chunk_offset+chunk_size] = (1.0 - alpha) * nll_chunk
                 nll[chunk_offset:chunk_offset+chunk_size] = nll_chunk
+
+                logprob = torch.zeros((hidden_chunk.size(0), self.cutoffs[-1]), dtype=hidden.dtype, device=hidden.device)
+                head_logprob = F.log_softmax(logits[0] / self.kd_temperature, dim=1)
+                offset = head_logprob.size(1) - self.n_clusters
+                logprob[:, 0:offset] = head_logprob[:, 0:offset]
+
+                cutoff_values = [0] + self.cutoffs
+                for i in range(1, len(cutoff_values) - 1):
+                    tail_logprob = F.log_softmax(logits[i] / self.kd_temperature, dim=1)
+                    logprob_i = head_logprob[:, -i][:, None] + tail_logprob
+                    logprob[:, offset:offset+logprob_i.size(1)] = logprob_i
+                    offset += logprob_i.size(1)
 
 
                 if soft_target:
@@ -392,8 +521,12 @@ class ProjectedAdaptiveLogSoftmax(nn.Module):
                     kl_div = prob_kd * logprob_kd
                     # kl_div = F.kl_div(logprob_kd, prob_kd, reduction='none')
                     kd_loss = -torch.sum(kl_div, dim=1)
-
-                    loss[chunk_offset:chunk_offset+chunk_size] = alpha * kd_loss * (temp*temp) + (nll_chunk * (1 - alpha))
+                    if self.kd_annealing:
+                        annealing_hard_min = 0.5
+                        annealing_hard_max = 0.95
+                        hard_ratio = annealing_hard_min + min(1, current_step / self.max_step) * (annealing_hard_max - annealing_hard_min)
+                        self.kd_alpha = 1.0 - hard_ratio
+                    loss[chunk_offset:chunk_offset+chunk_size] = self.kd_alpha * kd_loss * (self.kd_temperature*self.kd_temperature) + (nll_chunk * (1 - self.kd_alpha))
                 else:
                     loss[chunk_offset:chunk_offset+chunk_size] = nll_chunk
 
@@ -401,7 +534,7 @@ class ProjectedAdaptiveLogSoftmax(nn.Module):
 
         return (nll, loss)
 
-    def proba(self, hidden):
+    def _foward_proba(self, hidden):
         '''
             hidden :: [len*bsz x d_proj]
         '''
@@ -434,12 +567,11 @@ class ProjectedAdaptiveLogSoftmax(nn.Module):
             results_val = []
             results_ind = []
 
-            n_sample_chunks = 5
+            n_sample_chunks = self.n_sample_chunks
             n_samples = hidden.size(0)
             chunk_sizes = [n_samples // n_sample_chunks] * n_sample_chunks
             chunk_sizes[-1] += n_samples % n_sample_chunks
             chunk_offset = 0
-            temp = 1
 
             for chunk_n in range(n_sample_chunks):
                 chunk_size = chunk_sizes[chunk_n]
@@ -448,7 +580,7 @@ class ProjectedAdaptiveLogSoftmax(nn.Module):
                 head_weight, head_bias, head_proj = weights[0], biases[0], self.get_out_proj(0)
 
                 head_logit = self._compute_logit(hidden_chunk, head_weight, head_bias, head_proj)
-                head_prob = F.softmax(head_logit / temp, dim=1)
+                head_prob = F.softmax(head_logit / self.kd_temperature, dim=1)
 
                 offset = head_prob.size(1) - self.n_clusters
                 proba = torch.zeros((hidden_chunk.size(0), self.cutoffs[-1]), dtype=hidden.dtype, device=hidden.device)
@@ -461,7 +593,7 @@ class ProjectedAdaptiveLogSoftmax(nn.Module):
                     weight_i, bias_i, proj_i = weights[i], biases[i], self.get_out_proj(i)
 
                     tail_logit_i = self._compute_logit(hidden_chunk, weight_i, bias_i, proj_i)
-                    tail_prob_i = F.softmax(tail_logit_i / temp, dim=1)
+                    tail_prob_i = F.softmax(tail_logit_i / self.kd_temperature, dim=1)
 
                     #prob_i = (head_prob[:, -i] * tail_prob_i.T).T
                     # prob_i = torch.einsum('i,ij->ij', (head_prob[:, -i], tail_prob_i))
@@ -471,9 +603,9 @@ class ProjectedAdaptiveLogSoftmax(nn.Module):
 
                     offset += prob_i.size(1)
 
-                vals, indices = torch.topk(proba, k=30, dim=-1)
+                vals, indices = torch.topk(proba, k=self.kd_topk, dim=-1)
                 results_val.append(vals)
                 results_ind.append(indices)
                 chunk_offset += chunk_size
 
-        return (torch.vstack(results_val), torch.vstack(results_ind))
+        return (torch.cat(results_val, 0), torch.cat(results_ind, 0))

@@ -458,8 +458,7 @@ class AdaptiveEmbedding(nn.Module):
         self.n_token = n_token
         self.d_embed = d_embed
 
-        #self.cutoffs = cutoffs + [n_token]
-        self.cutoffs = cutoffs
+        self.cutoffs = cutoffs + [n_token]
         self.div_val = div_val
         self.d_proj = d_proj
 
@@ -521,7 +520,9 @@ class MemTransformerLM(nn.Module):
                  tgt_len=None, ext_len=None, mem_len=None,
                  cutoffs=[], adapt_inp=False,
                  same_length=False, attn_type=0, clamp_len=-1,
-                 sample_softmax=-1):
+                 sample_softmax=-1, kd_alpha=0.5, 
+                 kd_temperature=2, kd_annealing=True, 
+                 kd_topk=30, max_step=40000):
         super(MemTransformerLM, self).__init__()
         self.n_token = n_token
 
@@ -597,7 +598,12 @@ class MemTransformerLM(nn.Module):
                                                     cutoffs, div_val=div_val,
                                                     tie_projs=tie_projs,
                                                     out_projs=emb_projs,
-                                                    out_layers_weights=emb_layers)
+                                                    out_layers_weights=emb_layers,
+                                                    kd_alpha=kd_alpha,
+                                                    kd_temperature=kd_temperature,
+                                                    kd_annealing=kd_annealing,
+                                                    kd_topk=kd_topk,
+                                                    max_step=max_step)
 
 
         self.same_length = same_length
@@ -777,7 +783,7 @@ class MemTransformerLM(nn.Module):
 
         return core_out, new_mems
 
-    def forward(self, data, target, soft_target, mems):
+    def forward(self, data, target, soft_target, mems, current_step=0, proba=False):
         # nn.DataParallel does not allow size(0) tensors to be broadcasted.
         # So, have to initialize size(0) mems inside the model forward.
         # Moreover, have to return new_mems to allow nn.DataParallel to piece
@@ -785,9 +791,16 @@ class MemTransformerLM(nn.Module):
         if mems is None:
             mems = self.init_mems()
 
-        tgt_len = target.size(0)
         hidden, new_mems = self._forward(data, mems=mems)
 
+        if proba:
+            return self.softmax_proba(new_mems, hidden)
+
+        return self.softmax_training(new_mems, hidden, target, soft_target, current_step)
+
+    def softmax_training(self, new_mems, hidden, target, soft_target, current_step):
+
+        tgt_len = target.size(0)
         pred_hid = hidden[-tgt_len:]
         if self.sample_softmax > 0 and self.training:
             assert self.tie_weight
@@ -795,25 +808,16 @@ class MemTransformerLM(nn.Module):
                                   pred_hid, self.sampler)
             loss = -F.log_softmax(logit, -1)[:, :, 0]
         else:
-            nll, loss = self.crit(pred_hid.view(-1, pred_hid.size(-1)), target.view(-1), soft_target)
-            # loss = self.crit(pred_hid.view(-1, pred_hid.size(-1)), target.view(-1))
+            nll, loss = self.crit(pred_hid.view(-1, pred_hid.size(-1)), target.view(-1), soft_target, current_step)
             loss = loss.view(tgt_len, -1)
             nll = nll.view(tgt_len, -1)
 
         return (nll, loss, new_mems)
 
-    def proba(self, data, mems):
-        # nn.DataParallel does not allow size(0) tensors to be broadcasted.
-        # So, have to initialize size(0) mems inside the model forward.
-        # Moreover, have to return new_mems to allow nn.DataParallel to piece
-        # them together.
-        if mems is None:
-            mems = self.init_mems()
 
-        hidden, new_mems = self._forward(data, mems=mems.half())
+    def softmax_proba(self, new_mems, hidden):
 
-        proba = self.crit.proba(hidden.view(-1, hidden.size(-1)))
-
+        proba = self.crit(hidden.view(-1, hidden.size(-1)), None, None)
         return (proba, new_mems)
 
 

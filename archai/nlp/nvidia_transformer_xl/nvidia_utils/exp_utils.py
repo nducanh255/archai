@@ -20,6 +20,7 @@ import shutil
 import signal
 import sys
 import time
+import argparse
 from typing import Optional, Tuple
 
 import dllogger
@@ -253,3 +254,13 @@ def get_create_dirs(data_dir:Optional[str]=None, dataset_name='wt103',
     cache_dir = utils.full_path(cache_dir, create=True)
 
     return data_dir, output_dir, cache_dir
+
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')

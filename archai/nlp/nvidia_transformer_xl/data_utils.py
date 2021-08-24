@@ -24,7 +24,7 @@ import torch
 from archai.nlp.nvidia_transformer_xl import nvidia_utils as utils
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.gpt_vocab import GptVocab
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.vocabulary import Vocab
-from archai.common import utils
+# from archai.common import utils
 
 class LMOrderedIterator(object):
     def __init__(self, data, bsz, bptt, device='cpu', mem_len=None, ext_len=None, warmup=True):
