@@ -112,13 +112,16 @@ def get_model(model_config):
     return model
 
 
-def get_latency(model, model_config):
+def get_latency(model, model_config, n_threads=1, repeat=10):
+    if n_threads > 1:
+        torch.set_num_threads(n_threads)
+    model = model.to(device='cpu')
     t0 = benchmark.Timer(stmt='model(data)',
                           setup='',
                           globals={'data': torch.LongTensor(model_config['tgt_len']).random_(0, model_config['n_token']).unsqueeze(-1), 'model':model},
-                          # num_threads=num_threads,
+                          num_threads=n_threads,
                           label='Multithreaded model execution')
-    info = t0.timeit(10)
+    info = t0.timeit(repeat)
     info._lazy_init()
     latency = info._mean
 

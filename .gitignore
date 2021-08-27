@@ -113,3 +113,5 @@ model.th
 
 *.onnx
 *.html
+
+evo_search/

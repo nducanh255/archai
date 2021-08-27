@@ -81,7 +81,7 @@ def get_latencies(args, exp_name):
   path_to_results = os.path.join(args.results_dir, exp_name)
   
   yaml_file = os.path.join(path_to_results, 'latency_summary_sftmax_1thread.yaml'.format(args.seed))
-  if os.path.exists(yaml_file):
+  if False: #os.path.exists(yaml_file):
     with open(yaml_file, 'r') as f:
       print('Loading latency summary')
       latencies = yaml.safe_load(f)
@@ -110,10 +110,11 @@ def get_latencies(args, exp_name):
 
       # num_threads = torch.get_num_threads()
       # print(f'Benchmarking on {num_threads} threads')
+      torch.set_num_threads(8)
       t0 = benchmark.Timer(stmt='model(data)',
                           setup='',
                           globals={'data': torch.LongTensor(model_config['tgt_len']).random_(0, config['n_token']).unsqueeze(-1), 'model':model},
-                          # num_threads=num_threads,
+                          num_threads=8,
                           label='Multithreaded model execution')
       info = t0.timeit(10)
       info._lazy_init()
@@ -121,6 +122,8 @@ def get_latencies(args, exp_name):
   
       latencies[config_name] = curr_latency
       print(config_name, latencies[config_name])
+
+      return
 
     print('summarized %d configurations' % len(latencies.keys()))
     with open(yaml_file, 'w') as f:

@@ -1031,6 +1031,7 @@ class MemTransformerLM_flex(nn.Module):
             for i, layer in enumerate(self.layers):
                 hids.append(core_out.detach())
                 mems_i = None if mems is None else mems[i]
+
                 core_out = layer(core_out, pos_emb, self.r_w_bias[i],
                                  self.r_r_bias[i], dec_attn_mask=dec_attn_mask,
                                  mems=mems_i)

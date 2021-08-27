@@ -5,28 +5,25 @@ data:
   storage_id: us_east
 description: Train Transformer XL
 environment:
-  image: pytorch/pytorch:1.6.0-cuda10.1-cudnn7-devel
+  image: debadeepta/pytorch:1.7.0-cuda11.0-cudnn8-devel
   setup:
   - set -e -o xtrace
-  - sudo apt-get -y install git
   - pip install --user tensorboard
 jobs:
-- command: 'export CUDA_VISIBLE_DEVICES=0,1,2,3 &&                 python -m torch.distributed.launch
-    --master_port=1234 --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py
-    --config {config}                 --config_file wt103_base.yaml --n_layer 6 --n_head
-    2,4,2,2,4,4 --d_model 128 --d_head 64,32,64,64,32,32                 --d_inner
-    1229,1618,1901,952,1496,987 --d_embed 128 --div_val 4 --experiment_name job_0
-    &
-
-    export CUDA_VISIBLE_DEVICES=4,5,6,7 &&                 python -m torch.distributed.launch
-    --master_port=2222 --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py
-    --config {config}                 --config_file wt103_base.yaml --n_layer 12 --n_head
-    2,4,2,2,4,4,2,4,2,2,4,4 --d_model 128 --d_head 64,32,64,64,32,32,64,32,64,64,32,32                 --d_inner
-    1229,1618,1901,952,1496,987,1229,1618,1901,952,1496,987 --d_embed 128 --div_val
-    4 --experiment_name job_1 &
-
-    wait'
-  name: train_xl_config_16
+- command:
+  - set -e -o xtrace
+  - pip install --user -e .
+  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
+    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
+    7 --n_head 8,2,8,2,8,2,2 --d_model 128 --d_head 16,64,16,64,16,64,64                   --d_inner
+    2164,5694,3516,3840,5502,4665,3582 --d_embed 512 --div_val 4 --experiment_name
+    job_0
+  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
+    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
+    21 --n_head 8,2,8,2,8,2,2,8,2,8,2,8,2,2,8,2,8,2,8,2,2 --d_model 128 --d_head 16,64,16,64,16,64,64,16,64,16,64,16,64,64,16,64,16,64,16,64,64                   --d_inner
+    635,1880,1112,1226,1812,1517,1135,635,1880,1112,1226,1812,1517,1135,635,1880,1112,1226,1812,1517,1135
+    --d_embed 512 --div_val 4 --experiment_name job_1
+  name: train_xl_config_config_83_23
   sku: G8
 storage:
   us_east:

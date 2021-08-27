@@ -5,58 +5,23 @@ data:
   storage_id: us_east
 description: Train Transformer XL
 environment:
-  image: pytorch/pytorch:1.6.0-cuda10.1-cudnn7-devel
+  image: debadeepta/pytorch:1.7.0-cuda11.0-cudnn8-devel
   setup:
   - set -e -o xtrace
-  - sudo apt-get -y install git
   - pip install --user tensorboard
-search:
-  job_template:
-    command:
-    - set -e -o xtrace
-    - bash scripts/apex_install.sh
-    - pip install --user -e .
-    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
-      {config} --config_file wt103_base_FEAR.yaml                                         --n_layer
-      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
-      {d_inner} --d_embed {d_embed} --div_val {div_val}
-    name: train_xl_config_82
-    sku: G4
-  max_trials: 2
-  params:
-  - name: config
-    spec: discrete
-    values:
-    - dgx1_4gpu_fp32
-  - name: n_layer
-    spec: discrete
-    values:
-    - 6
-  - name: n_head
-    spec: discrete
-    values:
-    - 8,4,2,4,8,4
-  - name: d_model
-    spec: discrete
-    values:
-    - 128
-  - name: d_embed
-    spec: discrete
-    values:
-    - 128
-  - name: div_val
-    spec: discrete
-    values:
-    - 4
-  - name: d_head
-    spec: discrete
-    values:
-    - 16,32,32,64,32,16
-  - name: d_inner
-    spec: discrete
-    values:
-    - 1369,1908,1945,1367,1135,869
-  type: grid
+jobs:
+- command:
+  - set -e -o xtrace
+  - pip install --user -e .
+  - - 'python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
+      --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
+      6 --n_head 2,2,4,4,4,2 --d_model 308 --d_head 64,64,32,32,32,64                   --d_inner
+      1702,1625,2045,1297,1485,2003 --d_embed 512 --div_val 4 --experiment_name job_0
+      &
+
+      '
+  name: train_xl_config_config_143_82
+  sku: G8
 storage:
   us_east:
     container_name: phillytools

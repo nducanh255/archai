@@ -13,23 +13,18 @@ jobs:
 - command:
   - set -e -o xtrace
   - pip install --user -e .
-  - 'export CUDA_VISIBLE_DEVICES=0,1,2,3 &&                 python -m torch.distributed.launch
-    --master_port=1234 --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_4gpu_fp32                 --config_file wt103_base.yaml --n_layer
-    7 --n_head 8,2,4,4,8,4,8 --d_model 269 --d_head 16,64,32,32,16,32,16                 --d_inner
-    897,2046,1216,632,701,950,1677 --d_embed 512 --div_val 4 --experiment_name job_0
-    &
-
-    export CUDA_VISIBLE_DEVICES=4,5,6,7 &&                 python -m torch.distributed.launch
-    --master_port=2222 --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_4gpu_fp32                 --config_file wt103_base.yaml --n_layer
-    7 --n_head 8,2,4,4,8,4,8 --d_model 128 --d_head 16,64,32,32,16,32,16                 --d_inner
-    2143,4545,2810,1589,1733,2254,3774 --d_embed 512 --div_val 4 --experiment_name
-    job_1 &
-
-    wait'
-  name: train_xl_config_config_188_10
-  sku: G8
+  - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py
+    --config dgx1_4gpu_fp32                   --config_file wt103_base.yaml --n_layer
+    8 --n_head 4,8,8,4,8,4,4,2 --d_model 540 --d_head 32,16,16,32,16,32,32,64                   --d_inner
+    1482,1569,1129,1328,1121,1838,1446,860 --d_embed 128 --div_val 4 --experiment_name
+    job_0
+  - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py
+    --config dgx1_4gpu_fp32                   --config_file wt103_base.yaml --n_layer
+    8 --n_head 4,8,8,4,8,4,4,2 --d_model 128 --d_head 32,16,16,32,16,32,32,64                   --d_inner
+    7293,7687,5694,6596,5658,8906,7130,4476 --d_embed 128 --div_val 4 --experiment_name
+    job_1
+  name: train_xl_config_config_151_10
+  sku: G4
 storage:
   us_east:
     container_name: phillytools

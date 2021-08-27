@@ -5,58 +5,26 @@ data:
   storage_id: us_east
 description: Train Transformer XL
 environment:
-  image: pytorch/pytorch:1.6.0-cuda10.1-cudnn7-devel
+  image: debadeepta/pytorch:1.7.0-cuda11.0-cudnn8-devel
   setup:
   - set -e -o xtrace
-  - sudo apt-get -y install git
   - pip install --user tensorboard
-search:
-  job_template:
-    command:
-    - set -e -o xtrace
-    - bash scripts/apex_install.sh
-    - pip install --user -e .
-    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
-      {config} --config_file wt103_base_FEAR.yaml                                         --n_layer
-      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
-      {d_inner} --d_embed {d_embed} --div_val {div_val}
-    name: train_xl_config_53
-    sku: G4
-  max_trials: 2
-  params:
-  - name: config
-    spec: discrete
-    values:
-    - dgx1_4gpu_fp32
-  - name: n_layer
-    spec: discrete
-    values:
-    - 5
-  - name: n_head
-    spec: discrete
-    values:
-    - 8,2,4,2,4
-  - name: d_model
-    spec: discrete
-    values:
-    - 512
-  - name: d_embed
-    spec: discrete
-    values:
-    - 128
-  - name: div_val
-    spec: discrete
-    values:
-    - 4
-  - name: d_head
-    spec: discrete
-    values:
-    - 64,512,256,256,256
-  - name: d_inner
-    spec: discrete
-    values:
-    - 1050,1553,1453,1683,1330
-  type: grid
+jobs:
+- command:
+  - set -e -o xtrace
+  - pip install --user -e .
+  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
+    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
+    8 --n_head 4,8,8,4,8,4,4,2 --d_model 232 --d_head 32,16,16,32,16,32,32,64                   --d_inner
+    3553,3733,2821,3234,2805,4291,3478,2264 --d_embed 128 --div_val 4 --experiment_name
+    j0
+  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
+    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
+    8 --n_head 4,8,8,4,8,4,4,2 --d_model 232 --d_head 32,16,16,32,16,32,32,64                   --d_inner
+    3859,4054,3064,3512,3046,4660,3778,2458 --d_embed 128 --div_val 4 --experiment_name
+    j1
+  name: config_151_53
+  sku: G8
 storage:
   us_east:
     container_name: phillytools

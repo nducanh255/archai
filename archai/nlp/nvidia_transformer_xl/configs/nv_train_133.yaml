@@ -5,58 +5,26 @@ data:
   storage_id: us_east
 description: Train Transformer XL
 environment:
-  image: pytorch/pytorch:1.6.0-cuda10.1-cudnn7-devel
+  image: debadeepta/pytorch:1.7.0-cuda11.0-cudnn8-devel
   setup:
   - set -e -o xtrace
-  - sudo apt-get -y install git
   - pip install --user tensorboard
-search:
-  job_template:
-    command:
-    - set -e -o xtrace
-    - bash scripts/apex_install.sh
-    - pip install --user -e .
-    - python -m torch.distributed.launch --nproc_per_node="4" archai/nlp/nvidia_transformer_xl/train.py                                         --config
-      {config} --config_file wt103_base_FEAR.yaml                                         --n_layer
-      {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head}                                         --d_inner
-      {d_inner} --d_embed {d_embed} --div_val {div_val}
-    name: train_xl_config_133
-    sku: G4
-  max_trials: 2
-  params:
-  - name: config
-    spec: discrete
-    values:
-    - dgx1_4gpu_fp32
-  - name: n_layer
-    spec: discrete
-    values:
-    - 8
-  - name: n_head
-    spec: discrete
-    values:
-    - 4,4,2,2,8,4,8,2
-  - name: d_model
-    spec: discrete
-    values:
-    - 512
-  - name: d_embed
-    spec: discrete
-    values:
-    - 512
-  - name: div_val
-    spec: discrete
-    values:
-    - 4
-  - name: d_head
-    spec: discrete
-    values:
-    - 128,128,256,256,64,128,64,256
-  - name: d_inner
-    spec: discrete
-    values:
-    - 1844,1953,1731,1354,1972,1412,1549,1309
-  type: grid
+jobs:
+- command:
+  - set -e -o xtrace
+  - pip install --user -e .
+  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
+    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
+    27 --n_head 8,2,4,4,8,4,8,8,2,4,4,8,4,8,8,2,4,4,8,4,8,8,2,4,4,8,4 --d_model 128
+    --d_head 16,64,32,32,16,32,16,16,64,32,32,16,32,16,16,64,32,32,16,32,16,16,64,32,32,16,32                   --d_inner
+    897,2046,1216,632,701,950,1677,897,2046,1216,632,701,950,1677,897,2046,1216,632,701,950,1677,897,2046,1216,632,701,950
+    --d_embed 512 --div_val 4 --experiment_name j0
+  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
+    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
+    7 --n_head 8,2,4,4,8,4,8 --d_model 500 --d_head 16,64,32,32,16,32,16                   --d_inner
+    897,2046,1216,632,701,950,1677 --d_embed 512 --div_val 4 --experiment_name j1
+  name: config_188_133
+  sku: G8
 storage:
   us_east:
     container_name: phillytools

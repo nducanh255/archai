@@ -9,6 +9,7 @@ import json
 import re
 import pprint
 import types
+import pandas as pd
 from functools import partial
 from scipy.stats import spearmanr
 import matplotlib.pyplot as plt
@@ -44,6 +45,18 @@ yaml.add_constructor(u'tag:yaml.org,2002:python/object/apply:numpy.dtype', meta_
 model_config_keys = ['n_token', 'n_layer','n_head','d_model','d_head','d_inner','dropout','dropatt', \
                         'd_embed','div_val','pre_lnorm','tgt_len','ext_len','mem_len', \
                         'same_length','attn_type','clamp_len','sample_softmax']
+
+
+def get_label(baseline_config, new_config):
+  label = []
+  for k in ['n_layer','d_model','d_inner']:
+    if np.any(baseline_config[k] != new_config[k]):
+      label.append(k)
+
+  if 'n_layer' in label:
+    label.remove('d_inner')
+
+  return '_'.join(label)
 
 
 def forward_with_output_memtransformer(self, data, target, mems):
@@ -160,7 +173,10 @@ def get_info_from_json(json_file, step=[], type=None):
   
   with open(json_file, 'r', encoding='utf-8') as f:
     lines = f.readlines()[::-1]
-    job_desc = re.search('DLLL \{(.+?)\}', lines[-1])
+    try:
+      job_desc = re.search('DLLL \{(.+?)\}', lines[-1])
+    except:
+      return None
     job_desc = '{'+job_desc.group(1)+'}}'
     work_dir = json.loads(job_desc)['data']['work_dir']
     idx_start = re.search('amlt-results', work_dir).span()[-1] + 1
@@ -212,12 +228,19 @@ def get_info_from_json(json_file, step=[], type=None):
 def get_config_name(job):
   # idx = list(re.search('config_', job).span())[0]
   # return job[idx:]
-  if not 'baseline' in job:
-    return re.search('(config_[0-9]+)', job).group(1)
-  else:
+  if 'baseline' in job:
     dir_name = os.path.basename(os.path.dirname(job))
     return re.search('(config_[0-9]+_[0-9]+)', dir_name).group(1)
-
+  elif 'similar_params_sweep' in job or 'simp' in job:
+    idx =  re.search('(config_[0-9]+)', job).span()[0]
+    job = job[idx:]
+    config_name = job.split('/')[0]
+    return config_name + '_' + job.split('/')[1]
+  elif 'evo_search' in job:
+    return job
+  else:
+    return re.search('(config_[0-9]+)', job).group(1)
+    
 
 def recurse_dir(args, exp_name, path_to_dir, filetypes='.json'):
   if not isinstance(filetypes, list):
@@ -240,6 +263,18 @@ def recurse_dir(args, exp_name, path_to_dir, filetypes='.json'):
             elif ft=='config.yaml':
               with open(os.path.join(j_path), 'r') as f:
                 config = yaml.load(f)
+                if config is None:
+                  json_file = os.path.join(path_to_dir, 'train_log.json')
+                  with open(json_file, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
+                    try:
+                      job_desc = re.search('DLLL \{(.+?)\}', lines[0])
+                    except:
+                      return None
+                    job_desc = '{'+job_desc.group(1)+'}}'
+                    config = json.loads(job_desc)['data']
+                    config['n_token'] = 267735
+                    
                 model_config = {k: config[k] for k in model_config_keys}
                 
               cutoffs, tie_projs = [], [False]
@@ -329,7 +364,11 @@ def get_parser():
   parser.add_argument('--cross_seeds', action='store_true',
                       help='generate metrics across various seeds')        
   parser.add_argument('--animation', action='store_true',
-                      help='create animation of models training')               
+                      help='create animation of models training')   
+  parser.add_argument('--export_to_csv', action='store_true',
+                      help='export model configs and ppls to csv')   
+  parser.add_argument('--similar_params', action='store_true',
+                      help='plot ppl versus parameter size for similar param experiment')          
 
   args = parser.parse_args()
   return args
@@ -490,6 +529,24 @@ def main(args):
             common_ratios[seed].append(common_ratio)
             spr_ranks[seed].append(spr_rank)
 
+    # for i, topk in enumerate(topk_list):
+    #   plt.figure()
+    #   for k in common_ratios.keys():
+    #     if k=='seed_1111':
+    #         plt.scatter(150, common_ratios[k][i], marker='.', s=150, c='midnightblue', label='Common Ratio')
+    #         plt.scatter(150, spr_ranks[k][i], marker='^', s=100, c='tab:blue', label='Spearman Correlation')
+    #     else:
+    #       plt.scatter(150, common_ratios[k][i], marker='.', s=150, c='midnightblue')
+    #       plt.scatter(150, spr_ranks[k][i], marker='^', s=100, c='tab:blue')
+    #   plt.ylabel('Metric')
+    #   plt.xlabel('Time (s)')
+    #   plt.title('Topk = %d %%' % topk)
+    #   plt.grid(axis='y')
+    #   plt.xlim((0, 3000))
+    #   plt.ylim((0.0,1.1))
+    #   plt.legend(loc='lower right')#'center left', bbox_to_anchor=(1, 0.5))
+    #   plt.savefig('common_ratio_spearman_topk_{}.png'.format(topk), bbox_inches="tight")
+    
     plt.figure()
     for k in common_ratios.keys():
       plt.plot(topk_list, common_ratios[k], label=k, marker='.', markersize=10)
@@ -555,7 +612,7 @@ def main(args):
     files = os.listdir(path_to_results)
     found_synflow = False
     for f in files:
-      if 'synflow_scores' in f:
+      if False:#'synflow_scores' in f:
         found_synflow = True
         break
     yaml_file = os.path.join(path_to_results, f)
@@ -628,7 +685,13 @@ def main(args):
         timing_baseline = {}
         common_configs = {}
         
+        if 'constLR' in exp_name:
+          max_steps = [str(i) for i in range(500, 5000, 500)] #[str(i) for i in range(5000, 40000, 5000)] + ['2500', '500']
+        else:
+          max_steps = [str(i) for i in range(5000, 40000, 5000)] #+ ['2500', '500']
         for max_step, v in results_structured.items():
+          if not max_step in max_steps:
+            continue
           val_ppl_list_baseline[max_step] = []
           timing_baseline[max_step] = []
           val_ppl_list_gt[max_step] = []
@@ -694,6 +757,28 @@ def main(args):
           spr_ranks[legend_key][topk] = spr_rank_fear
           times[legend_key][topk] = np.average(timing_stage2)
 
+    markers = ['.', '^', '*', 'v', 'd', 'X', 's']
+    for topk in topk_list:
+      plt.figure()
+      for i, k in enumerate(common_ratios.keys()):
+        if 'fear' in k:
+          plt.scatter(times[k][topk], common_ratios[k][topk], marker='.', s=150, c='limegreen')
+          plt.scatter(times[k][topk], spr_ranks[k][topk], marker='^', s=100, c='limegreen')
+        else:
+          plt.scatter(times[k][topk], common_ratios[k][topk], label='Common Ratio', marker='.', s=150, c='midnightblue')
+          plt.scatter(times[k][topk], spr_ranks[k][topk], label='Spearman Correlation', marker='^', s=100)
+      if scores:
+        plt.scatter(0, common_ratios_synflow[topk], label='synflow', marker=markers[i+1], s=80)
+      plt.ylabel('Metric')
+      plt.xlabel('Time (s)')
+      plt.title('Topk = %d %%' % topk)
+      plt.grid(axis='y')
+      plt.xlim((0, 3000))
+      plt.ylim((0.0,1.1))
+      # plt.legend(loc='lower right')#'center left', bbox_to_anchor=(1, 0.5))
+      plt.savefig('common_ratio_spearman_topk_{}.png'.format(topk), bbox_inches="tight")
+    
+    
     markers = ['.', '*', 'v', 'd', 'X', 's']
     for topk in topk_list:
       plt.figure()
@@ -705,7 +790,7 @@ def main(args):
       plt.xlabel('Time (s)')
       plt.title('Topk = %d %%' % topk)
       plt.grid(axis='y')
-      plt.ylim((0,1))
+      plt.ylim((0.2,1.1))
       # plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
       plt.savefig('common_ratio_topk_{}.png'.format(topk), bbox_inches="tight")
 
@@ -717,7 +802,7 @@ def main(args):
       plt.ylabel('Spearman\'s Correlation')
       plt.xlabel('Time (s)')
       plt.title('Topk = %d %%' % topk)
-      plt.ylim((0,1))
+      plt.ylim((0.2,1.1))
       plt.grid(axis='y')
       # plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
       plt.savefig('spearman_topk_{}.png'.format(topk), bbox_inches="tight")
@@ -899,7 +984,10 @@ def main(args):
     
     legend_keys = []
     for exp_name in args.exp_name:
-      idx = re.search('(fear_stage_1)', exp_name).span()[-1]
+      try:
+        idx = re.search('(fear_stage_1)', exp_name).span()[-1]
+      except:
+        idx = re.search('(fear_stage1)', exp_name).span()[-1]
       legend_key = exp_name[idx+1:].split('_')[-1]
       if len(legend_key)==0:
         legend_key = 'homogeneous'
@@ -916,6 +1004,13 @@ def main(args):
 
       common_configs = np.intersect1d(list(results_gt.keys()), list(n_all_params.keys()))
       print('analyzing {} architectures'.format(len(common_configs)))
+
+      min = 100
+      for k in common_configs:
+        if abs(n_all_params[k]['total']-5e7)<0.1*5e7 and results_gt[k]['valid_perplexity']<min:
+          min = results_gt[k]['valid_perplexity']
+          print(min, n_all_params[k]['total']/1e6)
+      exit()
 
       # fear_stage_1 results:
       val_ppl_list_gt[legend_key] = []
@@ -1001,8 +1096,9 @@ def main(args):
     plt.ylabel('Common ratio')
     plt.xlabel('Topk (%)')
     plt.xticks(topk_list)
-    plt.title('ranking based on number of parameters')
+    # plt.title('ranking based on number of parameters')
     plt.grid(axis='y')
+    plt.ylim((0.0,1.1))
     plt.legend(loc='lower right')
     plt.savefig('common_ratio_topk_nparams.png', bbox_inches="tight")
 
@@ -1012,34 +1108,122 @@ def main(args):
     plt.ylabel('Common ratio')
     plt.xlabel('Topk (%)')
     plt.xticks(topk_list)
-    plt.title('ranking based on number of parameters')
+    # plt.title('ranking based on number of parameters')
     plt.grid(axis='y')
+    plt.ylim((0.0,1.1))
     plt.legend(loc='lower right')
     plt.savefig('common_ratio_topk_nparams_total.png', bbox_inches="tight")
 
     plt.figure()
     for k in legend_keys:
-      plt.scatter(topk_list, spr_ranks[k], label=k)
+      plt.scatter(topk_list, spr_ranks[k], label=k, marker='^')
     plt.ylabel('Spearman\'s Correlation')
     plt.xlabel('Topk (%)')
     plt.xticks(topk_list)
-    plt.ylim(top=1)
+    plt.ylim((0.0,1.1))
     plt.grid(axis='y')
     plt.legend(loc='lower right')
-    plt.title('ranking based on number of parameters')
+    # plt.title('ranking based on number of parameters')
     plt.savefig('spearman_topk_nparams.png', bbox_inches="tight")
 
     plt.figure()
     for k in legend_keys:
-      plt.scatter(topk_list, spr_ranks_total[k], label=k)
+      plt.scatter(topk_list, spr_ranks_total[k], label=k, marker='^')
     plt.ylabel('Spearman\'s Correlation')
     plt.xlabel('Topk (%)')
     plt.xticks(topk_list)
-    plt.ylim(top=1)
+    plt.ylim((0.0,1.1))
     plt.grid(axis='y')
     plt.legend(loc='upper right')
-    plt.title('ranking based on number of parameters')
+    # plt.title('ranking based on number of parameters')
     plt.savefig('spearman_topk_nparams_total.png', bbox_inches="tight")
+
+  
+  elif args.similar_params: # plots ppl versus parameter size pareto curve for similar params experiment
+    exp_name = 'fear_stage_1_heterogeneous'
+    path_to_results = os.path.join('/home/t-mojanj/logdir/nv_xformer_xl/prev_jobs/', exp_name)
+    yaml_file = os.path.join(path_to_results, 'result_summary.yaml')
+    with open(yaml_file, 'r') as f:
+      baseline_configs = collections.OrderedDict(yaml.safe_load(f))
+    yaml_file = os.path.join(path_to_results, 'params_summary.yaml')
+    with open(yaml_file, 'r') as f:
+      baseline_params = yaml.safe_load(f)
+    model_configs = recurse_dir(args, exp_name, path_to_results, filetypes='config.yaml')
+    for k in baseline_configs.keys():
+      baseline_configs[k].update(baseline_params[k])
+      baseline_configs[k].update(model_configs[k])
+
+    n_params = {}
+    n_params_total = {}
+    val_ppl_list_gt = {}
+    labels = {}
+    for exp_name in args.exp_name:
+      path_to_results = os.path.join(args.results_dir, exp_name)
+      yaml_file = os.path.join(path_to_results, 'result_summary.yaml')
+      with open(yaml_file, 'r') as f:
+        results_gt = collections.OrderedDict(yaml.safe_load(f))
+      yaml_file = os.path.join(path_to_results, 'params_summary.yaml')
+      with open(yaml_file, 'r') as f:
+          n_all_params = yaml.safe_load(f)
+      model_configs = recurse_dir(args, exp_name, path_to_results, filetypes='config.yaml')
+
+      common_configs = np.intersect1d(list(results_gt.keys()), list(n_all_params.keys()))
+      common_configs = np.sort(common_configs)
+      print('analyzing {} architectures'.format(len(common_configs)))
+      
+      for k in common_configs:
+        config_name = re.search('(config_[0-9]+)_', k).group(1)
+        if config_name in val_ppl_list_gt.keys():
+          val_ppl_list_gt[config_name].append(results_gt[k]['valid_perplexity'])
+          n_params[config_name].append((n_all_params[k]['FFN'] + n_all_params[k]['Attn']))
+          n_params_total[config_name].append(n_all_params[k]['total'])
+
+          labels[config_name].append(get_label(baseline_configs[config_name], model_configs[k]))
+        else:
+          val_ppl_list_gt[config_name] = [results_gt[k]['valid_perplexity']]
+          n_params[config_name] = [(n_all_params[k]['FFN'] + n_all_params[k]['Attn'])]
+          n_params_total[config_name] = [n_all_params[k]['total']]
+          labels[config_name] = [get_label(baseline_configs[config_name], model_configs[k])]
+        
+        if '151' in k:
+          print(k, results_gt[k]['valid_perplexity'], labels[config_name][-1])
+      
+    colors = ['b', 'g', 'r', 'm', 'y', 'c', 'k']
+    markers = {'n_layer':'.', 'd_inner':'^', 'd_model':'s', 'd_model_d_inner': 'd', 'n_layer_d_model': 'P'}
+    for idx, k in enumerate(val_ppl_list_gt.keys()):
+      plt.figure()
+      plt.scatter(baseline_configs[k]['FFN']+baseline_configs[k]['Attn'], baseline_configs[k]['valid_perplexity'], \
+                    color=colors[idx], marker='*', s=250, label='base config')
+
+      for i in range(len(labels[k])):
+        c = 'r' if labels[k][i]=='d_model_d_inner' else colors[idx]
+        plt.scatter(n_params[k][i], val_ppl_list_gt[k][i], color=c, \
+                    marker=markers[labels[k][i]], s=100, label='scaled '+labels[k][i], zorder=3)
+      plt.ylabel('Validation PPL')
+      plt.xlabel('Decoder nParams')
+      min_x = ((baseline_configs[k]['FFN']+baseline_configs[k]['Attn'])//1e6-1)*1e6
+      max_x = (max(n_params[k])//1e6+2)*1e6
+      min_y = 5*(np.min(val_ppl_list_gt[k])//5-1).tolist()
+      max_y = 5*(baseline_configs[k]['valid_perplexity']//5+1) #5*(max(baseline_configs[k]['valid_perplexity'], np.max(val_ppl_list_gt[k]))//5+1)
+      plt.xlim(min_x, max_x)
+      plt.ylim(min_y, max_y)
+      # plt.title('Pareto Curve')
+      plt.grid(axis='y')
+
+      # for j in range(0, len(labels[k]), 3):
+      #   x = np.mean(n_params[k][j:j+3])
+      #   plt.vlines(x, ymin=5*(min(val_ppl_list_gt[k])//5)-1, ymax=5*(baseline_configs[k]['valid_perplexity']//5+1), \
+      #               colors='darkgray', linestyles='dotted')
+      
+      plt_handles, plt_labels = plt.gca().get_legend_handles_labels()
+      newLabels, newHandles = [], []
+      for handle, label in zip(plt_handles, plt_labels):
+        if label not in newLabels:
+          newLabels.append(label)
+          newHandles.append(handle)
+      plt.legend(newHandles, newLabels, loc='center left', bbox_to_anchor=(1, 0.5))
+      
+      plt.savefig('pareto_similar_params_{}.png'.format(idx), bbox_inches="tight")
 
 
   elif args.cross_step:
@@ -1210,6 +1394,31 @@ def main(args):
     plt.savefig('rank_vs_time_train.png', bbox_inches="tight")
                 
 
+  elif args.export_to_csv:
+    config_keys = ['d_model', 'd_embed', 'n_layer', 'n_head', 'd_head', 'd_inner', 'div_val']
+
+    for exp_name in args.exp_name:
+      path_to_results = os.path.join(args.results_dir, exp_name)
+      model_configs = recurse_dir(args, exp_name, path_to_results, filetypes='config.yaml')
+      
+      yaml_file = os.path.join(path_to_results, 'result_summary.yaml')
+      with open(yaml_file, 'r') as f:
+        results = collections.OrderedDict(yaml.safe_load(f))
+
+      all_configs = {c:[] for c in config_keys}
+      all_configs['val_ppl'] = []
+      for config_name, config in model_configs.items():
+        try:
+          all_configs['val_ppl'].append(results[config_name]['valid_perplexity'])
+          for k in config_keys:
+            all_configs[k].append(config[k])
+        except:
+          pass
+        
+      df = pd.DataFrame(all_configs)
+      df.to_csv('./{}_arch_summary.csv'.format(exp_name))     
+
+
   else:
     for exp_name in args.exp_name:
       path_to_results = os.path.join(args.results_dir, exp_name)
@@ -1266,6 +1475,7 @@ def main(args):
 
 if __name__ == "__main__":
     args = get_parser()
+    
     main(args)
 
     # for exp_name in args.exp_name:

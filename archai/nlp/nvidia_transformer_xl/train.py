@@ -2,6 +2,7 @@ import argparse
 import functools
 import itertools
 import logging
+import logging.config
 import math
 import os
 import shutil
@@ -1053,9 +1054,15 @@ def main():
         logging.info('    - {} : {}'.format(k, v))
 
     # Dump training configuration in a yaml file
-    config_file = os.path.join(args.work_dir, 'config.yaml')
+    config_file = os.path.join('./', 'config.yaml')
     with open(config_file, 'w') as f:
         yaml.dump(args.__dict__, f, indent=2)
+    os.makedirs(args.work_dir, exist_ok=True)
+    print(len(args.work_dir))
+    try:
+        shutil.move(config_file, args.work_dir)
+    except:
+        pass
 
     logging.info('=' * 100)
     logging.info('#params = {}'.format(args.n_all_param))

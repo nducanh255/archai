@@ -35,7 +35,7 @@ n_unfreeze = 3
 different_seeds = None #[1111,1009,1200,1234,1302,1562,2222,3334,3425,4567]
 max_step = 500
 
-targets = ['itpseasiav100cl', 'itpscusv100cl', 'itpeastusv100cl', 'itpeastusv100cl2']  # amulet targets
+targets = ['itpseasiav100cl', 'itplabrr1cl1', 'itpscusv100cl']  # amulet targets
 gpu_config = ['dgx1_4gpu_fp32'] # dgx1_8gpu_fp16, dgx1_1gpu_fp16, toy, default, dgx1_4gpu_fp16
 n_gpus = 4
 
@@ -61,7 +61,7 @@ model_config_keys = ['n_token', 'n_layer','n_head','d_model','d_head','d_inner',
 
 
 #TODO: add this to fear stage 2 and 3
-def generate_bash_files(path_to_configs, f_name, exp_name=None):
+def generate_bash_files(path_to_configs, f_name, bash_start=0, exp_name=None):
   assert exp_name is not None, 'provide an experiment name for amulet jobs'
   
   bash_idx = 0
@@ -73,11 +73,11 @@ def generate_bash_files(path_to_configs, f_name, exp_name=None):
         if job_idx >= n_configs:
           break
         
-        bash_file = os.path.join(path_to_configs, f_name+'_'+str(bash_idx)+'.sh')
+        bash_file = os.path.join(path_to_configs, f_name+'_'+str(bash_idx + bash_start)+'.sh')
         if job_idx==0 and os.path.exists(bash_file):
               os.remove(bash_file)  
         with open(bash_file, 'a') as f:
-          f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/{} {} -t {}\n'.format('nv_train_{}.yaml'.format(job_idx+start_config), exp_name, targets[t]))
+          f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/{} {} -t {}\n'.format('nv_train_{}.yaml'.format(job_idx+bash_start_config), exp_name, targets[t]))
         
         # if different_seeds:
         #   f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/{} {} -t {}\n'.format('nv_train_{}.yaml'.format(job_idx+start_config), exp_name, targets[t]))
@@ -89,6 +89,8 @@ def generate_bash_files(path_to_configs, f_name, exp_name=None):
       break
 
     bash_idx += 1
+  
+  return (bash_idx + bash_start + 1)
 
 
 def gather_results(exp_name, path_to_dir, filetypes='.json'):
@@ -140,23 +142,29 @@ def gather_results(exp_name, path_to_dir, filetypes='.json'):
   return results
 
 
-def get_bundle_run_command(configs):
+def get_bundle_run_command(configs, parallel=True):
   for k in configs.keys():
     configs[k] = [str(get_yaml_values(v)) for v in configs[k]]
   print(configs)
 
-  command = ''
+  command = '' if parallel else []
   master_ports = [1234, 2222, 2345, 1342]
   for i in range(len(configs['n_layer'])):
     gpu_range = ','.join([str(x) for x in range(i*n_gpus, (i+1)*n_gpus)])
     
-    command += 'export CUDA_VISIBLE_DEVICES=%s && \
-                python -m torch.distributed.launch --master_port=%d --nproc_per_node="%s" archai/nlp/nvidia_transformer_xl/train.py --config %s \
-                --config_file wt103_base.yaml --n_layer %s --n_head %s --d_model %s --d_head %s \
-                --d_inner %s --d_embed %s --div_val %s --experiment_name job_%d &\n' \
-                % (gpu_range, master_ports[i], str(n_gpus), gpu_config, configs['n_layer'][i], configs['n_head'][i], configs['d_model'][i], configs['d_head'][i], configs['d_inner'][i], configs['d_embed'][i], configs['div_val'][i], i)
-
-  command += 'wait'
+    if parallel:
+      command += 'export CUDA_VISIBLE_DEVICES=%s && \
+                  python -m torch.distributed.launch --master_port=%d --nproc_per_node="%s" archai/nlp/nvidia_transformer_xl/train.py --config %s \
+                  --config_file wt103_base.yaml --n_layer %s --n_head %s --d_model %s --d_head %s \
+                  --d_inner %s --d_embed %s --div_val %s --experiment_name j%d &\n' \
+                  % (gpu_range, master_ports[i], str(n_gpus), gpu_config, configs['n_layer'][i], configs['n_head'][i], configs['d_model'][i], configs['d_head'][i], configs['d_inner'][i], configs['d_embed'][i], configs['div_val'][i], i)
+    else:
+      command.append('python -m torch.distributed.launch --nproc_per_node="%s" archai/nlp/nvidia_transformer_xl/train.py --config %s \
+                  --config_file wt103_base.yaml --n_layer %s --n_head %s --d_model %s --d_head %s \
+                  --d_inner %s --d_embed %s --div_val %s --experiment_name j%d' \
+                  % (str(n_gpus), gpu_config, configs['n_layer'][i], configs['n_head'][i], configs['d_model'][i], configs['d_head'][i], configs['d_inner'][i], configs['d_embed'][i], configs['div_val'][i], i))
+  if parallel:
+    command += 'wait'
   return command
 
 
@@ -448,9 +456,11 @@ if __name__ == '__main__':
 
     target_ppl_range = [40, 50]
     
-    start_config = 0
-    n_gpus = 4
-    gpu_config = 'dgx1_4gpu_fp32'
+    start_config = 63
+    bash_start_config = start_config
+    n_gpus = 8
+    parallel_run = False
+    gpu_config = 'dgx1_8gpu_fp32'
     targets = ['NLX-NDv2']
 
     '''proxy for n_params:
@@ -478,7 +488,7 @@ if __name__ == '__main__':
     for config_name, model_config in model_configs.items():
       curr_val_ppl = val_ppls[config_name]['valid_perplexity']
       if curr_val_ppl >= target_ppl_range[0] and curr_val_ppl <= target_ppl_range[-1]:
-        model_config['attn_type'] = 0
+        # model_config['attn_type'] = 0
         model_config['div_val'] = 4
         useful_configs[config_name] = model_config
 
@@ -499,42 +509,87 @@ if __name__ == '__main__':
     #   print(config_name, new_params*1./old_params)
     #   factors.append(new_params*1./old_params)
     # print(len(factors), min(factors), max(factors))
-
-
-    factors = np.linspace(1.5, 2.5, num=6).tolist()
-    selected_configs = np.random.choice(list(useful_configs.keys()), size=1)
+    
+    factors = np.linspace(3.0, 4.5, num=6).tolist()
+    selected_configs = ['config_151']#np.random.choice(list(useful_configs.keys()), size=5).tolist()
+    # selected_configs.remove('config_151')
+    # knobs = ['n_layer', 'd_model', 'd_inner']
+    knobs = ['d_inner']
+    
+    for config_name in selected_configs:
+      #-------------- change from an intermediate config
+      print(config_name, useful_configs[config_name]['d_model'])
+      useful_configs[config_name]['d_model'] = 346 #multiply(useful_configs[config_name]['d_model'], 1.8)
+      # factors = (np.asarray(factors)/3.).tolist()
     
     # find out architecture dependant scaling factors
     arch_factors = {}
     for config_name in selected_configs:
-      arch_factors[config_name] = {}
-      for f in factors:
-        model_config = copy.deepcopy(useful_configs[config_name])
-        model_config['d_model'] = int(model_config['d_model'] * f)
-        curr_n_all_param, params_adaptive_embedding, params_adaptive_softmax, params_attention, params_ff = get_model_and_params(model_config)
-        new_params = params_attention + params_ff
-        old_params =  n_all_params[config_name]['FFN'] + n_all_params[config_name]['Attn']
-        arch_factors[config_name][f] = (new_params*1./old_params)
+      arch_factors[config_name] = {k:{} for k in knobs}
+      for k in knobs:
+        for f in factors:
+          if k=='n_layer':
+            arch_factors[config_name][k][f] = 1.
+          else:
+            model_config = copy.deepcopy(useful_configs[config_name])
+            model_config[k] = multiply(model_config[k], factor=f)
+            if k=='d_model':
+              model_config[k] += (model_config[k] % 2)
+            elif k=='d_inner': 
+              model_config[k] += multiply(useful_configs[config_name]['d_model'], factor=f)
+            curr_n_all_param, params_adaptive_embedding, params_adaptive_softmax, params_attention, params_ff = get_model_and_params(model_config)
+            new_params = params_attention + params_ff
+            old_params =  n_all_params[config_name]['FFN'] + n_all_params[config_name]['Attn']
+            arch_factors[config_name][k][f] = (old_params * f)/new_params
+            
+            step = 0.1 * arch_factors[config_name][k][f]
+            iter = 0
+            while iter<10:
+              iter += 1
+              model_config[k] = copy.deepcopy(useful_configs[config_name][k])
+              model_config[k] = multiply(model_config[k], factor=f*arch_factors[config_name][k][f])
+              if k=='d_model':
+                model_config[k] += (model_config[k] % 2)
+              elif k=='d_inner': 
+                model_config[k] += multiply(useful_configs[config_name]['d_model'], factor=f*arch_factors[config_name][k][f])
+              
+              curr_n_all_param, params_adaptive_embedding, params_adaptive_softmax, params_attention, params_ff = get_model_and_params(model_config)
+              new_params = params_attention + params_ff
+              print('target:', f*old_params, 'achieved:', new_params)  
+              if np.absolute(new_params - f*old_params)/old_params > 0.005:
+                if new_params/old_params > f:
+                  arch_factors[config_name][k][f] -= step
+                  step /=2
+                else:
+                  arch_factors[config_name][k][f] += step
+                  step /=2
+              else:
+                break 
       
       print('=>', config_name, arch_factors[config_name])
     
     param_keys = ['n_layer', 'n_head', 'd_model', 'd_embed', 'div_val', 'd_head', 'd_inner']
+    bash_start = 0
+    yaml_idx = start_config
     for config_name in selected_configs:
       base_config = useful_configs[config_name]
+      print('base config:', base_config)
       param_values = {k: [] for k in param_keys}
       
       for f in factors:
         # generate architectures with scaled parameters
-        knobs = ['n_layer', 'd_model', 'd_inner']
         for knob in knobs:
           for k in param_values.keys():
             if k==knob:
               if k=='n_layer':
-                param_values[k].append(multiply(base_config[k], factor=arch_factors[config_name][f]))
+                param_values[k].append(multiply(base_config[k], factor=f*arch_factors[config_name][k][f]))
+                print('n_layer becomes', param_values[k][-1])
               elif k=='d_model':
-                param_values[k].append(multiply(base_config[k], factor=f))
+                scaled_d_model = multiply(base_config[k], factor=f*arch_factors[config_name][k][f])
+                scaled_d_model += (scaled_d_model % 2)
+                param_values[k].append(scaled_d_model)
               else:
-                param_values[k].append((multiply(base_config[k], factor=arch_factors[config_name][f]) + multiply(base_config['d_model'], factor=arch_factors[config_name][f])).tolist())
+                param_values[k].append((multiply(base_config[k], factor=f*arch_factors[config_name][k][f])+multiply(base_config['d_model'], factor=f*arch_factors[config_name][k][f])).tolist())
             else:
               param_values[k].append(base_config[k])
       
@@ -555,19 +610,19 @@ if __name__ == '__main__':
         curr_n_all_param, params_adaptive_embedding, params_adaptive_softmax, params_attention, params_ff = get_model_and_params(model_config)
         new_params = params_attention + params_ff
         old_params =  n_all_params[config_name]['FFN']+n_all_params[config_name]['Attn']
-        print(i, old_params, new_params, new_params*1./old_params)
+        print(config_name, i, old_params, new_params, new_params*1./old_params)
 
       n_configs = len(param_values['n_layer'])
       # create corresponding yaml files for amulet jobs
       c = 0
-      idx = 0
+      print('######', n_configs)
       while c < n_configs: 
         with open('/home/t-mojanj/Projects/archaiphilly/nv_train.yaml') as file:
           amlt_config = yaml.load(file)
           # if c==0:
           #   pprint.pprint(amlt_config)
 
-        bundle_count = 8//n_gpus
+        bundle_count = 8//n_gpus if parallel_run else 2
         curr_configs = {k:param_values[k][c:c+bundle_count] for k in param_values.keys()}
 
         amlt_config['environment']['setup'] = ['set -e -o xtrace', 'pip install --user tensorboard']
@@ -575,18 +630,23 @@ if __name__ == '__main__':
         
         del amlt_config['search']
         amlt_config['jobs'] = [{}]
-        amlt_config['jobs'][0]['name'] = 'train_xl_config_{}_{}'.format(config_name, str(c+start_config))
+        amlt_config['jobs'][0]['name'] = '{}_{}'.format(config_name, str(c//bundle_count+start_config))
         amlt_config['jobs'][0]['sku'] = 'G8'
         amlt_config['jobs'][0]['command'] = ['set -e -o xtrace', 'pip install --user -e .']
-        amlt_config['jobs'][0]['command'].append(get_bundle_run_command(curr_configs))
+        if parallel_run:
+          amlt_config['jobs'][0]['command'].append(get_bundle_run_command(curr_configs, parallel=parallel_run))
+        else:
+          amlt_config['jobs'][0]['command'] += get_bundle_run_command(curr_configs, parallel=parallel_run)
 
-        config_file = 'nv_train_'+str(int(start_config + idx))+'.yaml'
+        config_file = 'nv_train_'+str(int(yaml_idx))+'.yaml'
         f_name = os.path.join(path_to_configs, config_file)
         with open(f_name, 'w') as file:
             yaml.dump(amlt_config, file)
 
         c += bundle_count
-        idx += 1
+        yaml_idx += 1
 
-      n_configs = idx
-      generate_bash_files(path_to_configs, f_name='amlt_run_fear_stage1_similar_params', exp_name='fear_stage1_similar_params_sweep')
+      n_configs = (yaml_idx-bash_start_config)
+      print('######', n_configs)
+      bash_start = generate_bash_files(path_to_configs, f_name='amlt_run_fear_stage1_similar_params', bash_start=bash_start, exp_name='simp')
+      bash_start_config += n_configs
