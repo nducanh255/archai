@@ -109,6 +109,7 @@ venv.bak/
 model.th
 
 *.png
+*.csv
 
 *.onnx
 *.html
