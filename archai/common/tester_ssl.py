@@ -3,6 +3,7 @@
 
 from typing import Tuple, Optional
 
+import wandb
 import torch
 from torch import nn, Tensor
 from torch.utils.data import DataLoader
@@ -16,7 +17,10 @@ from .common import logger
 from archai.common.apex_utils import ApexUtils
 
 class TesterSimClr(EnforceOverrides):
-    def __init__(self, conf_val:Config, model:nn.Module, apex:ApexUtils)->None:
+    def __init__(self, conf_train:Config, model:nn.Module, apex:ApexUtils)->None:
+        conf_val = conf_train['validation']
+        conf_wandb = conf_train['wandb']
+        self.is_wandb_enabled = conf_wandb['enabled']
         self._title = conf_val['title']
         self._logger_freq = conf_val['logger_freq']
         conf_lossfn = conf_val['lossfn']
@@ -26,11 +30,17 @@ class TesterSimClr(EnforceOverrides):
         self.model = model
         self._lossfn = ml_utils.get_lossfn(conf_lossfn).to(apex.device)
         self._metrics = None
+        if self.is_wandb_enabled and self._apex.is_master():
+            wandb.define_metric("epoch_loss_val", step_metric="epoch")
+            wandb.define_metric("epoch_timings_val", step_metric="epoch")
+            wandb.define_metric("avg_step_timings_val", step_metric="epoch")
 
-    def test(self, test_dl: DataLoader)->MetricsSimClr:
+    def test(self, test_dl: DataLoader, epochs:int = 0, phase:str = 'val')->MetricsSimClr:
         logger.pushd(self._title)
 
         self._metrics = self._create_metrics()
+        self.epoch = epochs-1
+        self.phase = phase
 
         # recreate metrics for this run
         self._pre_test()
@@ -101,6 +111,25 @@ class TesterSimClr(EnforceOverrides):
 
     def _post_test(self)->None:
         self._metrics.post_run()
+        if self.is_wandb_enabled and self._apex.is_master() and self.phase == 'val':
+            wandb.log({'epoch_loss_val':self.reduce_mean(self._metrics.run_metrics.cur_epoch().loss.avg),
+                    'epoch_timings_val':self.reduce_sum(self._metrics.run_metrics.epoch_time_avg()),
+                    'avg_step_timings_val': self.reduce_mean(self._metrics.run_metrics.step_time_avg()),
+                    'epoch':self.epoch})
+
+    def reduce_sum(self, val):
+        return val
+        if self._metrics.is_dist():
+            return self._metrics.reduce_sum(val)
+        else:
+            return val
+
+    def reduce_mean(self, val):
+        return val
+        if self._metrics.is_dist():
+            return self._metrics.reduce_mean(val)
+        else:
+            return val
 
     def _pre_step(self, metrics:MetricsSimClr, xi:Tensor, xj: Tensor)->None:
         metrics.pre_step(xi, xj)

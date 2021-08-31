@@ -9,5 +9,5 @@
     "python.autoComplete.extraPaths": [
         "./archai"
     ],
-    "python.pythonPath": "/home/t-sgirish/.conda/envs/env_archai/bin/python",
+    "python.pythonPath": "/vulcanscratch/sgirish/venvs/env_archai/bin/python",
 }

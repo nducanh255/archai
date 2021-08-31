@@ -5,6 +5,8 @@
     "version": "0.2.0",
     "configurations": [
 
+    
+
         {
             "name": "All-Toy-NoPareto",
             "type": "python",
@@ -29,6 +31,15 @@
             "program": "${cwd}/scripts/main.py",
             "console": "integratedTerminal",
             "args": ["--full", "--algos", "darts"]
+        },
+        {
+            "name": "SimClr-Darts-Search-Toy",
+            "type": "python",
+            "request": "launch",
+            "program": "${cwd}/scripts/main.py",
+            "console": "integratedTerminal",
+            "args": ["--full", "--algos", "darts_simclr", "--dataset.name", "cifar10_simclr", "--datasets", "cifar10", "--nas.search.trainer.logger_freq", "1",
+                     "--dataset.max_batches", "50", "--nas.search.trainer.epochs", "10", "--nas.search.loader.train_batch", "64"]
         },
         {
             "name": "Darts-Search-Toy",
@@ -223,6 +234,15 @@
             "program": "${cwd}/scripts/main.py",
             "console": "integratedTerminal",
             "args": ["--no-search", "--full", "--algos", "manual"]
+        },
+        {
+            "name": "SimClr-Toy",
+            "type": "python",
+            "request": "launch",
+            "program": "${cwd}/scripts/ssl/train_simclr.py",
+            "console": "integratedTerminal",
+            "args": ["--loader.train_batch", "64", "--trainer.batch_chunks", "2", "--dataset_yaml", "confs/datasets/cifar10.yaml", "--train.epochs", "10",
+                     "-common.checkpoint.freq", "1", "--trainer.logger_freq", "100", "--dataset.max_batches", "100", "--trainer.validation.freq", "1"]
         },
         {
             "name": "AML-Darts-Full",

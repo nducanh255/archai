@@ -10,10 +10,10 @@ install_requires=[
     'pystopwatch2 @ git+https://github.com/ildoonet/pystopwatch2.git',
     'hyperopt', #  @ git+https://github.com/hyperopt/hyperopt.git
     'tensorwatch>=0.9.1', 'tensorboard',
-    'pretrainedmodels', 'tqdm', 'sklearn', 'matplotlib', 'psutil',
+    'pretrainedmodels', 'tqdm', 'sklearn', 'matplotlib', 'psutil', 'wandb'
     'requests', 'seaborn', 'h5py', 'rarfile', 'einops', 'opencv-python',
     'gorilla', 'pyyaml', 'overrides<4.0.0', 'runstats', 'psutil', 'statopt',
-    'pyunpack', 'patool', 'grpcio>=1.37.0',  'ray>=1.3.0', 'Send2Trash'
+    'pyunpack', 'patool', 'grpcio>=1.37.0',  'ray>=1.0.0', 'Send2Trash'
 ]
 
 setuptools.setup(

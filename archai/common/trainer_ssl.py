@@ -3,6 +3,7 @@
 
 from typing import Callable, Tuple, Optional
 
+import wandb
 import torch
 from torch import nn, Tensor
 from torch.optim.optimizer import Optimizer
@@ -27,7 +28,9 @@ class TrainerSimClr(EnforceOverrides):
                  checkpoint:Optional[CheckPoint]=None)->None:
         # region config vars
         self._conf_train = conf_train
+        conf_wandb = conf_train['wandb']
         conf_lossfn = conf_train['lossfn']
+        self.is_wandb_enabled = conf_wandb['enabled']
         self._grad_clip = conf_train['grad_clip']
         self._drop_path_prob = conf_train['drop_path_prob']
         self._logger_freq = conf_train['logger_freq']
@@ -39,10 +42,20 @@ class TrainerSimClr(EnforceOverrides):
         conf_validation = conf_train['validation']
         conf_apex = conf_train['apex']
         self._validation_freq = 0 if conf_validation is None else conf_validation['freq']
+
         # endregion
         logger.pushd(self._title + '__init__')
 
         self._apex = ApexUtils(conf_apex, logger)
+
+        if self.is_wandb_enabled and self._apex.is_master():
+            wandb.define_metric("global_step")
+            wandb.define_metric("epoch")
+            wandb.define_metric("loss_train", step_metric="global_step")
+            wandb.define_metric("lr", step_metric="global_step")
+            wandb.define_metric("epoch_loss_train", step_metric="epoch")
+            wandb.define_metric("epoch_timings_train", step_metric="epoch")
+            wandb.define_metric("avg_step_timings_train", step_metric="epoch")
 
         self._checkpoint = checkpoint
         self.model = model
@@ -50,7 +63,7 @@ class TrainerSimClr(EnforceOverrides):
         self._lossfn = ml_utils.get_lossfn(conf_lossfn)
         # using separate apex for Tester is not possible because we must use
         # same distributed model as Trainer and hence they must share apex
-        self._tester = TesterSimClr(conf_validation, model, self._apex) \
+        self._tester = TesterSimClr(conf_train, model, self._apex) \
                         if conf_validation else None
         self._metrics:Optional[MetricsSimClr] = None
 
@@ -107,8 +120,6 @@ class TrainerSimClr(EnforceOverrides):
 
         logger.pushd('epochs')
         for epoch in range(self._start_epoch, self._epochs):
-            # if epoch == 6:
-            #     dsgadgsfdgsfd
             logger.pushd(epoch)
             self._set_epoch(epoch, data_loaders)
             self.pre_epoch(data_loaders)
@@ -174,6 +185,19 @@ class TrainerSimClr(EnforceOverrides):
         assert self._metrics.epochs() == epoch
 
     #########################  hooks #########################
+    def reduce_sum(self, val):
+        return val
+        if self._metrics.is_dist():
+            return self._metrics.reduce_sum(val)
+        else:
+            return val
+    def reduce_mean(self, val):
+        return val
+        if self._metrics.is_dist():
+            return self._metrics.reduce_mean(val)
+        else:
+            return val
+
     def pre_fit(self, data_loaders:data.DataLoaders)->None:
         self._metrics.pre_run()
 
@@ -181,9 +205,25 @@ class TrainerSimClr(EnforceOverrides):
         test_metrics = None
         # first run test before checkpointing, otherwise we won't have val metrics
         if data_loaders.test_dl and self._tester:
-            test_metrics = self._tester.test(data_loaders.train_dl)
+            test_metrics = self._tester.test(data_loaders.train_dl, phase='test')
+            run_metrics = test_metrics.run_metrics
+            if self.is_wandb_enabled and self._apex.is_master():
+                wandb.run.summary[f'duration_test'] = self.reduce_sum(run_metrics.duration())
 
         self._metrics.post_run(test_metrics=test_metrics)
+        run_metrics = self._metrics.run_metrics
+        best_train, best_val, best_test = run_metrics.best_epoch()
+        if self.is_wandb_enabled and self._apex.is_master():
+            wandb.run.summary[f'duration_train'] = self.reduce_sum(run_metrics.duration())
+            if best_train:
+                wandb.run.summary['best_train_epoch'] = self.reduce_mean(best_train.index)
+                wandb.run.summary['best_train_loss'] = self.reduce_mean(best_train.loss.avg)
+            if best_val:
+                wandb.run.summary['best_val_epoch'] = self.reduce_mean(best_val.index)
+                wandb.run.summary['best_val_loss'] = self.reduce_mean(best_val.loss.avg)
+            if best_test:
+                wandb.run.summary['best_test_epoch'] = self.reduce_mean(best_test.index)
+                wandb.run.summary['best_test_loss'] = self.reduce_mean(best_test.loss.avg)
 
     def pre_epoch(self, data_loaders:data.DataLoaders)->None:
         self._metrics.pre_epoch(lr=self._multi_optim.get_lr(0, 0))
@@ -201,10 +241,16 @@ class TrainerSimClr(EnforceOverrides):
                 # vidx = list(val_dl.sampler)
                 # assert all(ti not in vidx for ti in tidx)
 
-                val_metrics = self._tester.test(data_loaders.val_dl)
+                val_metrics = self._tester.test(data_loaders.val_dl, epochs=self._metrics.epochs(), phase='val')
 
         # update val metrics
         self._metrics.post_epoch(lr=self._multi_optim.get_lr(0, 0), val_metrics=val_metrics)
+        if self.is_wandb_enabled and self._apex.is_master():
+            epoch_metric = self._metrics.run_metrics.cur_epoch()
+            wandb.log({'epoch_loss_train':self.reduce_mean(epoch_metric.loss.avg),
+                       'epoch_timings_train':self.reduce_mean(epoch_metric.duration()),
+                       'avg_step_timings_train':self.reduce_mean(epoch_metric.step_time.avg),
+                       'epoch':epoch})
 
         # checkpoint if enabled with given freq or if this is the last epoch
         if self._checkpoint is not None and self._apex.is_master() and \
@@ -231,6 +277,10 @@ class TrainerSimClr(EnforceOverrides):
 
     def post_step(self, loss:Tensor, batch_size:int)->None:
         self._metrics.post_step(loss, batch_size)
+        if self.is_wandb_enabled and self._apex.is_master():
+            wandb.log({"lr":self._multi_optim.get_lr(0, 0),
+                       "loss_train":self.reduce_mean(loss),
+                       "global_step":self._metrics.global_step})
     #########################  hooks #########################
 
     def get_device(self):

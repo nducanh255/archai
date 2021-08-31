@@ -37,6 +37,14 @@ class DartsExperimentRunnerSimClr(ExperimentRunner):
         return EvaluaterSimClr()
 
     @overrides
+    def run_search(self, conf:Config)->SearchResult:
+        model_desc_builder = self.model_desc_builder()
+        trainer_class = self.trainer_class()
+        finalizers = self.finalizers()
+        search = self.searcher()
+        return search.search(conf, model_desc_builder, trainer_class, finalizers)
+
+    @overrides
     def run_eval(self, conf:Config)->EvalResult:
         evaler = self.evaluater()
         return evaler.evaluate(conf,
@@ -63,7 +71,7 @@ class DartsExperimentRunnerSimClr(ExperimentRunner):
             conf = self._init_conf(True, clean_expdir=self.clean_expdir)
             if utils.is_main_process():
                 common.create_epoch_desc_dir(conf)
-            search_result = self.run_search(conf['nas']['search'])
+            search_result = self.run_search(conf)
 
         if eval:
             conf = self.get_conf(False)

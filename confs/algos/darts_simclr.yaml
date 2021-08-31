@@ -32,7 +32,11 @@ common:
     ray:
       enabled: False # initialize ray. Note: ray cannot be used if apex distributed is enabled
       local_mode: False # if True then ray runs in serial mode
-
+  wandb:
+    enabled: False
+    project_name: 'test' # specify experiment name from command line
+    run_name: 'cifar10_r2' # specify job name from command line
+    
   smoke_test: False
   only_eval: False
   resume: False
@@ -110,6 +114,8 @@ nas:
         _copy: '/dataset'
         # max_batches: 100 #REMOVE
     trainer:
+      wandb:
+        _copy: '/common/wandb'
       apex:
         _copy: '/common/apex'
       aux_weight: '_copy: /nas/eval/model_desc/aux_weight'
@@ -241,6 +247,8 @@ nas:
         _copy: '/dataset'
         # max_batches: 320 #REMOVE
     trainer:
+      wandb:
+        _copy: '/common/wandb'
       epoch_model_desc:
         _copy: '/nas/search/epoch_model_desc'
       apex:
@@ -279,7 +287,7 @@ nas:
         # decay_bn: .NaN # if NaN then same as decay otherwise apply different decay to BN layers
       alpha_optimizer:
         type: 'adam'
-        lr: 3.0e-4
+        lr: 3.0e-3
         decay: 1.0e-3
         betas: [0.5, 0.999]
         decay_bn: .NaN # if NaN then same as decay otherwise apply different decay to BN layers

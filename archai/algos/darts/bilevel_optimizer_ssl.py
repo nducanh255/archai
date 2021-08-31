@@ -155,9 +155,12 @@ class BilevelOptimizerSimClr:
         # transfer those grades back to our main model
         # update final gradient = dalpha - xi*hessian
         # TODO: currently alphas lr is same as w lr
+        # alpha_prints = []
         with torch.no_grad():
             for alpha, da, h in zip(self._alphas, dalpha, hessian):
                 alpha.grad = da - lr*h
+                # alpha_prints.append((lr,torch.linalg.norm(alpha).item(),torch.linalg.norm(da).item(),torch.linalg.norm(h).item(),torch.linalg.norm(alpha.grad).item()))
+
         # now that model has both w and alpha grads,
         # we can run w_optim.step() to update the param values
         

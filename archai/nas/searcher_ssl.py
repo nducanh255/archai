@@ -13,8 +13,10 @@ from torch.utils.data.dataloader import DataLoader
 
 from archai.common.common import logger
 
+from archai.common import common
 from archai.common.config import Config
 from archai.nas.model_desc_builder import ModelDescBuilder
+from archai.common.apex_utils import ApexUtils
 from archai.nas.arch_trainer import TArchTrainer
 from archai.common.trainer_ssl import TrainerSimClr
 from archai.nas.model_desc import CellType, ModelDesc
@@ -24,7 +26,6 @@ from archai.common.metrics_ssl import EpochMetricsSimClr, MetricsSimClr
 from archai.common import utils
 from archai.nas.finalizers import Finalizers
 from archai.nas.model_ssl import ModelSimClr
-
 
 class ModelMetrics:
     def __init__(self, model:Model, metrics:MetricsSimClr) -> None:
@@ -40,9 +41,11 @@ class SearchResult:
         self.train_metrics = train_metrics
 
 class SearcherSimClr(EnforceOverrides):
-    def search(self, conf_search:Config, model_desc_builder:Optional[ModelDescBuilder],
+    def search(self, conf:Config, model_desc_builder:Optional[ModelDescBuilder],
                  trainer_class:TArchTrainer, finalizers:Finalizers)->SearchResult:
 
+        conf_search = conf['nas']['search']
+        conf_common = common.get_conf_common(conf)
         # region config vars
         conf_model_desc = conf_search['model_desc']
         conf_post_train = conf_search['post_train']
@@ -57,6 +60,21 @@ class SearcherSimClr(EnforceOverrides):
         # build model description that we will search on
         model_desc = self.build_model_desc(model_desc_builder, conf_model_desc,
                                            reductions, cells, nodes)
+
+        apex = ApexUtils(conf_common['apex'], logger=None)
+        apex.sync_devices()
+        apex.barrier()
+        if apex.is_master():
+            conf_wandb = conf['common']['wandb']
+            if conf_wandb['enabled']:
+                import wandb
+                import hashlib
+                id = hashlib.md5(conf_wandb['run_name'].encode('utf-8')).hexdigest()
+                wandb.init(project=conf_wandb['project_name'],
+                            name=conf_wandb['run_name'],
+                            config=conf,
+                            id=id,
+                            resume=conf_search['resume'])
 
         # perform search on model description
         model_desc, search_metrics = self.search_model_desc(conf_search, model_desc,

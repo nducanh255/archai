@@ -96,6 +96,18 @@ def train_test(conf_main:Config):
             print('Resume ckpt not found')
             conf_checkpoint['resume'] = False
             conf_checkpoint['resumedir'] = ''
+    if apex.is_master():
+        conf_wandb = conf_common['wandb']
+        if conf_wandb['enabled']:
+            import wandb
+            import hashlib
+            id = hashlib.md5(conf_wandb['run_name'].encode('utf-8')).hexdigest()
+            wandb.init(project=conf_wandb['project_name'],
+                        name=conf_wandb['run_name'],
+                        config=conf,
+                        id=id,
+                        resume=conf_common['resume'],
+                        dir=os.path.join(conf_common['logdir']))
     trainer = TrainerSimClr(conf_trainer, model, ckpt)
     st = time.time()
     trainer.fit(data_loaders)

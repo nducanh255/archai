@@ -47,6 +47,10 @@ common:
       enabled: False # initialize ray. Note: ray cannot be used if apex distributed is enabled
       local_mode: False # if True then ray runs in serial mode
     resume: '_copy: /common/checkpoint/resume'
+  wandb:
+    enabled: False
+    project_name: 'test' # specify experiment name from command line
+    run_name: 'cifar10_simclr' # specify job name from command line
 
   smoke_test: False
   only_eval: False
@@ -76,6 +80,8 @@ loader:
 trainer:
   title: 'eval_train'
   resume: '_copy: /common/checkpoint/resume'
+  wandb:
+    _copy: '/common/wandb'
   apex:
     _copy: '/common/apex'
   epochs: 300

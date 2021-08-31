@@ -4,7 +4,22 @@ import numpy as np
 import pickle
 import shutil
 import os
+import wandb
+import hashlib
+m = hashlib.md5("resume_run".encode('utf-8')).hexdigest()
+wandb.init(project='my-test-project',name='resume_run', id=m,resume=True)
+wandb.define_metric("custom_step")
+wandb.define_metric("train_loss", step_metric="custom_step")
+wandb.define_metric("validation_loss", step_metric="custom_step")
+for i in range(10):
+  log_dict = {
+      "train_loss": 11/(i+1),
+      "custom_step": i**2,
+      "validation_loss": 11/(i+1)   
+  }
+  wandb.log(log_dict)
 
+exit()
 def unpickle(file):
     with open(file, 'rb') as fo:
         dict = pickle.load(fo)
@@ -56,3 +71,25 @@ else:
     # with open(file_path,"w") as f:
     #     f.write("Yo")
 
+# from torch.distributed.distributed_c10d import broadcast
+# import torch.multiprocessing as mp
+# import torch.distributed as dist
+# import torch
+
+# def main():
+#     mp.spawn(main_worker, nprocs=2, args=[2])
+# def main_worker(gpu, ngpus_per_node):
+#     dist.init_process_group(backend='nccl', init_method='tcp://localhost:23456',
+#                                 world_size=ngpus_per_node, rank=gpu)
+
+#     if gpu==0:
+#         a = torch.Tensor([1]).to(torch.device(f'cuda:{gpu}'))
+#     else:
+#         a = torch.Tensor([0]).to(torch.device(f'cuda:{gpu}'))
+
+#     torch.distributed.broadcast(a,0)
+#     print(a)
+
+
+# if __name__ == '__main__':
+#     main()
