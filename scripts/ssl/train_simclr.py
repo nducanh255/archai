@@ -104,7 +104,7 @@ def train_test(conf_main:Config):
             id = hashlib.md5(conf_wandb['run_name'].encode('utf-8')).hexdigest()
             wandb.init(project=conf_wandb['project_name'],
                         name=conf_wandb['run_name'],
-                        config=conf,
+                        config=conf_main,
                         id=id,
                         resume=conf_common['resume'],
                         dir=os.path.join(conf_common['logdir']))
