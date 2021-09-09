@@ -11,7 +11,7 @@ else
     rm -rf ./apex # for some reason this exist in amlk8s
     git clone https://github.com/NVIDIA/apex
     cd apex
-    # git checkout 0c2c6ee
+    git checkout 0c2c6ee
     # pip install --user -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
     export MKL_THREADING_LAYER=GNU
     pip install --user -v --disable-pip-version-check --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
