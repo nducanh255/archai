@@ -1,4 +1,5 @@
 pwd
+echo $1
 find . -name "*.py" -o -name "*.yaml" | tar -cf $1/code.tar -T -
 
 echo "System info"
