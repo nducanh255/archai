@@ -531,9 +531,9 @@ class AdaptiveEmbedding(nn.Module):
                 l_idx, r_idx = self.cutoff_ends[i], self.cutoff_ends[i + 1]
 
                 mask_i = (inp_flat >= l_idx) & (inp_flat < r_idx)
-                indices_i = mask_i.nonzero(as_tuple=False).squeeze()
+                indices_i = mask_i.nonzero(as_tuple=False).squeeze(-1)
 
-                if indices_i.numel() == 0:
+                if indices_i.numel()==0:
                     continue
 
                 inp_i = inp_flat.index_select(0, indices_i) - l_idx
@@ -565,7 +565,7 @@ class MemTransformerLM(nn.Module):
         self.d_embed = d_embed
         self.d_model = d_model
         self.n_head = n_head
-        self.d_head = d_head
+        self.d_head = d_model//n_head if d_head is None else d_head
 
         self.word_emb = AdaptiveEmbedding(n_token, d_embed, d_model, cutoffs,
                                           div_val=div_val)
@@ -852,7 +852,7 @@ class MemTransformerLM_flex(nn.Module):
         self.d_embed = d_embed
         self.d_model = d_model
         self.n_heads = n_head
-        self.d_heads = [d_model//n_head for n_head in n_head] if d_head is None else d_head
+        self.d_heads = [d_model//n_h for n_h in n_head] if d_head is None else d_head
         # assert (np.multiply(self.d_heads, self.n_heads)==[self.d_model]*len(self.n_heads)).all(), "d_model must be divisible by sampled num_heads"
 
         self.word_emb = AdaptiveEmbedding(n_token, d_embed, d_model, cutoffs, div_val=div_val)
@@ -929,17 +929,23 @@ class MemTransformerLM_flex(nn.Module):
             self.r_w_bias = []
             self.r_r_bias = []
             for i, layer in enumerate(self.layers):
-                self.r_w_bias.append(nn.Parameter(torch.Tensor(self.n_heads[i], self.d_heads[i]).zero_()))
-                self.r_r_bias.append(nn.Parameter(torch.Tensor(self.n_heads[i], self.d_heads[i]).zero_()))
+                setattr(self, f'r_w_bias_{i}', nn.Parameter(torch.Tensor(self.n_heads[i], self.d_heads[i]).zero_()))
+                setattr(self, f'r_r_bias_{i}', nn.Parameter(torch.Tensor(self.n_heads[i], self.d_heads[i]).zero_()))
+                # self.r_w_bias.append(nn.Parameter(torch.Tensor(self.n_heads[i], self.d_heads[i]).zero_()))
+                # self.r_r_bias.append(nn.Parameter(torch.Tensor(self.n_heads[i], self.d_heads[i]).zero_()))
+
         # learnable
         elif self.attn_type == 1:
             self.r_emb = []
             self.r_w_bias = []
             self.r_bias = []
             for i, layer in enumerate(self.layers):
-                self.r_emb.append(nn.Parameter(torch.Tensor(self.max_klen, self.n_heads[i], self.d_heads[i]).zero_()))
-                self.r_w_bias.append(nn.Parameter(torch.Tensor(self.n_heads[i], self.d_heads[i]).zero_()))
-                self.r_bias.append(nn.Parameter(torch.Tensor(self.max_klen, self.n_heads[i]).zero_()))
+                setattr(self, f'r_emb_{i}', nn.Parameter(torch.Tensor(self.max_klen, self.n_heads[i], self.d_heads[i]).zero_()))
+                setattr(self, f'r_w_bias_{i}', nn.Parameter(torch.Tensor(self.n_heads[i], self.d_heads[i]).zero_()))
+                setattr(self, f'r_bias_{i}', nn.Parameter(torch.Tensor(self.max_klen, self.n_heads[i]).zero_()))
+                # self.r_emb.append(nn.Parameter(torch.Tensor(self.max_klen, self.n_heads[i], self.d_heads[i]).zero_()))
+                # self.r_w_bias.append(nn.Parameter(torch.Tensor(self.n_heads[i], self.d_heads[i]).zero_()))
+                # self.r_bias.append(nn.Parameter(torch.Tensor(self.max_klen, self.n_heads[i]).zero_()))
         # absolute standard
         elif self.attn_type == 2:
             self.pos_emb = PositionalEmbedding(self.d_model)
@@ -1032,23 +1038,25 @@ class MemTransformerLM_flex(nn.Module):
                 hids.append(core_out.detach())
                 mems_i = None if mems is None else mems[i]
 
-                core_out = layer(core_out, pos_emb, self.r_w_bias[i],
-                                 self.r_r_bias[i], dec_attn_mask=dec_attn_mask,
-                                 mems=mems_i)
+                # core_out = layer(core_out, pos_emb, self.r_w_bias[i], self.r_r_bias[i], dec_attn_mask=dec_attn_mask, mems=mems_i)
+                core_out = layer(core_out, pos_emb, getattr(self, f'r_w_bias_{i}'), getattr(self, f'r_r_bias_{i}'), dec_attn_mask=dec_attn_mask, mems=mems_i)
         # learnable
         elif self.attn_type == 1:
             core_out = self.drop(word_emb)
             for i, layer in enumerate(self.layers):
                 hids.append(core_out.detach())
                 if self.clamp_len > 0:
-                    r_emb = self.r_emb[i][-self.clamp_len:]
-                    r_bias = self.r_bias[i][-self.clamp_len:]
+                    r_emb = getattr(self, f'r_emb_{i}')[-self.clamp_len:]
+                    r_bias = getattr(self, f'r_bias_{i}')[-self.clamp_len:]
+                    # r_emb = self.r_emb[i][-self.clamp_len:]
+                    # r_bias = self.r_bias[i][-self.clamp_len:]
                 else:
-                    r_emb, r_bias = self.r_emb[i], self.r_bias[i]
+                    r_emb, r_bias = getattr(self, f'r_emb_{i}'), getattr(self, f'r_bias_{i}')
+                    # r_emb, r_bias = self.r_emb[i], self.r_bias[i]
 
                 mems_i = None if mems is None else mems[i]
-                core_out = layer(core_out, r_emb, self.r_w_bias[i],
-                                 r_bias, dec_attn_mask=dec_attn_mask, mems=mems_i)
+                # core_out = layer(core_out, r_emb, self.r_w_bias[i], r_bias, dec_attn_mask=dec_attn_mask, mems=mems_i)
+                core_out = layer(core_out, r_emb, getattr(self, f'r_w_bias_{i}'), r_bias, dec_attn_mask=dec_attn_mask, mems=mems_i)
         # absolute
         elif self.attn_type == 2:
             pos_seq = torch.arange(klen - 1, -1, -1.0, device=word_emb.device,
@@ -1177,9 +1185,13 @@ def predict(self, hidden):
             return torch.argmax(log_prob, dim=1)   
         else:
             print('option 3')
-            log_prob = self._get_full_log_prob(hidden[not_in_shortlist], head_logit[not_in_shortlist], weights[not_in_shortlist], biases[not_in_shortlist], projs[not_in_shortlist])
-            output[not_in_shortlist] = torch.argmax(log_prob[not_in_shortlist], dim=1)
+            not_in_shortlist_indices = torch.nonzero(not_in_shortlist).reshape(-1)
+            log_prob = self._get_full_log_prob(torch.index_select(hidden, dim=0, index=not_in_shortlist_indices), 
+                                                torch.index_select(head_logit, dim=0, index=not_in_shortlist_indices),
+                                                weights[1:], biases[1:], projs[1:])
+            output[not_in_shortlist_indices] = torch.argmax(log_prob, dim=1)
             return output
+            
 
 
 if __name__ == '__main__':
@@ -1244,16 +1256,29 @@ if __name__ == '__main__':
         B = 1 # batch size
         data_len = tgt_len
         data = torch.LongTensor(data_len*B).random_(0, args.n_token).unsqueeze(-1).to(device)
-        # for _ in range(10000):
         output = model(data)
-        # torch.onnx.export(model, inp, os.path.join('onnx_models', 'memformer.onnx'), opset_version=13)
-        print('done')
+        print('Inference done')
+        
+        # inputs = {'data': data}
+        # torch.onnx.export(model,
+        #          (inputs,),
+        #          f=os.path.join('onnx_models', 'memformer.onnx'), # output file
+        #          input_names=['data'], # i
+        #          output_names=['out'], # output 
+        #          dynamic_axes={'data': {0: 'sequence', 1: 'batch'}, 'out': {0: 'sequence', 1: 'batch'}},
+        #          do_constant_folding=True,
+        #          use_external_data_format=False,
+        #          enable_onnx_checker=True,
+        #          opset_version=12)
+        # print('ONNX export complete')
 
-        # path_to_data = common.default_dataroot()
-        # path_to_data = utils.full_path(os.path.join(path_to_data,'textpred', exp_utils.dataset_dir_name('wt103')))
-        # corpus = get_lm_corpus(path_to_data, 'wt103', 'word', max_size=None)
-        # diter = corpus.get_iterator('train', 256, 192, device='cpu', ext_len=0)
-        # for idx, (inp, tgt, seqlen, _) in enumerate(diter):
-        #     output = model(inp)
-        #     torch.onnx.export(model, inp, os.path.join('onnx_models', 'memformer.onnx'), opset_version=13)
-        #     break
+        # import onnxruntime as rt
+        # model_file = os.path.join('onnx_models', 'memformer.onnx')
+        # options = rt.SessionOptions()
+        # options.enable_profiling = True
+        # model = rt.InferenceSession(model_file, options)
+       
+        # print(data)
+        # ort_inputs = {model.get_inputs()[0].name: data.detach().cpu().numpy()}
+        # ort_outs = model.run(None, ort_inputs)
+        # # print(ort_outs)

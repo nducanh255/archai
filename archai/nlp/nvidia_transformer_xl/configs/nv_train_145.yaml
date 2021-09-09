@@ -15,10 +15,15 @@ jobs:
   - pip install --user -e .
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 8,2,8,2,8,2,2 --d_model 128 --d_head 16,64,16,64,16,64,64                   --d_inner
-    3719,9786,6043,6599,9455,8017,6155 --d_embed 512 --div_val 4 --experiment_name
+    6 --n_head 4,4,2,8,4,2 --d_model 256 --d_head 64,64,128,32,64,128                   --d_inner
+    1720,1585,1420,1020,485,1420 --d_embed 256 --div_val 4 --max_step 500 --experiment_name
     j0
-  name: config_83_137
+  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
+    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
+    5 --n_head 2,4,2,8,8 --d_model 512 --d_head 256,128,256,64,64                   --d_inner
+    1120,1635,1985,2020,1335 --d_embed 512 --div_val 4 --max_step 500 --experiment_name
+    j1
+  name: config_145
   sku: G8
 storage:
   us_east:

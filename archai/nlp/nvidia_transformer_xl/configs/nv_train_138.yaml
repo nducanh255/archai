@@ -15,16 +15,15 @@ jobs:
   - pip install --user -e .
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    23 --n_head 8,2,8,2,8,2,2,8,2,8,2,8,2,2,8,2,8,2,8,2,2,8,2 --d_model 128 --d_head
-    16,64,16,64,16,64,64,16,64,16,64,16,64,64,16,64,16,64,16,64,64,16,64                   --d_inner
-    635,1880,1112,1226,1812,1517,1135,635,1880,1112,1226,1812,1517,1135,635,1880,1112,1226,1812,1517,1135,635,1880
-    --d_embed 512 --div_val 4 --experiment_name j0
+    8 --n_head 8,2,2,4,4,4,2,2 --d_model 256 --d_head 32,128,128,64,64,64,128,128                   --d_inner
+    1285,1620,1270,1785,1670,1370,1070,1120 --d_embed 256 --div_val 4 --max_step 500
+    --experiment_name j0
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 8,2,8,2,8,2,2 --d_model 422 --d_head 16,64,16,64,16,64,64                   --d_inner
-    635,1880,1112,1226,1812,1517,1135 --d_embed 512 --div_val 4 --experiment_name
-    j1
-  name: config_83_130
+    8 --n_head 4,2,2,4,2,2,2,8 --d_model 512 --d_head 128,256,256,128,256,256,256,64                   --d_inner
+    1870,1720,1170,1885,1820,1320,1885,1185 --d_embed 512 --div_val 4 --max_step 500
+    --experiment_name j1
+  name: config_138
   sku: G8
 storage:
   us_east:

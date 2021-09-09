@@ -8,6 +8,7 @@ import random
 import collections
 import re
 import copy
+import json
 
 from archai.nlp.nvidia_transformer_xl.mem_transformer import MemTransformerLM, MemTransformerLM_flex
 from archai.nlp.nvidia_transformer_xl.utils import recurse_dir, get_model_and_params
@@ -93,7 +94,7 @@ def generate_bash_files(path_to_configs, f_name, bash_start=0, exp_name=None):
   return (bash_idx + bash_start + 1)
 
 
-def gather_results(exp_name, path_to_dir, filetypes='.json'):
+def gather_results(exp_name, path_to_dir, filetypes='.json', verbose=True):
   if not isinstance(filetypes, list):
     filetypes = [filetypes]
   
@@ -101,7 +102,7 @@ def gather_results(exp_name, path_to_dir, filetypes='.json'):
   for j in os.listdir(path_to_dir):
       j_path = os.path.join(path_to_dir, j)
       if os.path.isdir(j_path):
-        results.update(gather_results(exp_name, j_path, filetypes))
+        results.update(gather_results(exp_name, j_path, filetypes, verbose))
       else:
         for ft in filetypes:
           if ft in j:
@@ -109,10 +110,22 @@ def gather_results(exp_name, path_to_dir, filetypes='.json'):
               logs = get_info_from_logs(j_path, stage_1='stage_1' in exp_name)
             elif ft=='.json':
               logs = get_info_from_json(j_path)
-            elif ft=='config.yaml':
+            elif ft=='.yaml':
               with open(os.path.join(j_path), 'r') as f:
                 config = yaml.load(f)
-                model_config = {k: config[k] for k in model_config_keys}
+              if config is None:
+                  json_file = os.path.join(path_to_dir, 'train_log.json')
+                  with open(json_file, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
+                    try:
+                      job_desc = re.search('DLLL \{(.+?)\}', lines[0])
+                    except:
+                      return None
+                    job_desc = '{'+job_desc.group(1)+'}}'
+                    config = json.loads(job_desc)['data']
+                    config['n_token'] = 267735  
+                
+              model_config = {k: config[k] for k in model_config_keys}
                 
               cutoffs, tie_projs = [], [False]
               if config['adaptive']:
@@ -133,7 +146,8 @@ def gather_results(exp_name, path_to_dir, filetypes='.json'):
             
             if logs: 
               config_name = get_config_name(j_path) #get_config_name(os.path.basename(os.path.dirname(j_path)))
-              print(config_name, logs)
+              if verbose:
+                print(config_name, logs)
               if config_name in results.keys():
                 results[config_name].update(logs)
               else:

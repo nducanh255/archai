@@ -28,8 +28,7 @@ from archai.nlp.nvidia_transformer_xl.mem_transformer import PositionwiseFF, Mul
                                                             RelLearnableDecoderLayer, RelPartialLearnableDecoderLayer, AdaptiveEmbedding, ProjectedAdaptiveLogSoftmax
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.log_uniform_sampler import sample_logits
 from archai.nlp.nvidia_transformer_xl.utils import process_parameters
-
-from profiler import get_model_profile
+from archai.nlp.nvidia_transformer_xl.profiler import get_model_profile
 
 def meta_constructor_mapping(loader, node):
     value = loader.construct_mapping(node)
@@ -231,7 +230,7 @@ def get_config_name(job):
   if 'baseline' in job:
     dir_name = os.path.basename(os.path.dirname(job))
     return re.search('(config_[0-9]+_[0-9]+)', dir_name).group(1)
-  elif 'similar_params_sweep' in job or 'simp' in job:
+  elif 'similar_params_sweep' in job or 'simp' in job or 'evolution' in job:
     idx =  re.search('(config_[0-9]+)', job).span()[0]
     job = job[idx:]
     config_name = job.split('/')[0]
@@ -686,9 +685,9 @@ def main(args):
         common_configs = {}
         
         if 'constLR' in exp_name:
-          max_steps = [str(i) for i in range(500, 5000, 500)] #[str(i) for i in range(5000, 40000, 5000)] + ['2500', '500']
+          max_steps = str(500)#[str(i) for i in range(500, 5000, 500)] #[str(i) for i in range(5000, 40000, 5000)] + ['2500', '500']
         else:
-          max_steps = [str(i) for i in range(5000, 40000, 5000)] #+ ['2500', '500']
+          max_steps = str(5000) #[str(i) for i in range(5000, 40000, 5000)] #+ ['2500', '500']
         for max_step, v in results_structured.items():
           if not max_step in max_steps:
             continue

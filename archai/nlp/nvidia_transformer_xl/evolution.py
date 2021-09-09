@@ -1,14 +1,17 @@
 import random
 import os
+import re
 import pickle
 import copy
 import imageio
+import yaml
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 
-import torch
-
 from archai.nlp.nvidia_transformer_xl.utils import get_model, process_parameters, get_latency
+from archai.nlp.nvidia_transformer_xl.generate_archs import gather_results
+from archai.nlp.nvidia_transformer_xl.train_evolution import train_during_evolution
 
 
 model_config_defaults = {'d_head': None, 'n_token': 267736, 'dropout': 0.1, 'dropatt': 0.0, \
@@ -64,6 +67,25 @@ class Converter(object):
 
         return config
 
+    def gene2key(self, gene):
+        key_list = []
+
+        current_index = 0
+        key_list += [gene[current_index]]  # d_mdoel
+        current_index += 1
+
+        key_list += [gene[current_index]]  # n_layer
+        current_index += 1
+
+        key_list += gene[current_index: current_index + gene[1]]  # d_inner
+        current_index += self.max_n_layer
+
+        key_list += gene[current_index: current_index + gene[1]]  # n_head
+        current_index += self.max_n_layer
+
+        return ','.join(str(k) for k in key_list)
+
+    
     def get_gene_choice(self, d_inner_min=None):
         gene_choice = []
 
@@ -90,7 +112,7 @@ class Namespace:
 class Evolution(object):
     def __init__(self, results_path, population_size=125, parent_size=25, mutation_size=50, mutation_prob=0.3, crossover_size=50, n_iter=30,
                 n_layer_choice=[5,6,7,8], d_model_choice=[64,128,256,512], d_inner_choice=list(range(512, 2048, 50)), n_head_choice=[2,4,8],
-                param_constraint=4e6, latency_scale=1., n_threads=1, latency_repeat=5):
+                param_constraint=4e6, latency_scale=1., n_threads=1, latency_repeat=5, **kwargs):
         
         self.results_path = os.path.join(results_path, 'param_threshold_{}'.format(param_constraint))
         os.makedirs(self.results_path, exist_ok=True)
@@ -110,6 +132,7 @@ class Evolution(object):
         
         self.param_constraint = param_constraint
         self.profile()
+        self.max_val_ppl = 70
         self.latency_scale = latency_scale
 
         self.n_threads = n_threads # number of threads for latency measurement
@@ -124,14 +147,19 @@ class Evolution(object):
 
         self.counts = {}
 
-    def run_evo_search(self, pareto_search=False):
+    def run_evo_search(self, pareto_search=False, eps=None, use_convex_hull=False, start_train=0, config='dgx1_1gpu_fp32', config_file='wt103_base.yaml', 
+                        max_step=500, experiment_name='evolution', scheduler='constant', use_valid=True, **kwargs):
+        
         # if pareto_search is Flase, only searches in the vicinity of the maximum score seen
+        print('Performing {} search'.format('full-pareto' if pareto_search else 'best sample'))
+        
         population = self.random_sample(self.population_size)
         self.all_population = population
         
         self.update_counts(population)
 
-        logs = {'population':[population], 'params':[], 'latencies':[], 'parents':[], 'parents_scores':[], 'best_config':[], 'pareto':[]}
+        # logs = {'population':[copy.deepcopy(population)], 'params':[], 'latencies':[], 'parents':[], 'parents_scores':[], 'best_config':[], 'pareto':[]}
+        logs = {'population':[], 'params':[], 'latencies':[], 'parents':[], 'parents_scores':[], 'best_config':[], 'pareto':[]}
 
         parents_score = []
         parents_params = []
@@ -140,7 +168,9 @@ class Evolution(object):
             idx = 0 if i==0 else self.parent_size
             
             print(f"| Start Iteration {i}:")
-            population_scores_unseen, population_params_unseen, population_latencies_unseen = self.get_scores(population[idx:])
+            do_train = True if (i >= start_train) else False
+            population_scores_unseen, population_params_unseen, population_latencies_unseen = self.get_scores(population[idx:], do_train, config, config_file, max_step, 
+                                                                                                                experiment_name, scheduler, use_valid)
             population_scores = parents_score + population_scores_unseen
             population_params = parents_params + population_params_unseen
             population_latencies = parents_latencies + population_latencies_unseen
@@ -150,12 +180,11 @@ class Evolution(object):
             self.all_scores += population_scores_unseen
             self.all_params += population_params_unseen
             self.all_latencies += population_latencies_unseen
-            print('all_population len:', 'all_scores len:', len(self.all_scores), len(self.all_population), 'all_params len:', len(self.all_params), 'all_latencies len:', len(self.all_latencies))
-            self.update_pareto_front()
+            print('all_population len:', len(self.all_population), 'all_scores len:', len(self.all_scores), 'all_params len:', len(self.all_params), 'all_latencies len:', len(self.all_latencies))
+            self.update_pareto_front(eps, allow_decrease=True, use_convex_hull=use_convex_hull)
             
             if pareto_search:
                 count_weights = self.get_count_weights()
-                print(count_weights)
 
                 # selected_ind = np.random.choice(len(self.pareto['population']), size=self.parent_size, replace=(len(self.pareto['population'])<self.parent_size))
                 selected_ind = np.random.choice(len(self.pareto['population']), size=self.parent_size, p=count_weights)
@@ -194,16 +223,16 @@ class Evolution(object):
                     crossover_population.append(crossovered_gene)
                     k += 1
 
+            logs['population'].append(copy.deepcopy(population))
+            logs['params'].append(copy.deepcopy(population_params))
+            logs['latencies'].append(copy.deepcopy(population_latencies))
+            logs['parents'].append(copy.deepcopy(parents_population))
+            logs['parents_scores'].append(copy.deepcopy(parents_score))
+            logs['best_config'].append(copy.deepcopy(self.best_config))
+            logs['pareto'].append(copy.deepcopy(self.pareto))
+
             population = parents_population + mutate_population + crossover_population
             self.update_counts(population)
-
-            logs['population'].append(population)
-            logs['params'].append(population_params)
-            logs['latencies'].append(population_latencies)
-            logs['parents'].append(parents_population)
-            logs['parents_scores'].append(parents_score)
-            logs['best_config'].append(self.best_config)
-            logs['pareto'].append(self.pareto)
 
             self.all_population += mutate_population + crossover_population
 
@@ -242,7 +271,8 @@ class Evolution(object):
 
         return mutated_gene
   
-    def get_scores(self, genes):
+    def get_scores(self, genes, do_train=False, config='dgx1_1gpu_fp32', config_file='wt103_base.yaml', 
+                    max_step=500, experiment_name='evolution', scheduler='constant', use_valid=True):
         configs = []
         for gene in genes:
             configs.append(self.converter.gene2config(gene))
@@ -250,19 +280,34 @@ class Evolution(object):
         scores = []
         params = []
         latencies = []
+        avg_time = []
         for i, config in enumerate(configs):
             model_config = copy.deepcopy(model_config_defaults)
             model_config.update(config)
             model = get_model(model_config)
             
-            curr_n_all_param, _, _, params_attention, params_ff = process_parameters(model, verbose=False)
-            params.append(params_attention + params_ff)
+            if do_train:
+                t0 = time.time()
+                summary = train_during_evolution(model, config, config_file, max_step, experiment_name, scheduler)
+                t1 = time.time()
+                avg_time.append(t1-t0)
+
+                key = 'valid_perplexity' if use_valid else 'test_perplexity'
+                params.append(-summary[key])
+
+            else:
+                curr_n_all_param, _, _, params_attention, params_ff = process_parameters(model, verbose=False)
+                params.append(params_attention + params_ff)
             
             latency = get_latency(model, model_config, n_threads=self.n_threads, repeat=self.latency_repeat)
             latencies.append(latency)
+
+            if do_train:
+                print('average time for training samples was %.2f' % np.mean(avg_time))
+                score = -(summary[key]*1./self.max_val_ppl) - (latency*1./self.max_latency) * self.latency_scale
+            else:
+                score = ((params_attention + params_ff)*1./self.max_n_params) - (latency*1./self.max_latency) * self.latency_scale
             
-            # TODO: normalize params and latency by the maximum allowed
-            score = ((params_attention + params_ff)*1./self.max_n_params) - (latency*1./self.max_latency) * self.latency_scale
             scores.append(score)
             print('indvidual %d -> params: %d, latency: %.4f, score: %.4f' % (i, params_attention+params_ff, latency, score))
 
@@ -303,7 +348,9 @@ class Evolution(object):
 
         return popu
 
-    def semi_brute_force(self, nsamples, batch=1000):
+    def semi_brute_force(self, nsamples, batch=1000, eps=None, use_convex_hull=False, do_train=False, config='dgx1_1gpu_fp32', config_file='wt103_base.yaml', 
+                        max_step=500, experiment_name='evolution', scheduler='constant', use_valid=True, **kwargs):
+
         path_to_population = os.path.join(self.results_path, 'init_population_bruteforce.pkl')
         if os.path.exists(path_to_population):
             with open(path_to_population, 'rb') as f:
@@ -317,13 +364,14 @@ class Evolution(object):
         population_scores = []
         for idx in range(0, nsamples, batch):
             curr_population = population[idx:idx+batch]
-            curr_population_scores, curr_population_params, curr_population_latencies = self.get_scores(curr_population)
+            curr_population_scores, curr_population_params, curr_population_latencies = self.get_scores(curr_population, do_train, config, config_file, max_step, 
+                                                                                                        experiment_name, scheduler, use_valid)
             population_scores += curr_population_scores
 
             self.all_population += curr_population
             self.all_params += curr_population_params
             self.all_latencies += curr_population_latencies
-            self.update_pareto_front()
+            self.update_pareto_front(eps, allow_decrease=True, use_convex_hull=use_convex_hull)
 
             sorted_ind = np.array(population_scores).argsort()[::-1]
             self.best_config = self.converter.gene2config(self.all_population[sorted_ind[0]])
@@ -350,7 +398,7 @@ class Evolution(object):
         print(f"| nParams for highest score model: {self.best_param}")
         print(f"| Latency for highest score model: {self.best_latency}")
         self.plot_samples()
-        self.update_pareto_front()
+        self.update_pareto_front(eps, allow_decrease=True, use_convex_hull=use_convex_hull)
         
     def profile(self):
         gene = [self.gene_choice[i][-1] for i in range(self.gene_len)]
@@ -368,28 +416,138 @@ class Evolution(object):
 
         return
 
-    def update_pareto_front(self):
-        self.pareto['population'] = []
-        self.pareto['scores'] = []
-        self.pareto['params'] = []
-        self.pareto['latencies'] = []
+    def update_pareto_front(self, eps=None, allow_decrease=True, use_convex_hull=False):
+        if use_convex_hull:
+            xs = self.all_params
+            ys = self.all_latencies
+            hull_indices, eps_indices = self.get_convex_hull(xs, ys, eps, allow_decrease)
 
-        for i in range(len(self.all_population)):
-            this_params, this_latency = self.all_params[i], self.all_latencies[i]
-            is_pareto = True
-            for j in range(len(self.all_params)):
-                params, latency = self.all_params[j], self.all_latencies[j]
-                if (params > this_params) and (latency < this_latency):
-                    is_pareto = False
-                    break 
-            if is_pareto:
-                self.pareto['population'].append(self.all_population[i])
-                self.pareto['scores'].append(self.all_scores[i])
-                self.pareto['params'].append(self.all_params[i])
-                self.pareto['latencies'].append(self.all_latencies[i])
-    
+            all_indices = hull_indices + eps_indices
+
+            self.pareto['population'] = [self.all_population[i] for i in all_indices]
+            self.pareto['scores'] = [self.all_scores[i] for i in all_indices]
+            self.pareto['params'] = [self.all_params[i] for i in all_indices]
+            self.pareto['latencies'] = [self.all_latencies[i] for i in all_indices]
+
+        else:
+            for i in range(len(self.all_population)):
+                this_params, this_latency = self.all_params[i], self.all_latencies[i]
+                is_pareto = True
+                for j in range(len(self.all_params)):
+                    params, latency = self.all_params[j], self.all_latencies[j]
+                    if (params > this_params) and (latency < this_latency):
+                        is_pareto = False
+                        break 
+                if is_pareto:
+                    self.pareto['population'].append(self.all_population[i])
+                    self.pareto['scores'].append(self.all_scores[i])
+                    self.pareto['params'].append(self.all_params[i])
+                    self.pareto['latencies'].append(self.all_latencies[i])
+
+        print('number of points on the pareto front:', len(self.pareto['params']))            
+        
         return
 
+    def get_convex_hull(self, xs, ys, eps=None, allow_decrease=True):
+        """
+        Andrew's Monotone Chain Algorithm: (https://en.wikipedia.org/wiki/Graham_scan)
+        Assume the data are sorted in order of xs, then the computation complexity is O(n)
+        If not sorted, then a sort by x-value is applied first. The complexity becomes O(nlog(n))
+        Return:
+        hull_indices (list): indices for the points on the hull exactly
+        eps_indices (list): indices for the points on the hull + eps tolerance
+        """
+        indices = list(range(len(xs)))
+        # check xs is sorted
+        is_monotone = True
+        for i in range(1, len(xs)):
+            if xs[i] < xs[i-1]:
+                is_monotone = False
+                break
+        if not is_monotone:
+            indices.sort(key=lambda i : (xs[i], ys[i]))
+
+        def _is_on_ray_left(x1, y1, x2, y2, x3, y3, inclusive=False, epsilon=0):
+            """
+            Return whether x3,y3 is on the left side of the ray x1,y1 -> x2,y2.
+            If inclusive, then the answer is left or on the ray.
+            If otherwise, then the answer is strictly left.
+            """
+            val = (x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1)
+            if inclusive:
+                return val >= epsilon
+            return val > epsilon
+        
+        def _remove_non_hull_idx(x1, y1, idxs):
+            while len(idxs) > 1:
+                x2, y2 = xs[idxs[-1]], ys[idxs[-1]]
+                x3, y3 = xs[idxs[-2]], ys[idxs[-2]]
+                if not _is_on_ray_left(x1, y1, x2, y2, x3, y3):
+                    if np.abs(x1 - x2) > 1e-6 or np.abs(y1 - y2) > 1e-6:
+                        # this ensures that the no points are duplicates
+                        break
+                del idxs[-1]
+            return idxs
+
+        hull_indices = []
+        max_y = -float('inf')
+        c = 0
+        for idx in indices:
+            x1, y1 = xs[idx], ys[idx]
+            max_y = max(y1, max_y)
+            hull_indices = _remove_non_hull_idx(x1, y1, hull_indices)
+            hull_indices.append(idx)
+
+            # plt.scatter(xs, ys, label='pts')
+            # hull_xs = [xs[i] for i in hull_indices]
+            # hull_ys = [ys[i] for i in hull_indices]
+            # plt.scatter(hull_xs, hull_ys, c='black', label='eps-hull')
+            # plt.savefig(os.path.join(self.results_path, 'debug_convex_hull_{}.png'.format(c)), dpi=plt.gcf().dpi, bbox_inches='tight')
+            # c += 1
+
+        if not allow_decrease:
+            # use a fake final point at (2 * x_max , y_max) to remove decreasing.
+            x1, y1 = xs[indices[-1]] * 2, max_y
+            hull_indices = _remove_non_hull_idx(x1, y1, hull_indices)
+
+        # compute epsilon hull (convex hull + (1+eps) band)
+        eps_indices = hull_indices
+        if eps is not None and eps > 0:
+            eps_indices = []
+            h_idx = 0 # right idx, in the hull_indices
+            for idx in indices:
+                x = xs[idx]
+                y = ys[idx]
+                if h_idx >= len(hull_indices):
+                    # Larger than the largest model on the hull
+                    #y_interp = min_y
+                    y_interp = ys[hull_indices[-1]]
+                elif idx == hull_indices[h_idx]:
+                    # critical pts on hull
+                    y_interp = y
+                    x1, y1 = x, y # hull point to left
+                    h_idx += 1
+                    if h_idx < len(hull_indices):
+                        x2, y2 = xs[hull_indices[h_idx]], ys[hull_indices[h_idx]]
+                    else:
+                        #x2, y2 = xs[indices[-1]] * 2, min_y
+                        x2, y2 = xs[indices[-1]] * 2, ys[hull_indices[-1]]
+                else:
+                    # Between pts of hull
+                    try:
+                        y_interp = y1 + (y2 - y1) / (x2 - x1) * (x - x1)
+                        if np.isnan(y_interp):
+                            y_interp = min(y1, y2)
+                    except:
+                        # numerical issues when x2, x1 are close
+                        y_interp = min(y1, y2)
+                if y <= y_interp * (1. + eps):
+                    eps_indices.append(idx)
+                    assert x1 <= x and x2 >= x, "idx={} idx[h_idx-1]={} idx[h_idx]={}  x={} y={} x1={} x2={} y1={} y2={} y_interp={}".format(\
+                        idx, hull_indices[h_idx-1], hull_indices[h_idx], x, y, x1, x2, y1, y2, y_interp)
+
+        return hull_indices, eps_indices
+    
     def update_counts(self, population):
         n_repeated = 0
         for gene in population:
@@ -407,7 +565,6 @@ class Evolution(object):
         for gene in self.pareto['population']:
             key = ','.join([str(g) for g in gene])
             pareto_counts.append(self.counts[key])
-        print(pareto_counts)
 
         # total_counts = np.sum(pareto_counts)
         # count_weights = [count/total_counts for count in pareto_counts]
@@ -469,25 +626,323 @@ def test_converter():
     print('gene choices:', converter.get_gene_choice())
 
 
-def test_evo_search():
-    args = {'results_path': '/home/t-mojanj/Projects/archai/evo_search','population_size':50, 'parent_size':10, 'mutation_size':20, 'mutation_prob':0.3, 'crossover_size':20, 'n_iter':30,
-            'n_layer_choice':[3,4,5,6,7,8], 'd_model_choice':[128, 256, 512], 'd_inner_choice':list(range(512, 2049, 50))+[2048], 'n_head_choice':[2,4,8],
-            'param_constraint':5e6, 'latency_scale':2., 'n_threads':1, 'latency_repeat':5
-            }
+def test_evo_search(args, brute_force=False):
     alg = Evolution(**args)
 
-    # alg.semi_brute_force(nsamples=20000)
+    if brute_force:
+        alg.semi_brute_force(**args)
 
-    best_config = alg.run_evo_search(pareto_search=True)
-    print(best_config)
+    else:
+        best_config = alg.run_evo_search(**args)
+        print(best_config)
 
-    images = []
+        images = []
+        dir_name = 'param_threshold_{}'.format(args['param_constraint']/1e6)
+        if args['pareto_search']:
+            dir_name += '_pareto'
+        if args['use_convex_hull']:
+            dir_name += '_convex_hull'
+
+        results_path = os.path.join(args['results_path'], dir_name)
+        for i in range(args['n_iter']):
+            fname = os.path.join(results_path, 'pareto_latency_iter{}.png'.format(i))
+            images.append(imageio.imread(fname))
+        imageio.mimsave(os.path.join(results_path, 'search_animation.gif'), images)
+
+
+def test_convex_hull(args):
+    alg = Evolution(**args)
     results_path = os.path.join(args['results_path'], 'param_threshold_{}'.format(args['param_constraint']))
-    for i in range(args['n_iter']):
-        fname = os.path.join(results_path, 'pareto_latency_iter{}.png'.format(i))
-        images.append(imageio.imread(fname))
-    imageio.mimsave(os.path.join(results_path, 'search_animation.gif'), images)
+
+    # random points,
+    np.random.seed(0)
+    xs = np.random.uniform(size=100)
+    ys = np.random.uniform(size=100) + xs + 1.0
+    eps = np.random.uniform(low=0.0, high=0.3)
+    print(eps)
+
+    # compute eps convex hull.
+    hull_indices, indices = alg.get_convex_hull(xs, ys, eps, allow_decrease=True)
+
+    # plot
+    hull_xs = [xs[i] for i in indices]
+    hull_ys = [ys[i] for i in indices]
+    bound_xs = [xs[i] for i in hull_indices]
+    bound_ys = [ys[i] * (1+eps) for i in hull_indices]
+    plt.plot(bound_xs, bound_ys, c='red', label='eps-bound')
+    plt.scatter(xs, ys, label='pts')
+    plt.scatter(hull_xs, hull_ys, c='black', marker='+', label='eps-hull')
+    plt.show()
+    plt.savefig(os.path.join(results_path, 'debug_convex_hull.png'), dpi=plt.gcf().dpi, bbox_inches='tight')
+
+
+def get_yaml_values(value):
+  if isinstance(value, list):
+    value_string = ''
+    for v in value:
+      value_string += (str(v) + ',')
+    return value_string[:-1]
+  else:
+    return value
+
+
+def get_bundle_run_command(configs, max_step, n_gpus, gpu_config, is_pareto):
+  command = []
+  for i, curr_config in enumerate(configs):
+    curr_config['d_embed'] = curr_config['d_model']
+    curr_config['d_head'] = [curr_config['d_model']//n_head for n_head in curr_config['n_head']]
+    for k, v in curr_config.items():
+        curr_config[k] = str(get_yaml_values(v))
+    
+    exp_name = 'j' + str(i) + ('_pareto' if is_pareto[i] else '')
+    command.append('python -m torch.distributed.launch --nproc_per_node="%s" archai/nlp/nvidia_transformer_xl/train.py --config %s \
+                  --config_file wt103_base.yaml --n_layer %s --n_head %s --d_model %s --d_head %s \
+                  --d_inner %s --d_embed %s --div_val %s --max_step %d --experiment_name %s' \
+                  % (str(n_gpus), gpu_config, curr_config['n_layer'], curr_config['n_head'], curr_config['d_model'], curr_config['d_head'], curr_config['d_inner'], \
+                      curr_config['d_embed'], model_config_defaults['div_val'], max_step, exp_name))
+
+  return command
+
+
+def create_jobs(args, max_step=500, start_config=0, bundle_count=50, n_gpus=8, gpu_config='dgx1_8gpu_fp32', targets=['NLX-NDv2']):
+    # get amlt bash files for running all jobs to get the ground-truth Pareto
+    alg = Evolution(**args)
+
+    # results_path = os.path.join(args['results_path'], 'param_threshold_{}'.format(args['param_constraint']))
+    results_path = os.path.join(args['results_path'], 'param_threshold_5000000_D3_V2')
+    path_to_logs = os.path.join(results_path, 'logs.pkl')
+    with open(path_to_logs, 'rb') as f:
+        logs = pickle.load(f)
+
+    # get a list of pareto points
+    pareto_keys = []
+    pareto_pop = logs['pareto'][-1]['population']
+    for gene in pareto_pop:
+        key = alg.converter.gene2key(gene) #','.join([str(g) for g in gene])
+        if not key in pareto_keys:
+            pareto_keys.append(key)
+    print('number of paretos:', len(pareto_keys))
+
+    print(len(logs['population']))
+
+    seen = {}
+    all_population = []
+    is_pareto = []
+    all_latencies = {}
+    for iter, pop in enumerate(logs['population']):
+        unseen = 0
+        for idx, gene in enumerate(pop):
+            key = alg.converter.gene2key(gene) #','.join([str(g) for g in gene])
+            if not key in seen.keys():
+                seen[key] = 1
+                model_config = alg.converter.gene2config(gene)
+                all_population.append(model_config)
+                unseen += 1
+
+                if key in pareto_keys:
+                    is_pareto.append(True)
+                else:
+                    is_pareto.append(False)
+                
+                if iter < len(logs['latencies']):
+                    all_latencies[key] = logs['latencies'][iter][idx]
+        # print('unseen here:', unseen)
+    print('{} total configs and {} on the pareto'.format(len(all_population), np.sum(is_pareto)))
+    
+    path_to_pkl = os.path.join(results_path, 'latencies.pkl')
+    with open(path_to_pkl, 'wb') as f:
+        pickle.dump(all_latencies, f)
+    
+    # create corresponding yaml files for amulet jobs
+    n_configs = len(all_population)
+    c = 0
+    config_idx = start_config
+    while c < n_configs: 
+        with open('/home/t-mojanj/Projects/archaiphilly/nv_train.yaml') as file:
+            amlt_config = yaml.safe_load(file)
+            # if c==0:
+            #   pprint.pprint(amlt_config)
+
+        amlt_config['environment']['setup'] = ['set -e -o xtrace', 'pip install --user tensorboard']
+        amlt_config['environment']['image'] = 'debadeepta/pytorch:1.7.0-cuda11.0-cudnn8-devel'
+        
+        del amlt_config['search']
+        amlt_config['jobs'] = [{}]
+        amlt_config['jobs'][0]['name'] = 'config_{}'.format(str(config_idx))
+        amlt_config['jobs'][0]['sku'] = 'G8'
+        amlt_config['jobs'][0]['command'] = ['set -e -o xtrace', 'pip install --user -e .']
+        amlt_config['jobs'][0]['command'] += get_bundle_run_command(all_population[c:c+bundle_count], max_step, n_gpus, gpu_config, is_pareto[c:c+bundle_count])
+
+        config_file = 'nv_train_'+str(config_idx)+'.yaml'
+        path_to_configs = os.path.join('/home/t-mojanj/Projects/archai/archai/nlp/nvidia_transformer_xl', 'configs')
+        f_name = os.path.join(path_to_configs, config_file)
+        with open(f_name, 'w') as file:
+            yaml.dump(amlt_config, file)
+
+        c += bundle_count
+        config_idx += 1
+
+    exp_name = 'evolution_' + str(max_step)
+    f_name = 'amlt_run_evolution_'+str(max_step)
+    bash_file = os.path.join(path_to_configs, f_name+'.sh')
+    if os.path.exists(bash_file):
+        os.remove(bash_file)  
+    for i in range(start_config, config_idx):
+        with open(bash_file, 'a') as f:
+            f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_{}.yaml {} -t {}\n'.format(i, exp_name, targets[0]))
+
+
+def get_gt_pareto(args, exp_name, path_to_dir, start_config, eps=0.05):
+    gt_results = gather_results(exp_name, path_to_dir, filetypes=['.yaml', '.json'], verbose=False)
+    print('found %d model configurations' % len(gt_results.keys()))
+
+    print('Loading the latencies from log file')
+    # results_path = os.path.join(args['results_path'], 'param_threshold_{}'.format(args['param_constraint']))
+    results_path = os.path.join(args['results_path'], 'param_threshold_5000000_D3_V2')
+    path_to_pkl = os.path.join(results_path, 'latencies.pkl')
+    with open(path_to_pkl, 'rb') as f:
+        latencies = pickle.load(f)
+    
+    # load previous pareto
+    loaded_pareto = None
+    path_to_pkl = os.path.join(results_path, 'pareto.pkl')
+    if os.path.exists(path_to_pkl):
+        with open(path_to_pkl, 'rb') as f:
+            loaded_pareto = pickle.load(f)
+    
+    alg = Evolution(**args)
+
+    gt_latencies = []
+    gt_val_ppls = []
+    is_pareto = []
+    for job_name, result in gt_results.items():
+        gene = alg.converter.config2gene(result)
+        key = alg.converter.gene2key(gene) #','.join([str(g) for g in gene])
+        if key in latencies.keys():
+            config_number = re.search('config_([0-9]+)_', job_name).group(1)
+            print(job_name, config_number)
+            assert int(config_number) >= start_config
+
+            gt_latencies.append(latencies[key])
+            gt_val_ppls.append(result['valid_perplexity'])
+            if loaded_pareto:
+                is_pareto.append(loaded_pareto[key])
+            else:
+                is_pareto.append(True if 'pareto' in job_name else False)
+    is_pareto = np.asarray(is_pareto)
+    print(f'found {len(gt_val_ppls)} models with {np.sum(is_pareto)} on the pareto')
+    assert len(gt_val_ppls)>=len(latencies.keys()), print(len(gt_val_ppls), len(latencies.keys()))
+
+    # extract the actual pareto front based on val ppl and latency
+    range_val_ppl = np.max(gt_val_ppls) - np.min(gt_val_ppls)
+    sorted_indices = np.argsort(gt_val_ppls)[::-1]
+    is_gt_pareto = np.zeros_like(is_pareto)
+    for i in range(len(sorted_indices)):
+        this_is_pareto = True
+        for j in sorted_indices[i:]:
+            val_ppl_diff = abs(gt_val_ppls[sorted_indices[i]]-gt_val_ppls[j])*1./range_val_ppl
+            if val_ppl_diff <= eps and gt_latencies[sorted_indices[i]] > gt_latencies[j]:
+                this_is_pareto = False
+                break
+        is_gt_pareto[sorted_indices[i]] = this_is_pareto
+
+    print(len(is_gt_pareto), len(np.nonzero(is_gt_pareto)[0]))
+    TPR = len(np.intersect1d(np.nonzero(is_gt_pareto)[0], np.nonzero(is_pareto)[0]))*100./len(np.nonzero(is_gt_pareto)[0])
+    TNR = len(np.intersect1d(np.nonzero(~is_gt_pareto)[0], np.nonzero(~is_pareto)[0]))*100./len(np.nonzero(~is_gt_pareto)[0])
+    print(f'TPR={TPR}% and TNR={TNR}%')
+    
+    plt.figure()
+    plt.scatter(np.asarray(gt_latencies)[~is_pareto] * 1000., np.asarray(gt_val_ppls)[~is_pareto], s=10)
+    plt.scatter(np.asarray(gt_latencies)[is_pareto] * 1000., np.asarray(gt_val_ppls)[is_pareto], s=10)
+    # plt.scatter(np.asarray(gt_latencies)[is_gt_pareto] * 1000., np.asarray(gt_val_ppls)[is_gt_pareto], s=10)
+    # plt.scatter(np.asarray(gt_val_ppls)[~is_pareto], np.asarray(gt_latencies)[~is_pareto] * 1000., s=10)
+    # plt.scatter(np.asarray(gt_val_ppls)[is_pareto], np.asarray(gt_latencies)[is_pareto] * 1000., s=10)
+    plt.xlabel('Latency (ms)')
+    plt.ylabel('Val PPL')
+    plt.xlim((np.min(gt_latencies)*1000-10, np.max(gt_latencies)*1000+10))
+    plt.title('Pareto Curve')
+    plt.grid(axis='y')
+
+    fname = 'gt_pareto_latency.png'
+    plt.savefig(os.path.join(results_path, fname), bbox_inches="tight")
+
+
+def get_final_pareto_front(args, eps=0.05):
+    alg = Evolution(**args)
+
+    # results_path = os.path.join(args['results_path'], 'param_threshold_{}'.format(args['param_constraint']))
+    results_path = os.path.join(args['results_path'], 'param_threshold_5000000_D3_V2')
+    path_to_logs = os.path.join(results_path, 'logs.pkl')
+    with open(path_to_logs, 'rb') as f:
+        logs = pickle.load(f)
+
+    # get all population
+    seen_keys = []
+    all_population = []
+    all_scores = []
+    all_params = []
+    all_latencies = []
+    for i, pop in enumerate(logs['population']):
+        for j, gene in enumerate(pop):
+            key = alg.converter.gene2key(gene)
+            if not key in seen_keys:
+                seen_keys.append(key)
+                all_population.append(gene)
+                all_scores.append((logs['params'][i][j]*1./alg.max_n_params) - (logs['latencies'][i][j]*1./alg.max_latency) * alg.latency_scale)
+                all_params.append(logs['params'][i][j])
+                all_latencies.append(logs['latencies'][i][j])
+
+    range_params = np.max(all_params) - np.min(all_params)
+    pareto = {'population':[], 'params':[], 'latencies':[]}
+    sorted_indices = np.argsort(all_params)
+    is_pareto_dict = {}
+    for i in range(len(sorted_indices)):
+        is_pareto = True
+        for j in sorted_indices[i:]:
+            param_diff = abs(all_params[sorted_indices[i]]-all_params[j])*1./range_params
+            if param_diff <= eps and all_latencies[sorted_indices[i]] > all_latencies[j]:
+                is_pareto = False
+                break
+        if is_pareto:
+            pareto['population'].append(all_population[sorted_indices[i]])
+            pareto['params'].append(all_params[sorted_indices[i]])
+            pareto['latencies'].append(all_latencies[sorted_indices[i]])
+        
+        is_pareto_dict[seen_keys[sorted_indices[i]]] = is_pareto
+
+    path_to_logs = os.path.join(results_path, 'pareto.pkl')
+    with open(path_to_logs, 'wb') as f:
+        pickle.dump(is_pareto_dict, f)
+
+    plt.figure()
+    plt.scatter(all_params, np.asarray(all_latencies) * 1000., s=10)
+    plt.scatter(pareto['params'], np.asarray(pareto['latencies']) * 1000., s=10)
+    plt.ylabel('Latency (ms)')
+    plt.xlabel('Decoder nParams')
+    plt.xlim((4.2e6, 2.6e7))
+    plt.title('Pareto Curve')
+    plt.grid(axis='y')
+    plt.savefig(os.path.join(results_path, 'final_convex_hull.png'), bbox_inches="tight")
+
 
 if __name__=='__main__':
+    args = {'results_path': '/home/t-mojanj/Projects/archai/evo_search','population_size':5, 'parent_size':1, 'mutation_size':2, 'mutation_prob':0.3, 'crossover_size':2, 
+            'n_iter':1, 'n_layer_choice':[3,4,5,6,7,8], 'd_model_choice':[128, 256, 512], 'd_inner_choice':list(range(512, 2049, 50))+[2048], 'n_head_choice':[2,4,8],
+            'param_constraint':5e6, 'latency_scale':2., 'n_threads':1, 'latency_repeat':5, 'pareto_search':True,
+            ################### extracting pareto
+            'eps':0.05, 'use_conves_hull':False,
+            ################### brute_force
+            'nsamples':20000, 'batch':1000, 'do_train':False,
+            ################### evaluation scheme
+            'start_train':False, 'config':'dgx1_1gpu_fp32', 'config_file':'wt103_base.yaml', 'max_step':500, 'experiment_name':'evolution', 
+            'scheduler':'constant', 'use_valid':True}
+
     # test_converter()
-    test_evo_search()
+    # test_convex_hull(args)
+    test_evo_search(args, brute_force=False)
+    # create_jobs(args, max_step=5000, start_config=25, bundle_count=50, n_gpus=8, gpu_config='dgx1_8gpu_fp32', targets=['NLX-NDv2'])
+    # get_final_pareto_front(args, eps=0.05)
+
+    # gt_exp_name = 'evolution_500'
+    # path_to_amlt_results = os.path.join('/home/t-mojanj/logdir/nv_xformer_xl/prev_jobs/', gt_exp_name)
+    # get_gt_pareto(args, exp_name=gt_exp_name, path_to_dir=path_to_amlt_results, start_config=25, eps=0.05)

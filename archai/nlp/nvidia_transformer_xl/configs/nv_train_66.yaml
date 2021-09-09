@@ -13,15 +13,17 @@ jobs:
 - command:
   - set -e -o xtrace
   - pip install --user -e .
-  - - 'python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-      --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-      22 --n_head 4,8,8,4,8,4,4,2,4,8,8,4,8,4,4,2,4,8,8,4,8,4 --d_model 128 --d_head
-      32,16,16,32,16,32,32,64,32,16,16,32,16,32,32,64,32,16,16,32,16,32                   --d_inner
-      1482,1569,1129,1328,1121,1838,1446,860,1482,1569,1129,1328,1121,1838,1446,860,1482,1569,1129,1328,1121,1838
-      --d_embed 128 --div_val 4 --experiment_name job_0 &
-
-      '
-  name: train_xl_config_config_151_66
+  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
+    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
+    6 --n_head 8,4,2,2,8,8 --d_model 512 --d_head 64,128,256,256,64,64                   --d_inner
+    970,1720,1570,1120,1420,1870 --d_embed 512 --div_val 4 --max_step 500 --experiment_name
+    j0
+  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
+    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
+    8 --n_head 8,2,8,2,2,4,4,2 --d_model 512 --d_head 64,256,64,256,256,128,128,256                   --d_inner
+    1720,1670,1320,1970,1820,1320,1070,1270 --d_embed 512 --div_val 4 --max_step 500
+    --experiment_name j1
+  name: config_66
   sku: G8
 storage:
   us_east:

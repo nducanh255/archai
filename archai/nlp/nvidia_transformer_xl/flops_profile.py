@@ -22,7 +22,7 @@ from archai.nlp.nvidia_transformer_xl.data_utils import get_lm_corpus
 from archai.nlp.nvidia_transformer_xl.nvidia_utils import exp_utils
 from archai.common import utils, common
 
-from gather_results import get_metrics, get_config_name
+from archai.nlp.nvidia_transformer_xl.gather_results import get_metrics, get_config_name
 
 def meta_constructor_mapping(loader, node):
     value = loader.construct_mapping(node)
@@ -40,12 +40,12 @@ model_config_keys = ['n_token', 'n_layer','n_head','d_model','d_head','d_inner',
                         'd_embed','div_val','pre_lnorm','tgt_len','ext_len','mem_len', \
                         'same_length','attn_type','clamp_len','sample_softmax']
 
-def recurse_dir(args, path_to_dir):
+def recurse_dir(args, path_to_dir, verbose=True):
   results = {}
   for j in os.listdir(path_to_dir):
       j_path = os.path.join(path_to_dir, j)
       if os.path.isdir(j_path):
-        results.update(recurse_dir(args, j_path))
+        results.update(recurse_dir(args, j_path, verbose))
       else:
         logs = None
         if 'config.yaml' in j_path:
@@ -66,11 +66,12 @@ def recurse_dir(args, path_to_dir):
           model_config['tie_projs'] = tie_projs
           model_config['tie_weight'] = config['tied']
           model_config['dtype'] = None
-          logs = {'config': config, 'model_config': model_config}
+          logs = {'config': config, 'model_config': model_config, 'path':path_to_dir}
         
         if logs: 
           config_name = get_config_name(j_path) #get_config_name(os.path.basename(os.path.dirname(j_path)))
-          print(config_name, logs)
+          if verbose:
+            print(config_name, logs)
           results[config_name] = logs
   
   return results

@@ -131,7 +131,7 @@ def parse_args():
                        help='Number of total layers')
     model.add_argument('--n_head', type=lambda s: [int(item) for item in s.split(',')], default=[8],
                        help='Number of heads')
-    model.add_argument('--d_head', type=lambda s: [int(item) for item in s.split(',')], default=[64],
+    model.add_argument('--d_head', type=lambda s: [int(item) for item in s.split(',')], default=None,
                        help='Head dimension')
     model.add_argument('--d_embed', type=int, default=-1, # will be set from d_model
                        help='Embedding dimension')
@@ -1015,6 +1015,7 @@ def main():
                 eta_min=args.eta_min)
         else:
             scheduler_sparse = None
+    
     elif args.scheduler == 'inv_sqrt':
         # originally used for Transformer (in Attention is all you need)
         def lr_lambda(step):
@@ -1058,7 +1059,6 @@ def main():
     with open(config_file, 'w') as f:
         yaml.dump(args.__dict__, f, indent=2)
     os.makedirs(args.work_dir, exist_ok=True)
-    print(len(args.work_dir))
     try:
         shutil.move(config_file, args.work_dir)
     except:
