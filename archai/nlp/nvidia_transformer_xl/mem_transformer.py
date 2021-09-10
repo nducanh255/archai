@@ -232,8 +232,11 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
 
         self.r_net = nn.Linear(self.d_model, self.n_head * self.d_head, bias=False)
 
-    def forward(self, w, r, r_w_bias, r_r_bias, attn_mask=None, mems=None):
+    def forward(self, w, r, r_w_bias, r_r_bias, attn_mask=None, mems=None, val_attn_mask=None, is_last=False):
         qlen, rlen, bsz = w.size(0), r.size(0), w.size(1)
+
+        att_mem = None
+        val_mem = None
 
         if mems is not None:
             cat = torch.cat([mems, w], 0)
@@ -282,6 +285,26 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
 
         # [bsz x n_head x qlen x klen]
         attn_prob = F.softmax(attn_score, dim=3)
+        
+
+        if is_last:
+            att_mem = attn_prob
+            # w_head_v: klen x bsz x n_head x d_head
+            val_mem = torch.einsum('ibnd,jbnd->bnij', (w_head_v, w_head_v))
+            # val_mem: bsz x n_head x klen x klen
+            val_mem.mul_(self.scale)
+
+            # Mask??
+
+            # compute attention probability
+            # if val_attn_mask is not None:
+            #     if val_attn_mask.dim() == 2:
+            #         val_mem.masked_fill_(val_attn_mask[None, None, :, :], -float('inf'))
+            #     elif val_attn_mask.dim() == 3:
+            #         val_mem.masked_fill_(val_attn_mask[:, None, :, :], -float('inf'))
+
+            val_mem = F.softmax(val_mem, dim=3)
+
         attn_prob = self.dropatt(attn_prob)
 
         # compute attention vector
@@ -302,7 +325,7 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
             # residual connection + layer normalization
             output = self.layer_norm(w + attn_out)
 
-        return output
+        return output, att_mem, val_mem
 
 
 class RelLearnableMultiHeadAttn(RelMultiHeadAttn):
@@ -440,14 +463,15 @@ class RelPartialLearnableDecoderLayer(nn.Module):
         self.pos_ff = PositionwiseFF(d_model, d_inner, dropout,
                                      pre_lnorm=kwargs.get('pre_lnorm'))
 
-    def forward(self, dec_inp, r, r_w_bias, r_r_bias, dec_attn_mask=None, mems=None):
+    def forward(self, dec_inp, r, r_w_bias, r_r_bias, dec_attn_mask=None, val_attn_mask=None, mems=None, is_last=False):
 
-        output = self.dec_attn(dec_inp, r, r_w_bias, r_r_bias,
+        output, att_mem, val_mem = self.dec_attn(dec_inp, r, r_w_bias, r_r_bias,
                                attn_mask=dec_attn_mask,
-                               mems=mems)
+                               val_attn_mask=val_attn_mask,
+                               mems=mems, is_last=is_last)
         output = self.pos_ff(output)
 
-        return output
+        return output, att_mem, val_mem
 
 
 class AdaptiveEmbedding(nn.Module):
@@ -522,7 +546,10 @@ class MemTransformerLM(nn.Module):
                  same_length=False, attn_type=0, clamp_len=-1,
                  sample_softmax=-1, kd_alpha=0.5, 
                  kd_temperature=2, kd_annealing=True, 
-                 kd_topk=30, max_step=40000):
+                 kd_topk=30, max_step=40000,
+                 kd_topatt=False, kd_only_topatt=False,
+                 kd_hidden=False, teacher_dmodel=512,
+                 kd_only_hidden=False):
         super(MemTransformerLM, self).__init__()
         self.n_token = n_token
 
@@ -549,6 +576,8 @@ class MemTransformerLM(nn.Module):
         self.max_klen = tgt_len + ext_len + mem_len
 
         self.attn_type = attn_type
+
+        self.kd_topatt = kd_topatt
 
         self.layers = nn.ModuleList()
         # the default attention
@@ -603,7 +632,12 @@ class MemTransformerLM(nn.Module):
                                                     kd_temperature=kd_temperature,
                                                     kd_annealing=kd_annealing,
                                                     kd_topk=kd_topk,
-                                                    max_step=max_step)
+                                                    kd_only_topatt=kd_only_topatt,
+                                                    max_step=max_step,
+                                                    kd_hidden=kd_hidden, 
+                                                    teacher_dmodel=teacher_dmodel,
+                                                    d_model=d_model,
+                                                    kd_only_hidden=kd_only_hidden)
 
 
         self.same_length = same_length
@@ -695,6 +729,9 @@ class MemTransformerLM(nn.Module):
 
         mlen = mems[0].size(0) if mems is not None else 0
         klen = mlen + qlen
+
+        val_attn_mask=None
+
         if self.same_length:
             all_ones = word_emb.new_ones(qlen, klen)
             mask_len = klen - self.mem_len - 1
@@ -707,6 +744,13 @@ class MemTransformerLM(nn.Module):
         else:
             dec_attn_mask = torch.triu(
                 word_emb.new_ones(qlen, klen), diagonal=1+mlen).bool()
+
+            if self.kd_topatt:
+                val_attn_mask = word_emb.new_zeros(klen, klen)
+                val_attn_mask[qlen:, qlen:] = 1
+                val_attn_mask[qlen:, qlen:] = torch.triu(val_attn_mask[qlen:, qlen:], diagonal=1)
+                val_attn_mask = val_attn_mask.bool()
+
 
         hids = []
         # default
@@ -723,9 +767,10 @@ class MemTransformerLM(nn.Module):
             for i, layer in enumerate(self.layers):
                 hids.append(core_out.detach())
                 mems_i = None if mems is None else mems[i]
-                core_out = layer(core_out, pos_emb, self.r_w_bias,
-                                 self.r_r_bias, dec_attn_mask=dec_attn_mask,
-                                 mems=mems_i)
+                core_out, att_mem, val_mem = layer(core_out, pos_emb, self.r_w_bias,
+                                                self.r_r_bias, dec_attn_mask=dec_attn_mask,
+                                                val_attn_mask = val_attn_mask,
+                                                mems=mems_i, is_last=(len(self.layers) - 1) == i and self.kd_topatt)
         # learnable
         elif self.attn_type == 1:
             core_out = self.drop(word_emb)
@@ -781,9 +826,9 @@ class MemTransformerLM(nn.Module):
 
         new_mems = self._update_mems(hids, mems, qlen, mlen)
 
-        return core_out, new_mems
+        return core_out, new_mems, att_mem, val_mem
 
-    def forward(self, data, target, soft_target, mems, current_step=0, proba=False):
+    def forward(self, data, target, soft_target, mems, current_step=0, proba=False, t_att_mem=None, t_val_mem=None, t_hidden_mem=None):
         # nn.DataParallel does not allow size(0) tensors to be broadcasted.
         # So, have to initialize size(0) mems inside the model forward.
         # Moreover, have to return new_mems to allow nn.DataParallel to piece
@@ -791,14 +836,14 @@ class MemTransformerLM(nn.Module):
         if mems is None:
             mems = self.init_mems()
 
-        hidden, new_mems = self._forward(data, mems=mems)
+        hidden, new_mems, att_mem, val_mem = self._forward(data, mems=mems)
 
         if proba:
-            return self.softmax_proba(new_mems, hidden)
+            return self.softmax_proba(new_mems, hidden), att_mem, val_mem, hidden
 
-        return self.softmax_training(new_mems, hidden, target, soft_target, current_step)
+        return self.softmax_training(new_mems, hidden, target, soft_target, current_step, att_mem=att_mem, val_mem=val_mem, t_att_mem=t_att_mem, t_val_mem=t_val_mem, t_hidden_mem=t_hidden_mem)
 
-    def softmax_training(self, new_mems, hidden, target, soft_target, current_step):
+    def softmax_training(self, new_mems, hidden, target, soft_target, current_step, att_mem, val_mem, t_att_mem, t_val_mem, t_hidden_mem):
 
         tgt_len = target.size(0)
         pred_hid = hidden[-tgt_len:]
@@ -808,9 +853,9 @@ class MemTransformerLM(nn.Module):
                                   pred_hid, self.sampler)
             loss = -F.log_softmax(logit, -1)[:, :, 0]
         else:
-            nll, loss = self.crit(pred_hid.view(-1, pred_hid.size(-1)), target.view(-1), soft_target, current_step)
-            loss = loss.view(tgt_len, -1)
-            nll = nll.view(tgt_len, -1)
+            nll, loss = self.crit(pred_hid.view(-1, pred_hid.size(-1)), target.view(-1), soft_target, current_step, att_mem=att_mem, val_mem=val_mem, t_att_mem=t_att_mem, t_val_mem=t_val_mem, t_hidden_mem=t_hidden_mem)
+            # loss = loss.view(tgt_len, -1)
+            # nll = nll.view(tgt_len, -1)
 
         return (nll, loss, new_mems)
 

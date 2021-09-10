@@ -253,6 +253,9 @@ def parse_args():
     kd.add_argument('--teacher_name',  type=str,
                       default=None,
                       help='Teachers folder name.')
+    kd.add_argument('--pretrained_name',  type=str,
+                      default=None,
+                      help='Pretrained model folder name.')
     kd.add_argument('--kd_temperature',  type=float,
                       default=1,
                       help='Softmax temperature.')
@@ -262,6 +265,18 @@ def parse_args():
     kd.add_argument('--kd_annealing',  type=exp_utils.str2bool,
                       default=True,
                       help='KD Alpha annealing.')
+    kd.add_argument('--kd_topatt',  type=exp_utils.str2bool,
+                      default=False,
+                      help='MiniLM style of distillation (last attention and values).')
+    kd.add_argument('--kd_hidden',  type=exp_utils.str2bool,
+                      default=False,
+                      help='Distill last hidden + NLL.')
+    kd.add_argument('--kd_only_hidden',  type=exp_utils.str2bool,
+                      default=False,
+                      help='Distill only last hidden.')
+    kd.add_argument('--kd_only_topatt',  type=exp_utils.str2bool,
+                      default=False,
+                      help='Train with only MiniLM loss (No LM loss).')
     kd.add_argument('--kd_topk',  type=int,
                       default=30,
                       help='Top K probabilities to use for KD.')
@@ -490,12 +505,16 @@ def train_iteration(model, teacher_model, i, mems, teacher_mems, data_chunks, ta
 
     enable_autocast = args.fp16 and args.amp == 'pytorch'
     proba = None
+    att_mem = None
+    val_mem = None
+    hidden_mem = None
+
     if teacher_model:
         with torch.no_grad():
-            proba, teacher_mems[i] = teacher_model(data_i, None, None, teacher_mems[i], proba=True)
+            (proba, teacher_mems[i]), att_mem, val_mem, hidden_mem = teacher_model(data_i, None, None, teacher_mems[i], proba=True)
 
     with torch.cuda.amp.autocast(enable_autocast):
-        nll, loss, mems[i] = model(data_i, target_i, proba, mems[i], current_step=train_step)
+        nll, loss, mems[i] = model(data_i, target_i, proba, mems[i], current_step=train_step, t_att_mem=att_mem, t_val_mem=val_mem, t_hidden_mem=hidden_mem)
     loss = loss.float().mean().type_as(loss) / args.batch_chunk
     nll = nll.float().mean().type_as(nll) / args.batch_chunk
     # print(loss)
@@ -514,7 +533,10 @@ def train_iteration(model, teacher_model, i, mems, teacher_mems, data_chunks, ta
     else:
         loss.backward()
 
-    train_loss = nll.float().item()
+    if args.kd_only_topatt or args.kd_only_hidden:
+        train_loss = loss.float().item()
+    else:
+        train_loss = nll.float().item()
     return train_loss
 
 
@@ -844,6 +866,10 @@ def main():
         'kd_topk': args.kd_topk,
         'kd_annealing': args.kd_annealing,
         'max_step': args.max_step,
+        'kd_topatt': args.kd_topatt,
+        'kd_only_topatt': args.kd_only_topatt,
+        'kd_hidden': args.kd_hidden,
+        'kd_only_hidden': args.kd_only_hidden
         }
 
     model = MemTransformerLM(**model_config)
@@ -855,6 +881,7 @@ def main():
         teacher_checkpoint = load_checkpoint(teacher_path)
         teacher_checkpoint['model_config']['kd_topk'] = args.kd_topk
         teacher_checkpoint['model_config']['kd_temperature'] = args.kd_temperature
+        teacher_checkpoint['model_config']['kd_topatt'] = args.kd_topatt
         teacher_model = MemTransformerLM(**teacher_checkpoint['model_config'])
         teacher_model.load_state_dict(teacher_checkpoint['model_state'])
 
@@ -1015,6 +1042,15 @@ def main():
     last_batch = 0
     last_iter = 0
     best_val_loss = None
+
+    if args.pretrained_name:
+
+        
+        pretrained_path = pl.Path(args.data).parent / 'teacher_models' / args.pretrained_name / 'checkpoint_best.pt'
+        print(f'Loading pretrained model: {pretrained_path}')
+        pretrained_checkpoint = load_checkpoint(pretrained_path)
+        model.load_state_dict(pretrained_checkpoint['model_state'], strict=False)
+
 
     if args.restart:
         try:

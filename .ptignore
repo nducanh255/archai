@@ -3,3 +3,5 @@ tools/
 archived/
 dockers/
 docs/
+.pytest_cache/
+.mypy_cache/

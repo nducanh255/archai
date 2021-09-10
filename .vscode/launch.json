@@ -259,6 +259,36 @@
             ]
         },
         {
+            "name": "Train Transformer XL",
+            "type": "python",
+            "request": "launch",
+            "program": "${cwd}/archai/nlp/nvidia_transformer_xl/train.py",
+            "console": "integratedTerminal",
+            "args": ["--experiment_name", "test_pt19_t_1",
+                    "--config_file", "wt103_base.yaml",
+                    "--config", "dgx1_1gpu_fp16",
+                    "--div_val", "4",
+                    "--vocab_size", "200000",
+            ]
+        },
+
+        {
+            "name": "Transformer XL KD Test",
+            "type": "python",
+            "request": "launch",
+            "program": "${cwd}/archai/nlp/nvidia_transformer_xl/train.py",
+            "console": "integratedTerminal",
+            "args": ["--experiment_name", "kd_test_ta3",
+                    "--config_file", "wt103_base.yaml",
+                    "--config", "dgx1_1gpu_fp16",
+                    "--div_val", "4",
+                    "--n_layer", "4",
+                    "--teacher_name", "pt16_16layer_word",
+                    "--batch_chunk", "16"
+            ]
+        },
+
+        {
             "name": "Exprep",
             "type": "python",
             "request": "launch",

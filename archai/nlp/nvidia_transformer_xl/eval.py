@@ -204,7 +204,7 @@ def evaluate(eval_iter, model, meters, log_interval, max_size=None, repeat=1):
 
                 torch.cuda.synchronize()
                 start_iter = time.time()
-                loss, mems = model(data, target, mems)
+                loss, _, mems = model(data, target, None, mems)
                 torch.cuda.synchronize()
                 elapsed = time.time() - start_iter
 

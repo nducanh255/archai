@@ -35,7 +35,8 @@ class ProjectedAdaptiveLogSoftmax(nn.Module):
     def __init__(self, n_token, d_embed, d_proj, cutoffs, div_val=1,
                  tie_projs=None, out_layers_weights=None, out_projs=None,
                  keep_order=False, kd_alpha=0.5, kd_annealing=True, 
-                 kd_temperature=2, kd_topk=30, max_step=40000):
+                 kd_temperature=2, kd_topk=30, kd_only_topatt=False, max_step=40000,
+                 kd_hidden=False, teacher_dmodel=512, d_model=256, kd_only_hidden=False):
         super().__init__()
 
         self.n_token = n_token
@@ -56,8 +57,15 @@ class ProjectedAdaptiveLogSoftmax(nn.Module):
         self.kd_temperature = kd_temperature
         self.kd_annealing = kd_annealing
         self.kd_topk = kd_topk
+        self.kd_only_topatt = kd_only_topatt
         self.max_step = max_step
         self.n_sample_chunks = 2
+        self.kd_hidden = kd_hidden
+        self.kd_only_hidden = kd_only_hidden
+
+        self.teacher_hidden_proj = None
+        if kd_hidden and teacher_dmodel != d_model:
+            self.teacher_hidden_proj = nn.Linear(d_model, teacher_dmodel, bias=False)
 
 
         if self.n_clusters > 0:
@@ -299,19 +307,19 @@ class ProjectedAdaptiveLogSoftmax(nn.Module):
 
         return nll
 
-    def forward(self, hidden, target, soft_target, current_step=0, keep_order=False):
+    def forward(self, hidden, target, soft_target, current_step=0, keep_order=False, att_mem=None, val_mem=None, t_att_mem=None, t_val_mem=None, t_hidden_mem=None):
 
         if soft_target is not None:
             nll = self._forward_std(hidden, target, True)
-            loss = self._forward_kd(hidden, target, soft_target, nll, current_step, keep_order)
-            return (nll, loss)
+            loss = self._forward_kd(hidden, target, soft_target, nll, current_step, keep_order, att_mem, val_mem, t_att_mem, t_val_mem, t_hidden_mem)
+            return (nll.detach(), loss)
         elif target is not None:
             nll = self._forward_std(hidden, target, keep_order)
             return (nll, nll)
         else:
             return self._foward_proba(hidden)
 
-    def _forward_kd(self, hidden, target, soft_target, nll, current_step, keep_order=False):
+    def _forward_kd(self, hidden, target, soft_target, nll, current_step, keep_order=False, att_mem=None, val_mem=None, t_att_mem=None, t_val_mem=None, t_hidden_mem=None):
         '''
             hidden :: [len*bsz x d_proj]
             target :: [len*bsz]
@@ -349,14 +357,58 @@ class ProjectedAdaptiveLogSoftmax(nn.Module):
                 biases.append(bias_i)
 
 
+            if self.kd_annealing:
+                annealing_hard_min = 0.5
+                annealing_hard_max = 0.95
+                hard_ratio = annealing_hard_min + min(1, current_step / self.max_step) * (annealing_hard_max - annealing_hard_min)
+                self.kd_alpha = 1.0 - hard_ratio
+
+            if self.kd_hidden:
+                t_hidden_mem = t_hidden_mem.detach().view(-1, t_hidden_mem.size(-1))
+                if self.teacher_hidden_proj is not None:
+                    hidden_proj = self.teacher_hidden_proj(hidden)
+                
+                mse = F.mse_loss(hidden_proj, t_hidden_mem) * 12
+                if self.kd_only_hidden:
+                    return mse
+
+                return mse * self.kd_alpha + nll.mean() * (1.0 - self.kd_alpha)
+
             n_sample_chunks = self.n_sample_chunks
             n_samples = hidden.size(0)
             chunk_sizes = [n_samples // n_sample_chunks] * n_sample_chunks
             chunk_sizes[-1] += n_samples % n_sample_chunks
             chunk_offset = 0
 
+            if att_mem is not None:
+                bsz, nhead, qlen, klen = att_mem.shape
+                vbsz, vnhead, vqlen, vklen = val_mem.shape
+
+                att_mem = att_mem.view(-1, klen)
+                att_kl_div = F.kl_div(torch.log(att_mem + 1e-6), t_att_mem.detach().view(-1, klen), reduction='none')
+                att_kl_div = torch.sum(att_kl_div, dim=1)
+                att_kl_div = att_kl_div.view((bsz, nhead, qlen))
+                att_kl_div = torch.mean(att_kl_div, dim=1).view(-1)
+
+
+                val_mem = val_mem.view(-1, vklen)
+                val_kl_div = F.kl_div(torch.log(val_mem + 1e-6), t_val_mem.detach().view(-1, vklen), reduction='none')
+                val_kl_div = torch.sum(val_kl_div, dim=1)
+                val_kl_div = val_kl_div.view((vbsz, vnhead, vqlen))
+                val_kl_div = torch.mean(val_kl_div, dim=1).view(-1)
+
+                if self.kd_only_topatt:
+                    t_hidden_mem = t_hidden_mem.detach().view(-1, t_hidden_mem.size(-1))
+                    if self.teacher_hidden_proj is not None:
+                        hidden_proj = self.teacher_hidden_proj(hidden)
+                    
+                    mse = F.mse_loss(hidden_proj, t_hidden_mem) * 35
+                    return att_kl_div.mean() + val_kl_div.mean() + mse
+
+                return (att_kl_div.mean() + val_kl_div.mean()) * self.kd_alpha + nll.mean() * (1.0 - self.kd_alpha)
+
             # nll = torch.zeros_like(target, dtype=hidden.dtype, device=hidden.device)
-            loss = torch.zeros_like(target, dtype=hidden.dtype, device=hidden.device)
+            sl_loss = torch.zeros_like(target, dtype=hidden.dtype, device=hidden.device)
 
             # self.kd_temperature = 1.0
 
@@ -400,22 +452,26 @@ class ProjectedAdaptiveLogSoftmax(nn.Module):
                     inds = soft_target[1][chunk_offset:chunk_offset+chunk_size]
                     prob_kd = soft_target[0][chunk_offset:chunk_offset+chunk_size].type_as(logprob)
                     logprob_kd = logprob.gather(1, inds)
-                    # kl_div = prob_kd * (torch.log(prob_kd) - logprob_kd)
-                    kl_div = prob_kd * logprob_kd
-                    # kl_div = F.kl_div(logprob_kd, prob_kd, reduction='none')
-                    kd_loss = -torch.sum(kl_div, dim=1)
-                    if self.kd_annealing:
-                        annealing_hard_min = 0.5
-                        annealing_hard_max = 0.95
-                        hard_ratio = annealing_hard_min + min(1, current_step / self.max_step) * (annealing_hard_max - annealing_hard_min)
-                        self.kd_alpha = 1.0 - hard_ratio
-                    loss[chunk_offset:chunk_offset+chunk_size] = self.kd_alpha * kd_loss * (self.kd_temperature*self.kd_temperature) + (nll_chunk * (1 - self.kd_alpha))
+
+                    # KL Div
+                    if self.kd_temperature > 1.0:
+                        kl_div = F.kl_div(logprob_kd, prob_kd, reduction='none')
+                        kd_loss = torch.sum(kl_div, dim=1)
+                    #Cross Entropy
+                    else:
+                        kl_div = prob_kd * logprob_kd
+                        kd_loss = -torch.sum(kl_div, dim=1)
+
+                    sl_loss[chunk_offset:chunk_offset+chunk_size] = kd_loss
                 else:
-                    loss[chunk_offset:chunk_offset+chunk_size] = nll_chunk
+                    sl_loss[chunk_offset:chunk_offset+chunk_size] = nll_chunk
+
+                # loss[chunk_offset:chunk_offset+chunk_size] = att_kl_div[chunk_offset:chunk_offset+chunk_size] + val_kl_div[chunk_offset:chunk_offset+chunk_size]
+                # loss[chunk_offset:chunk_offset+chunk_size] = att_kl_div[chunk_offset:chunk_offset+chunk_size]
 
                 chunk_offset += chunk_size
 
-        return loss
+        return self.kd_alpha * sl_loss.mean() * (self.kd_temperature*self.kd_temperature) + (nll.mean() * (1 - self.kd_alpha))
 
 
     def _forward_kd2(self, hidden, target, soft_target, current_step, keep_order=False):
