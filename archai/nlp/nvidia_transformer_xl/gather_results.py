@@ -235,7 +235,7 @@ def get_config_name(job):
     job = job[idx:]
     config_name = job.split('/')[0]
     return config_name + '_' + job.split('/')[1]
-  elif 'evo_search' in job:
+  elif 'evo_search' in job or 'midevolution' in job:
     return job
   else:
     return re.search('(config_[0-9]+)', job).group(1)

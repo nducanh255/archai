@@ -37,7 +37,175 @@ def get_args(config, config_file, max_step, experiment_name, scheduler):
     with open(config_file_path) as f:
         config_from_yaml = yaml.load(f, Loader=yaml.FullLoader)[config]['train']
 
-    parser = argparse.ArgumentParser()
+    parent_parser = argparse.ArgumentParser(
+        description='PyTorch Transformer-XL Language Model',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        add_help=False,
+        )
+    parser = argparse.ArgumentParser(parents=[parent_parser], add_help=True)
+    
+    general = parser.add_argument_group('general setup')
+    general.add_argument('--work_dir', default='~/logdir', type=str,
+                         help='Directory for the results')
+    general.add_argument('--experiment_name', default='nv_xformer_xl', type=str,
+                         help='Directory for the results')
+    general.add_argument('--append_dataset', action='store_true',
+                         help='Automatically append dataset name to work_dir')
+    general.add_argument('--append_time', action='store_true',
+                         help='Automatically append current time to work_dir')
+    general.add_argument('--cuda', action='store_true',
+                         help='Run training on a GPU using CUDA')
+    general.add_argument('--fp16', action='store_true',
+                         help='Run training in fp16/mixed precision')
+    general.add_argument('--restart', type=str, default='',
+                         help='Restart training from the saved checkpoint')
+    general.add_argument('--debug', action='store_true', default=None,
+                         help='Run in debug mode (do not create exp dir)')
+    general.add_argument('--log_all_ranks', action='store_true',
+                         help='Enable logging from all distributed ranks')
+    general.add_argument('--dllog_file', type=str, default='train_log.json',
+                         help='Name of the DLLogger output file')
+    general.add_argument('--txtlog_file', type=str, default='train_log.log',
+                         help='Name of the txt log file')
+    general.add_argument('--save_all', action='store_true',
+                         help='Save all checkpoints')
+    general.add_argument('--no_env', action='store_false',
+                         help='Do not print info on execution env')
+    general.add_argument('--no_eval', action='store_true',
+                         help='Disable model evaluation')
+    general.add_argument('--log_interval', type=int, default=10,
+                         help='Report interval')
+    general.add_argument('--target_throughput', type=float, default=None,
+                         help='Target training throughput (for benchmarking)')
+    general.add_argument('--target_perplexity', type=float, default=None,
+                         help='Target validation perplexity (for benchmarking)')
+    general.add_argument('--apex_amp_opt_level', type=str, default='O2',
+                         choices=['O0', 'O1', 'O2', 'O3'],
+                         help='Optimization level for apex amp')
+    general.add_argument('--amp', choices=['apex', 'pytorch'], default='apex',
+                         help='Implementation of automatic mixed precision')
+    general.add_argument('--affinity', type=str,
+                         default='socket_unique_interleaved',
+                         choices=['socket', 'single', 'single_unique',
+                                  'socket_unique_interleaved',
+                                  'socket_unique_continuous',
+                                  'disabled'],
+                         help='type of CPU affinity')
+    general.add_argument('--get_params', action='store_true',
+                         help='Get parameter breakdown for different layers')
+
+    dataset = parser.add_argument_group('dataset setup')
+    dataset.add_argument('--data', type=str, default=None,
+                         help='Location of the data corpus')
+    dataset.add_argument('--dataset', type=str, default='wt103',
+                         choices=['wt103', 'wt2', 'lm1b', 'enwik8', 'text8'],
+                         help='Dataset name')
+    dataset.add_argument('--vocab', type=str, default='word', choices=['word', 'bpe'],
+                         help='Type of vocabulary')
+    dataset.add_argument('--vocab_size', type=int, default=None,
+                         help='Size of vocabulary')
+
+    model = parser.add_argument_group('model setup - defaults are for base model')
+    model.add_argument('--init', default='normal', type=str,
+                       help='Parameter initializer to use')
+    model.add_argument('--emb_init', default='normal', type=str,
+                       help='Parameter initializer to use')
+    model.add_argument('--init_range', type=float, default=0.1,
+                       help='Parameters initialized by U(-init_range, init_range)')
+    model.add_argument('--emb_init_range', type=float, default=0.01,
+                       help='Parameters initialized by U(-init_range, init_range)')
+    model.add_argument('--init_std', type=float, default=0.02,
+                       help='Parameters initialized by N(0, init_std)')
+    model.add_argument('--proj_init_std', type=float, default=0.01,
+                       help='Parameters initialized by N(0, init_std)')
+
+    opt = parser.add_argument_group('optimizer setup')
+    opt.add_argument('--optim', default='jitlamb', type=str,
+                     choices=['adam', 'sgd', 'adagrad', 'lamb', 'jitlamb'],
+                     help='Optimizer to use')
+    opt.add_argument('--lr', type=float, default=0.01,
+                     help='Initial learning rate')
+    opt.add_argument('--mom', type=float, default=0.0,
+                     help='Momentum for sgd')
+    opt.add_argument('--scheduler', default='cosine', type=str,
+                     choices=['cosine', 'inv_sqrt', 'dev_perf', 'constant'],
+                     help='LR scheduler to use')
+    opt.add_argument('--max_step_scheduler', type=int, default=None,
+                     help='Max number of training steps for LR scheduler')
+    opt.add_argument('--warmup_step', type=int, default=1000,
+                     help='Number of iterations for LR warmup')
+    opt.add_argument('--decay_rate', type=float, default=0.5,
+                     help='Decay factor when ReduceLROnPlateau is used')
+    opt.add_argument('--lr_min', type=float, default=0.0,
+                     help='Minimum learning rate during annealing')
+    opt.add_argument('--clip', type=float, default=0.25,
+                     help='Gradient clipping')
+    opt.add_argument('--weight_decay', type=float, default=0.0,
+                     help='Weight decay for adam|lamb')
+    opt.add_argument('--clip_nonemb', action='store_true',
+                     help='Only clip the gradient of non-embedding params')
+    opt.add_argument('--patience', type=int, default=0,
+                     help='Patience')
+    opt.add_argument('--eta_min', type=float, default=0.001,
+                     help='Min learning rate for cosine scheduler')
+
+    training = parser.add_argument_group('training setup')
+    training.add_argument('--max_step', type=int, default=40000,
+                          help='Max number of training steps')
+    training.add_argument('--batch_size', type=int, default=256,
+                          help='Global batch size')
+    training.add_argument('--local_batch_size', type=int, default=None,
+                          help='Local (per-device) batch size, this setting \
+                          overrides global --batch_size and sets batch_size \
+                          to local_batch_size * world_size')
+    training.add_argument('--batch_chunk', type=int, default=1,
+                          help='Split batch into chunks and train with '
+                          'gradient accumulation. 16GB V100 FP16 requires 1 chunk, FP32 requires 2 chunks')
+    training.add_argument('--roll', action='store_true',
+                          help='Enable random shifts within each data stream')
+    training.add_argument('--tgt_len', type=int, default=192,
+                          help='Number of tokens to predict')
+    training.add_argument('--ext_len', type=int, default=0,
+                          help='Length of the extended context')
+    training.add_argument('--mem_len', type=int, default=192,
+                          help='Length of the retained previous heads, number of tokens cached from previous iterations during training')
+    training.add_argument('--seed', type=int, default=1111,
+                          help='Random seed')
+    training.add_argument('--multi_gpu', default=None, type=str,
+                          choices=['ddp', 'dp'],
+                          help='Use multiple GPU')
+    training.add_argument('--gpu0_bsz', type=int, default=-1,
+                          help='Batch size on gpu 0 (for "dp" backend)')
+    training.add_argument('--same_length', action='store_true',
+                          help='Use the same attn length for all tokens')
+    training.add_argument('--varlen', action='store_true',
+                          help='Use variable length')
+    training.add_argument('--swap_mem', action='store_true',
+                          help='Swap memory tensors to cpu')
+
+    val = parser.add_argument_group('validation setup')
+    val.add_argument('--eval_tgt_len', type=int, default=192,
+                     help='Number of tokens to predict for evaluation')
+    val.add_argument('--eval_batch_size', type=int, default=16,
+                     help='Eval batch size')
+    val.add_argument('--eval_max_steps', type=int, default=-1,
+                     help='Max eval steps')
+    val.add_argument('--eval_interval', type=int, default=5000,
+                     help='Evaluation interval')
+
+    fear = parser.add_argument_group('FEAR setup')
+    fear.add_argument('--ppl_threshold', type=lambda s: [float(item) for item in s.split(',')], default=None,
+                        help='Delimited list of perplexity thresholds for extracting the FEAR checkpoint')
+    fear.add_argument('--use_train', action='store_true',
+                          help='Use training ppl for extracting FEAR checkpoint, if not selected, uses validation ppl')
+    fear.add_argument('--fear_terminate', action='store_true',
+                          help='Terminate training after extracting the FEAR checkpoint')
+
+    dist = parser.add_argument_group('distributed setup')
+    dist.add_argument('--local_rank',  type=int,
+                      default=os.getenv('LOCAL_RANK', 0),
+                      help='Used for multi-process training.')
+
     parser.set_defaults(**config_from_yaml)
     args, _ = parser.parse_known_args()
     if args.ppl_threshold:
@@ -46,11 +214,6 @@ def get_args(config, config_file, max_step, experiment_name, scheduler):
     args.max_step = max_step
     args.experiment_name = experiment_name
     args.scheduler = scheduler
-
-    args.tied = not args.not_tied
-
-    if args.d_embed < 0:
-        args.d_embed = args.d_model
 
     if args.ext_len < 0:
         raise RuntimeError('Extended context length must be non-negative')
@@ -79,11 +242,6 @@ def get_args(config, config_file, max_step, experiment_name, scheduler):
 
     if args.debug is None:
         args.debug = utils.is_debugging()
-
-    if len(args.n_head)==1:
-        args.n_head = args.n_head[0]
-        args.d_head = args.d_head[0]
-        args.d_inner = args.d_inner[0]
 
     return args
 
@@ -323,7 +481,7 @@ def train_iteration(model, i, mems, data_chunks, target_chunks, scaler,
     return train_loss
 
 
-def train(tr_iter, va_iter, model, para_model, model_config, optimizer,
+def train(tr_iter, va_iter, model, para_model, optimizer,
           optimizer_sparse, scheduler, scheduler_sparse, scaler, vocab, epoch,
           last_batch, last_iter, train_step, best_val_loss, meters,
           device, args, fear_activated=0):
@@ -421,7 +579,7 @@ def train(tr_iter, va_iter, model, para_model, model_config, optimizer,
             meters['train_throughput'].update(throughput)
             target_tokens = 0
 
-            log_str = '| epoch {:3d} step {:>8d} | batches {:>6d} / {:d} | lr {:.3e} ' \
+            print('| epoch {:3d} step {:>8d} | batches {:>6d} / {:d} | lr {:.3e} ' \
                 '| ms/batch {:5.1f} | tok/s {:7.0f} | loss {:5.2f}'.format(
                     epoch,
                     train_step,
@@ -431,26 +589,7 @@ def train(tr_iter, va_iter, model, para_model, model_config, optimizer,
                     avg_elapsed * 1000,
                     throughput,
                     cur_loss,
-                    )
-
-            dllogger_data = {
-                'epoch': epoch,
-                'train_batch': batch+1,
-                'lr': lr,
-                'train_time/batch': avg_elapsed * 1000,
-                'train_throughput': throughput,
-                'train_loss': cur_loss,
-                }
-
-            if args.dataset in ['enwik8', 'text8']:
-                log_str += ' | bpc {:9.5f}'.format(cur_loss / math.log(2))
-                dllogger_data['train_bits_per_character'] = cur_loss / math.log(2)
-            else:
-                log_str += ' | ppl {:9.2f}'.format(math.exp(cur_loss))
-                dllogger_data['train_perplexity'] = math.exp(cur_loss)
-
-            logging.info(log_str)
-            dllogger.log(step=tuple([train_step]), data=dllogger_data)
+                    ))
 
             if args.ppl_threshold is not None and len(args.ppl_threshold): # check to see if fear is enabled
                 if args.use_train:
@@ -461,27 +600,6 @@ def train(tr_iter, va_iter, model, para_model, model_config, optimizer,
                     val_loss = nv_distributed.all_reduce_item(val_loss, op='mean')
                     curr_ppl = math.exp(val_loss)
 
-                if curr_ppl <= args.ppl_threshold[0] and not fear_activated:
-                    logging.info('-' * 100)
-                    log_str = ' Saving FEAR checkpoint at {} ppl {:9.2f}'.format('train' if args.use_train else 'val', curr_ppl)
-                    logging.info(log_str)
-                    logging.info('-' * 100)
-
-                    save_checkpoint(args, model, model_config, optimizer, scheduler,
-                            scaler, vocab, epoch, batch, last_iter,
-                            train_step, best_val_loss, is_best=False,
-                            work_dir=args.work_dir, is_fear=True, ppl_threshold=args.ppl_threshold[0])
-
-                    args.ppl_threshold.pop(0)
-                    if len(args.ppl_threshold)==0:   # if there are no more perplexity thresholds, terminate fear stage 1
-                        fear_activated = 1
-
-                # stop training
-                if args.fear_terminate and fear_activated:
-                    log_str = 'Terminating training for FEAR Stage 1'
-                    logging.info(log_str)
-                    break
-
         do_periodic_eval = train_step % args.eval_interval == 0
         is_final_step = train_step == args.max_step
         interrupted = False #timeout_handler.interrupted
@@ -491,29 +609,9 @@ def train(tr_iter, va_iter, model, para_model, model_config, optimizer,
             val_loss = evaluate(va_iter, model, args)
             val_loss = nv_distributed.all_reduce_item(val_loss, op='mean')
 
-            logging.info('-' * 100)
-            log_str = '| Eval {:3d} at step {:>8d} | time: {:5.2f}s ' \
-                      '| valid loss {:5.2f}'.format(
+            print('| Eval {:3d} at step {:>8d} | time: {:5.2f}s | valid loss {:5.2f}'.format(
                           train_step // args.eval_interval,
-                          train_step,
-                          (time.time() - eval_start_time),
-                          val_loss,
-                          )
-
-            dllogger_data = {
-                'valid_elapsed': (time.time() - eval_start_time),
-                'valid_loss': val_loss,
-                }
-
-            if args.dataset in ['enwik8', 'text8']:
-                log_str += ' | bpc {:9.5f}'.format(val_loss / math.log(2))
-                dllogger_data['valid_bits_per_character'] = val_loss / math.log(2)
-            else:
-                log_str += ' | valid ppl {:9.3f}'.format(math.exp(val_loss))
-                dllogger_data['valid_perplexity'] = math.exp(val_loss)
-            logging.info(log_str)
-            logging.info('-' * 100)
-            dllogger.log(step=tuple([train_step]), data=dllogger_data)
+                          train_step, (time.time() - eval_start_time), val_loss,))
 
             last_iter = tr_iter.last_iter
 
@@ -522,11 +620,6 @@ def train(tr_iter, va_iter, model, para_model, model_config, optimizer,
             if not best_val_loss or val_loss < best_val_loss:
                 best_val_loss = val_loss
                 is_best = True
-
-            save_checkpoint(args, model, model_config, optimizer, scheduler,
-                            scaler, vocab, epoch, batch, last_iter,
-                            train_step, best_val_loss, is_best,
-                            args.work_dir)
 
             # dev-performance based learning rate annealing
             if args.scheduler == 'dev_perf':
@@ -538,7 +631,7 @@ def train(tr_iter, va_iter, model, para_model, model_config, optimizer,
             log_start_time += time.time() - eval_start_time
         
         if interrupted:
-            logging.info(f'Received SIGTERM, exiting')
+            print(f'Received SIGTERM, exiting')
             sys.exit(0)
 
         if is_final_step:
@@ -760,12 +853,13 @@ def train_during_evolution(model, config, config_file, max_step, experiment_name
     # At any point you can hit Ctrl + C to break out of training early.
     start_time = time.time()
     fear_activated = 0
+    print('here', device)
     try:
         for epoch in itertools.count(start=start_epoch):
             if args.roll: # enable random shifts in datasets
                 tr_iter.roll(seed=args.seed + epoch)
             train_step, best_val_loss, fear_activated = train(
-                                            tr_iter, va_iter, model, para_model, model_config,
+                                            tr_iter, va_iter, model, para_model,
                                             optimizer, optimizer_sparse, scheduler,
                                             scheduler_sparse, scaler, vocab, epoch, last_batch,
                                             last_iter, train_step, best_val_loss, meters,

@@ -192,7 +192,7 @@ if __name__ == "__main__":
         print(f'Loading checkpoint from {path}')
         checkpoint = torch.load(os.path.join(path, 'checkpoint_best.pt'))#, map_location=dst)
         if isinstance(model, MemTransformerLM_flex):
-          for key in ['r_w_bias', 'r_r_bias']:   # To Do: only support for attention_type=0 now
+          for key in ['r_w_bias', 'r_r_bias']:   # TODO: only support for attention_type=0 now
             for i in range(model.n_layer):
               if f'{key}_{i}' not in checkpoint['model_state'].keys():
                 checkpoint['model_state'][f'{key}_{i}'] = torch.Tensor(model.n_heads[i], model.d_heads[i]).zero_()

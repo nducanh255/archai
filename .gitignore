@@ -115,3 +115,7 @@ model.th
 *.html
 
 evo_search/
+onnx_models/
+amlt_logs/
+
+onnxruntime_profile_*

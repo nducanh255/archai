@@ -6,12 +6,16 @@ import copy
 import imageio
 import yaml
 import time
+import types
 import numpy as np
 import matplotlib.pyplot as plt
+
+import torch
 
 from archai.nlp.nvidia_transformer_xl.utils import get_model, process_parameters, get_latency
 from archai.nlp.nvidia_transformer_xl.generate_archs import gather_results
 from archai.nlp.nvidia_transformer_xl.train_evolution import train_during_evolution
+from archai.nlp.nvidia_transformer_xl.mem_transformer import forward_predict_memtransformer, predict
 
 
 model_config_defaults = {'d_head': None, 'n_token': 267736, 'dropout': 0.1, 'dropatt': 0.0, \
@@ -114,7 +118,7 @@ class Evolution(object):
                 n_layer_choice=[5,6,7,8], d_model_choice=[64,128,256,512], d_inner_choice=list(range(512, 2048, 50)), n_head_choice=[2,4,8],
                 param_constraint=4e6, latency_scale=1., n_threads=1, latency_repeat=5, **kwargs):
         
-        self.results_path = os.path.join(results_path, 'param_threshold_{}'.format(param_constraint))
+        self.results_path = results_path
         os.makedirs(self.results_path, exist_ok=True)
         
         self.population_size = population_size
@@ -139,7 +143,7 @@ class Evolution(object):
         self.latency_repeat = latency_repeat # number of runs for mean latency computation
         
         self.best_config = None
-        self.pareto = {'population':[], 'params':[], 'latencies':[]}
+        self.pareto = {'population':[], 'scores':[], 'params':[], 'latencies':[]}
         self.all_population = []
         self.all_scores = []
         self.all_params = []
@@ -147,7 +151,7 @@ class Evolution(object):
 
         self.counts = {}
 
-    def run_evo_search(self, pareto_search=False, eps=None, use_convex_hull=False, start_train=0, config='dgx1_1gpu_fp32', config_file='wt103_base.yaml', 
+    def run_evo_search(self, pareto_search=False, eps=None, use_convex_hull=False, start_train=0, train_local=False, gpu_config='dgx1_1gpu_fp32', config_file='wt103_base.yaml', 
                         max_step=500, experiment_name='evolution', scheduler='constant', use_valid=True, **kwargs):
         
         # if pareto_search is Flase, only searches in the vicinity of the maximum score seen
@@ -166,16 +170,29 @@ class Evolution(object):
         parents_latencies = []
         for i in range(self.n_iter):
             idx = 0 if i==0 else self.parent_size
-            
             print(f"| Start Iteration {i}:")
+            
             do_train = True if (i >= start_train) else False
-            population_scores_unseen, population_params_unseen, population_latencies_unseen = self.get_scores(population[idx:], do_train, config, config_file, max_step, 
+            if do_train and i==start_train:
+                idx = 0
+                parents_score = []
+                parents_params = []
+                parents_latencies = []
+                
+                self.all_population = population
+                self.all_scores = []
+                self.all_params = []
+                self.all_latencies = []
+
+            population_scores_unseen, population_params_unseen, population_latencies_unseen = self.get_scores(population[idx:], do_train, train_local, gpu_config, config_file, max_step, 
                                                                                                                 experiment_name, scheduler, use_valid)
             population_scores = parents_score + population_scores_unseen
             population_params = parents_params + population_params_unseen
             population_latencies = parents_latencies + population_latencies_unseen
             assert len(population_scores)==self.population_size
             print(f"| Iteration {i}, Max score: {max(population_scores)}")
+
+            exit()
 
             self.all_scores += population_scores_unseen
             self.all_params += population_params_unseen
@@ -231,12 +248,17 @@ class Evolution(object):
             logs['best_config'].append(copy.deepcopy(self.best_config))
             logs['pareto'].append(copy.deepcopy(self.pareto))
 
+            path_to_pkl = os.path.join(self.results_path, f'logs_itr{i}.pkl')
+            with open(path_to_pkl, 'wb') as f:
+                pickle.dump({'population':logs['population'][-1], 'params':logs['params'][-1], 'latencies':logs['latencies'][-1], 'parents':logs['parents'][-1], \
+                'parents_scores':logs['parents_scores'][-1], 'best_config':logs['best_config'][-1], 'pareto':logs['pareto'][-1]}, f)
+
             population = parents_population + mutate_population + crossover_population
             self.update_counts(population)
 
             self.all_population += mutate_population + crossover_population
 
-            self.plot_samples(iter=i, parents={'params':parents_params, 'latencies':parents_latencies})
+            self.plot_samples(iter=i, parents={'params':parents_params, 'latencies':parents_latencies}, from_training=do_train)
 
         path_to_pkl = os.path.join(self.results_path, 'logs.pkl')
         with open(path_to_pkl, 'wb') as f:
@@ -271,30 +293,65 @@ class Evolution(object):
 
         return mutated_gene
   
-    def get_scores(self, genes, do_train=False, config='dgx1_1gpu_fp32', config_file='wt103_base.yaml', 
-                    max_step=500, experiment_name='evolution', scheduler='constant', use_valid=True):
+    def get_scores(self, genes, do_train=False, train_local=False, gpu_config='dgx1_1gpu_fp32', config_file='wt103_base.yaml', 
+                    max_step=500, experiment_name='evolution', scheduler='constant', use_valid=True, start_config=0):
         configs = []
         for gene in genes:
             configs.append(self.converter.gene2config(gene))
 
+        configs_from_jobs = None
+        if do_train and not train_local:
+            t0 = time.time()
+            bundle_count = (self.population_size // 4) + 1  #distributes training over 4 jobs
+            exp_name, bash_fname, n_configs = create_jobs(configs, start_config, bundle_count=bundle_count, max_step=max_step, n_gpus=8, gpu_config='dgx1_8gpu_fp32', target='NLX-NDv2')
+            # os.system(f'bash {bash_fname}')
+
+            # time.sleep(60)
+            # check_job_status(exp_name, n_configs, start_config)
+            # print('####################', n_configs)
+
+            # TODO: stall here until the jobs are done
+            path_to_results = './amlt_logs'
+            os.makedirs(path_to_results, exist_ok=True)
+            command = 'amlt results {} -I "*.json"  -o {} --no-md5'.format(exp_name, path_to_results)
+            os.system(command)
+            command = 'amlt results {} -I "*.yaml"  -o {} --no-md5'.format(exp_name, path_to_results)
+            os.system(command)
+            val_ppls, configs_from_jobs = gather_amulet_results(len(genes), exp_name, path_to_results, bundle_count, n_configs, start_config)
+            t1 = time.time()
+            train_time = t1-t0
+
         scores = []
-        params = []
+        if do_train and not train_local:
+            params = copy.deepcopy((val_ppls*-1).tolist())
+        else:
+            params = []
         latencies = []
         avg_time = []
         for i, config in enumerate(configs):
             model_config = copy.deepcopy(model_config_defaults)
             model_config.update(config)
-            model = get_model(model_config)
+            model = get_model(model_config, train=(do_train and train_local))
+
+            if configs_from_jobs is not None:
+                print('checking trained models match with the population')
+                for k, v in config.items():
+                    assert v==configs_from_jobs[i][k]
             
             if do_train:
-                t0 = time.time()
-                summary = train_during_evolution(model, config, config_file, max_step, experiment_name, scheduler)
-                t1 = time.time()
-                avg_time.append(t1-t0)
+                if train_local:
+                    t0 = time.time()
+                    summary = train_during_evolution(model, gpu_config, config_file, max_step, experiment_name, scheduler)
+                    t1 = time.time()
+                    avg_time.append(t1-t0)
 
-                key = 'valid_perplexity' if use_valid else 'test_perplexity'
-                params.append(-summary[key])
-
+                    key = 'valid_perplexity' if use_valid else 'test_perplexity'
+                    params.append(-summary[key])
+                    
+                    model.forward = types.MethodType(forward_predict_memtransformer, model)
+                    model.crit.forward = types.MethodType(predict, model.crit)
+                    model = model.to(device='cpu')
+                    model.eval()
             else:
                 curr_n_all_param, _, _, params_attention, params_ff = process_parameters(model, verbose=False)
                 params.append(params_attention + params_ff)
@@ -303,14 +360,19 @@ class Evolution(object):
             latencies.append(latency)
 
             if do_train:
-                print('average time for training samples was %.2f' % np.mean(avg_time))
-                score = -(summary[key]*1./self.max_val_ppl) - (latency*1./self.max_latency) * self.latency_scale
+                score = (params[i]*1./self.max_val_ppl) - (latency*1./self.max_latency) * self.latency_scale
+                print('indvidual %d -> ppl: %d, latency: %.4f, score: %.4f' % (i, -params[i], latency, score))
             else:
                 score = ((params_attention + params_ff)*1./self.max_n_params) - (latency*1./self.max_latency) * self.latency_scale
+                print('indvidual %d -> params: %d, latency: %.4f, score: %.4f' % (i, params_attention+params_ff, latency, score))
             
             scores.append(score)
-            print('indvidual %d -> params: %d, latency: %.4f, score: %.4f' % (i, params_attention+params_ff, latency, score))
-
+        
+        if do_train and train_local:
+            train_time = np.mean(avg_time)
+        if do_train:
+            print('average time for training samples was %.2fs' % train_time)
+        
         return scores, params, latencies
   
     def satisfy_constraints(self, gene):
@@ -348,7 +410,7 @@ class Evolution(object):
 
         return popu
 
-    def semi_brute_force(self, nsamples, batch=1000, eps=None, use_convex_hull=False, do_train=False, config='dgx1_1gpu_fp32', config_file='wt103_base.yaml', 
+    def semi_brute_force(self, nsamples, batch=1000, eps=None, use_convex_hull=False, do_train=False, train_local=False, gpu_config='dgx1_1gpu_fp32', config_file='wt103_base.yaml', 
                         max_step=500, experiment_name='evolution', scheduler='constant', use_valid=True, **kwargs):
 
         path_to_population = os.path.join(self.results_path, 'init_population_bruteforce.pkl')
@@ -364,7 +426,7 @@ class Evolution(object):
         population_scores = []
         for idx in range(0, nsamples, batch):
             curr_population = population[idx:idx+batch]
-            curr_population_scores, curr_population_params, curr_population_latencies = self.get_scores(curr_population, do_train, config, config_file, max_step, 
+            curr_population_scores, curr_population_params, curr_population_latencies = self.get_scores(curr_population, do_train, train_local, gpu_config, config_file, max_step, 
                                                                                                         experiment_name, scheduler, use_valid)
             population_scores += curr_population_scores
 
@@ -380,7 +442,7 @@ class Evolution(object):
             print(f"| Config for highest score model: {self.best_config}")
             print(f"| nParams for highest score model: {self.best_param}")
             print(f"| Latency for highest score model: {self.best_latency}")
-            self.plot_samples()
+            self.plot_samples(from_training=do_train)
             
             logs = {'population':population, 'params':curr_population_params, 'latencies':curr_population_latencies, 'scores':curr_population_scores, 'pareto':self.pareto}
 
@@ -397,7 +459,7 @@ class Evolution(object):
         print(f"| Config for highest score model: {self.best_config}")
         print(f"| nParams for highest score model: {self.best_param}")
         print(f"| Latency for highest score model: {self.best_latency}")
-        self.plot_samples()
+        self.plot_samples(from_training=do_train)
         self.update_pareto_front(eps, allow_decrease=True, use_convex_hull=use_convex_hull)
         
     def profile(self):
@@ -417,6 +479,8 @@ class Evolution(object):
         return
 
     def update_pareto_front(self, eps=None, allow_decrease=True, use_convex_hull=False):
+        self.pareto = {'population':[], 'scores':[], 'params':[], 'latencies':[]}
+        
         if use_convex_hull:
             xs = self.all_params
             ys = self.all_latencies
@@ -579,18 +643,45 @@ class Evolution(object):
 
         return count_weights
     
-    def plot_samples(self, iter=None, parents=None):
+    def plot_samples(self, iter=None, parents=None, from_training=False):
+        if from_training:
+            x_axis = np.asarray(self.all_latencies) * 1000.
+            x_axis_pareto = np.asarray(self.pareto['latencies']) * 1000.
+            y_axis = -np.asarray(self.all_params)
+            y_axis_pareto = -np.asarray(self.pareto['params'])
+            x_label = 'Latency (ms)'
+            y_label = 'Val ppl'
+            if self.best_config:
+                x_best = self.best_latency * 1000.
+                y_best = -self.best_param
+            if parents:
+                x_parents = np.asarray(parents['latencies']) * 1000.
+                y_parents = -np.asarray(parents['params'])
+        else:
+            x_axis = np.asarray(self.all_params)
+            x_axis_pareto = np.asarray(self.pareto['params'])
+            y_axis = np.asarray(self.all_latencies) * 1000.
+            y_axis_pareto = np.asarray(self.pareto['latencies']) * 1000.
+            x_label = 'Decoder nParams'
+            y_label = 'Latency (ms)'
+            if self.best_config:
+                x_best = self.best_param
+                y_best = self.best_latency * 1000.
+            if parents:
+                x_parents = parents['params']
+                y_parents = np.asarray(parents['latencies']) * 1000.
+        
         plt.figure()
-        plt.scatter(self.all_params, np.asarray(self.all_latencies) * 1000., s=10)
-        plt.scatter(self.pareto['params'], np.asarray(self.pareto['latencies']) * 1000., s=10)
+        plt.scatter(x_axis, y_axis, s=10)
+        plt.scatter(x_axis_pareto, y_axis_pareto, s=10)
         if self.best_config:
-            plt.scatter(self.best_param, self.best_latency * 1000., c='y', s=50, marker='*', edgecolors='k', alpha=0.3)
+            plt.scatter(x_best, y_best, c='y', s=50, marker='*', edgecolors='k', alpha=0.3)
         if parents:
-            plt.scatter(parents['params'], np.asarray(parents['latencies']) * 1000., s=5, color='tab:green')
-        plt.ylabel('Latency (ms)')
-        plt.xlabel('Decoder nParams')
-        plt.ylim((70, 300))
-        plt.xlim((4.2e6, 2.6e7))
+            plt.scatter(x_parents, y_parents, s=5, color='tab:green')
+        plt.ylabel(y_label)
+        plt.xlabel(x_label)
+        # plt.ylim((70, 300))
+        # plt.xlim((4.2e6, 2.6e7))
         plt.title('Pareto Curve')
         plt.grid(axis='y')
 
@@ -637,22 +728,15 @@ def test_evo_search(args, brute_force=False):
         print(best_config)
 
         images = []
-        dir_name = 'param_threshold_{}'.format(args['param_constraint']/1e6)
-        if args['pareto_search']:
-            dir_name += '_pareto'
-        if args['use_convex_hull']:
-            dir_name += '_convex_hull'
-
-        results_path = os.path.join(args['results_path'], dir_name)
         for i in range(args['n_iter']):
-            fname = os.path.join(results_path, 'pareto_latency_iter{}.png'.format(i))
+            fname = os.path.join(args['results_path'], 'pareto_latency_iter{}.png'.format(i))
             images.append(imageio.imread(fname))
-        imageio.mimsave(os.path.join(results_path, 'search_animation.gif'), images)
+        imageio.mimsave(os.path.join(args['results_path'], 'search_animation.gif'), images)
 
 
 def test_convex_hull(args):
     alg = Evolution(**args)
-    results_path = os.path.join(args['results_path'], 'param_threshold_{}'.format(args['param_constraint']))
+    results_path = args['results_path']
 
     # random points,
     np.random.seed(0)
@@ -676,6 +760,76 @@ def test_convex_hull(args):
     plt.savefig(os.path.join(results_path, 'debug_convex_hull.png'), dpi=plt.gcf().dpi, bbox_inches='tight')
 
 
+def check_job_status(exp_name, n_configs, start_config=0):
+    pass_count = 0
+    while pass_count < n_configs:
+        print('Waiting for 1 minute before checking job status...')
+        time.sleep(60)
+
+        os.system(f'amlt status  {exp_name} > tmp.txt')
+        with open('tmp.txt', 'r') as f:
+            lines = f.readlines()
+
+        for i in range(len(lines)):
+            l = lines[i].split()
+            if len(l)==0:
+                continue
+            if ':config_' in l[0]:
+                config_idx = int(re.search(':config_([0-9]+)', l[0]).group(1))
+                print(f'checking status of job {config_idx}')
+                if (config_idx < start_config) or (config_idx >= (start_config + n_configs)):
+                    print('This job index is not in range')
+                    continue
+                if 'pass' in l:
+                    pass_count += 1
+        print(f'{pass_count} total amlt jobs finished so far.')
+
+    os.system('rm tmp.txt')
+
+
+def gather_amulet_results(population_size, exp_name, path_to_results, bundle_count, n_configs, start_config):
+    keys = []
+    for i in range(start_config, start_config + n_configs):
+        for j in range(bundle_count):
+            if len(keys)==population_size:
+                break
+            keys.append(f'config_{i}_j{j}')
+    print(keys)
+    
+    def found_all_jobs(keys, results):
+        for k in keys:
+            if k not in results.keys():
+                return False
+        return True 
+
+    results = gather_results(exp_name, path_to_results, filetypes='.json')
+    while not found_all_jobs(keys, results):
+        print(population_size)
+        time.sleep(60)
+        results = gather_results(exp_name, path_to_results, filetypes='.json')
+    configs = gather_results(exp_name, path_to_results, filetypes='.yaml')
+
+    results_this_experiment = {k:results[k] for k in keys} 
+    configs_from_jobs = {k:{'d_model':configs[k]['d_model'], 'n_layer':configs[k]['n_layer'], 'd_inner':configs[k]['d_inner'], 'n_head':configs[k]['n_head']} for k in keys}
+    
+    configs_list = []
+    val_ppls = np.zeros(population_size)
+    indices = []
+    for k, v in results_this_experiment.items():
+        config_num = int(re.search('config_([0-9]+)', k).group(1))
+        job_num = int(re.search('j([0-9]+)', k).group(1))
+        val_ppls[(config_num * bundle_count) + job_num] = v['valid_perplexity']
+        configs_list.append(configs_from_jobs[k])
+        indices.append((config_num * bundle_count) + job_num)
+
+    configs_list_sorted = []
+    for i in range(len(configs_list)):
+        idx = indices.index(i)
+        configs_list_sorted.append(configs_list[idx])
+
+    return val_ppls, configs_list_sorted
+
+
 def get_yaml_values(value):
   if isinstance(value, list):
     value_string = ''
@@ -686,7 +840,7 @@ def get_yaml_values(value):
     return value
 
 
-def get_bundle_run_command(configs, max_step, n_gpus, gpu_config, is_pareto):
+def get_bundle_run_command(configs, max_step, n_gpus, gpu_config, is_pareto=None):
   command = []
   for i, curr_config in enumerate(configs):
     curr_config['d_embed'] = curr_config['d_model']
@@ -694,7 +848,7 @@ def get_bundle_run_command(configs, max_step, n_gpus, gpu_config, is_pareto):
     for k, v in curr_config.items():
         curr_config[k] = str(get_yaml_values(v))
     
-    exp_name = 'j' + str(i) + ('_pareto' if is_pareto[i] else '')
+    exp_name = 'j' + str(i) + ('_pareto' if (is_pareto is not None and is_pareto[i]) else '')
     command.append('python -m torch.distributed.launch --nproc_per_node="%s" archai/nlp/nvidia_transformer_xl/train.py --config %s \
                   --config_file wt103_base.yaml --n_layer %s --n_head %s --d_model %s --d_head %s \
                   --d_inner %s --d_embed %s --div_val %s --max_step %d --experiment_name %s' \
@@ -704,12 +858,57 @@ def get_bundle_run_command(configs, max_step, n_gpus, gpu_config, is_pareto):
   return command
 
 
-def create_jobs(args, max_step=500, start_config=0, bundle_count=50, n_gpus=8, gpu_config='dgx1_8gpu_fp32', targets=['NLX-NDv2']):
+def create_jobs(all_population, start_config=0, bundle_count=50, max_step=500, n_gpus=8, gpu_config='dgx1_8gpu_fp32', target='NLX-NDv2', exp_name='midevolution_training_'):
+    # create corresponding yaml files for amulet jobs
+    n_configs = len(all_population)
+    c = 0
+    config_idx = start_config
+    while c < n_configs: 
+        with open('/home/t-mojanj/Projects/archaiphilly/nv_train.yaml') as file:
+            amlt_config = yaml.safe_load(file)
+            # if c==0:
+            #   pprint.pprint(amlt_config)
+
+        amlt_config['environment']['setup'] = ['set -e -o xtrace', 'pip install --user tensorboard']
+        if target=='NLX-NDV2':
+            amlt_config['environment']['image'] = 'mcr.microsoft.com/azureml/openmpi4.1.0-cuda11.0.3-cudnn8-ubuntu18.04:latest'
+            amlt_config['environment']['registry'] = 'mcr.microsoft.com'
+        else:
+            amlt_config['environment']['image'] = 'debadeepta/pytorch:1.7.0-cuda11.0-cudnn8-devel'
+        
+        del amlt_config['search']
+        amlt_config['jobs'] = [{}]
+        amlt_config['jobs'][0]['name'] = 'config_{}'.format(str(config_idx))
+        amlt_config['jobs'][0]['sku'] = 'G8'
+        amlt_config['jobs'][0]['command'] = ['set -e -o xtrace', 'pip install --user -e .']
+        amlt_config['jobs'][0]['command'] += get_bundle_run_command(copy.deepcopy(all_population[c:c+bundle_count]), max_step, n_gpus, gpu_config, is_pareto=None)
+
+        config_file = 'nv_train_'+str(config_idx)+'.yaml'
+        path_to_configs = os.path.join('/home/t-mojanj/Projects/archai/archai/nlp/nvidia_transformer_xl', 'configs')
+        f_name = os.path.join(path_to_configs, config_file)
+        with open(f_name, 'w') as file:
+            yaml.dump(amlt_config, file)
+
+        c += bundle_count
+        config_idx += 1
+
+    exp_name = exp_name + str(max_step)
+    bash_f_name = 'amlt_run_evolution_'+str(max_step)
+    bash_file = os.path.join(path_to_configs, bash_f_name+'.sh')
+    if os.path.exists(bash_file):
+        os.remove(bash_file)  
+    for i in range(start_config, config_idx):
+        with open(bash_file, 'a') as f:
+            f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_{}.yaml {} -t {}\n'.format(i, exp_name, target))
+
+    return exp_name, bash_file, config_idx-start_config
+
+
+def submit_gt_jobs(args, max_step=500, start_config=0, bundle_count=50, n_gpus=8, gpu_config='dgx1_8gpu_fp32', targets=['NLX-NDv2']):
     # get amlt bash files for running all jobs to get the ground-truth Pareto
     alg = Evolution(**args)
 
-    # results_path = os.path.join(args['results_path'], 'param_threshold_{}'.format(args['param_constraint']))
-    results_path = os.path.join(args['results_path'], 'param_threshold_5000000_D3_V2')
+    results_path = args['results_path']
     path_to_logs = os.path.join(results_path, 'logs.pkl')
     with open(path_to_logs, 'rb') as f:
         logs = pickle.load(f)
@@ -753,43 +952,7 @@ def create_jobs(args, max_step=500, start_config=0, bundle_count=50, n_gpus=8, g
     with open(path_to_pkl, 'wb') as f:
         pickle.dump(all_latencies, f)
     
-    # create corresponding yaml files for amulet jobs
-    n_configs = len(all_population)
-    c = 0
-    config_idx = start_config
-    while c < n_configs: 
-        with open('/home/t-mojanj/Projects/archaiphilly/nv_train.yaml') as file:
-            amlt_config = yaml.safe_load(file)
-            # if c==0:
-            #   pprint.pprint(amlt_config)
-
-        amlt_config['environment']['setup'] = ['set -e -o xtrace', 'pip install --user tensorboard']
-        amlt_config['environment']['image'] = 'debadeepta/pytorch:1.7.0-cuda11.0-cudnn8-devel'
-        
-        del amlt_config['search']
-        amlt_config['jobs'] = [{}]
-        amlt_config['jobs'][0]['name'] = 'config_{}'.format(str(config_idx))
-        amlt_config['jobs'][0]['sku'] = 'G8'
-        amlt_config['jobs'][0]['command'] = ['set -e -o xtrace', 'pip install --user -e .']
-        amlt_config['jobs'][0]['command'] += get_bundle_run_command(all_population[c:c+bundle_count], max_step, n_gpus, gpu_config, is_pareto[c:c+bundle_count])
-
-        config_file = 'nv_train_'+str(config_idx)+'.yaml'
-        path_to_configs = os.path.join('/home/t-mojanj/Projects/archai/archai/nlp/nvidia_transformer_xl', 'configs')
-        f_name = os.path.join(path_to_configs, config_file)
-        with open(f_name, 'w') as file:
-            yaml.dump(amlt_config, file)
-
-        c += bundle_count
-        config_idx += 1
-
-    exp_name = 'evolution_' + str(max_step)
-    f_name = 'amlt_run_evolution_'+str(max_step)
-    bash_file = os.path.join(path_to_configs, f_name+'.sh')
-    if os.path.exists(bash_file):
-        os.remove(bash_file)  
-    for i in range(start_config, config_idx):
-        with open(bash_file, 'a') as f:
-            f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_{}.yaml {} -t {}\n'.format(i, exp_name, targets[0]))
+    create_jobs(all_population, start_config, bundle_count, max_step, n_gpus, gpu_config, targets[0], exp_name='evolution_')
 
 
 def get_gt_pareto(args, exp_name, path_to_dir, start_config, eps=0.05):
@@ -797,8 +960,7 @@ def get_gt_pareto(args, exp_name, path_to_dir, start_config, eps=0.05):
     print('found %d model configurations' % len(gt_results.keys()))
 
     print('Loading the latencies from log file')
-    # results_path = os.path.join(args['results_path'], 'param_threshold_{}'.format(args['param_constraint']))
-    results_path = os.path.join(args['results_path'], 'param_threshold_5000000_D3_V2')
+    results_path = args['results_path']
     path_to_pkl = os.path.join(results_path, 'latencies.pkl')
     with open(path_to_pkl, 'rb') as f:
         latencies = pickle.load(f)
@@ -870,8 +1032,7 @@ def get_gt_pareto(args, exp_name, path_to_dir, start_config, eps=0.05):
 def get_final_pareto_front(args, eps=0.05):
     alg = Evolution(**args)
 
-    # results_path = os.path.join(args['results_path'], 'param_threshold_{}'.format(args['param_constraint']))
-    results_path = os.path.join(args['results_path'], 'param_threshold_5000000_D3_V2')
+    results_path = args['results_path']
     path_to_logs = os.path.join(results_path, 'logs.pkl')
     with open(path_to_logs, 'rb') as f:
         logs = pickle.load(f)
@@ -926,23 +1087,40 @@ def get_final_pareto_front(args, eps=0.05):
 
 
 if __name__=='__main__':
-    args = {'results_path': '/home/t-mojanj/Projects/archai/evo_search','population_size':5, 'parent_size':1, 'mutation_size':2, 'mutation_prob':0.3, 'crossover_size':2, 
-            'n_iter':1, 'n_layer_choice':[3,4,5,6,7,8], 'd_model_choice':[128, 256, 512], 'd_inner_choice':list(range(512, 2049, 50))+[2048], 'n_head_choice':[2,4,8],
+    seed = 1111
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
+
+
+    args = {'default_path': '/home/t-mojanj/Projects/archai/evo_search','population_size':5, 'parent_size':1, 'mutation_size':2, 'mutation_prob':0.3, 'crossover_size':2, 
+            'n_iter':30, 'n_layer_choice':[3,4,5,6,7,8], 'd_model_choice':[128, 256, 512], 'd_inner_choice':list(range(512, 2049, 50))+[2048], 'n_head_choice':[2,4,8],
             'param_constraint':5e6, 'latency_scale':2., 'n_threads':1, 'latency_repeat':5, 'pareto_search':True,
             ################### extracting pareto
-            'eps':0.05, 'use_conves_hull':False,
+            'eps':0.05, 'use_convex_hull':False,
             ################### brute_force
             'nsamples':20000, 'batch':1000, 'do_train':False,
-            ################### evaluation scheme
-            'start_train':False, 'config':'dgx1_1gpu_fp32', 'config_file':'wt103_base.yaml', 'max_step':500, 'experiment_name':'evolution', 
+            ################### evaluation scheme  (set start_train to bigger than n_iter to disable training for evaluation)
+            'start_train':0, 'train_local':False, 'gpu_config':'dgx1_8gpu_fp32', 'config_file':'wt103_base.yaml', 'max_step':500, 'experiment_name':'evolution', 
             'scheduler':'constant', 'use_valid':True}
+    
+    dir_name = 'param_threshold_{}'.format(args['param_constraint']/1e6)
+    if args['pareto_search']:
+        dir_name += '_pareto'
+    if args['use_convex_hull']:
+        dir_name += '_convex_hull'
+
+    # dir_name='test'
+    # args['results_path'] = os.path.join(args['default_path'], dir_name)
+    # args['results_path'] = os.path.join(args['default_path'], 'param_threshold_5000000_D3_V2')
+    args['results_path'] = os.path.join(args['default_path'], 'param_threshold_5000000.0_old_pareto')
 
     # test_converter()
     # test_convex_hull(args)
-    test_evo_search(args, brute_force=False)
-    # create_jobs(args, max_step=5000, start_config=25, bundle_count=50, n_gpus=8, gpu_config='dgx1_8gpu_fp32', targets=['NLX-NDv2'])
+    # test_evo_search(args, brute_force=False)
+    submit_gt_jobs(args, max_step=500, start_config=48, bundle_count=50, n_gpus=8, gpu_config='dgx1_8gpu_fp32', targets=['NLX-NDv2'])
     # get_final_pareto_front(args, eps=0.05)
 
     # gt_exp_name = 'evolution_500'
     # path_to_amlt_results = os.path.join('/home/t-mojanj/logdir/nv_xformer_xl/prev_jobs/', gt_exp_name)
-    # get_gt_pareto(args, exp_name=gt_exp_name, path_to_dir=path_to_amlt_results, start_config=25, eps=0.05)
+    # get_gt_pareto(args, exp_name=gt_exp_name, path_to_dir=path_to_amlt_results, start_config=0, eps=0.05)

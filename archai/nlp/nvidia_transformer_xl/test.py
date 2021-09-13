@@ -97,3 +97,5 @@ if __name__ == "__main__":
     plt.scatter(similar_indices, params_sorted[similar_indices])
     plt.xticks(similar_indices)
     plt.savefig('params.png', bbox_inches="tight")
+
+

@@ -99,15 +99,17 @@ def get_model_and_params(model_config, verbose=False):
   return curr_n_all_param, params_adaptive_embedding, params_adaptive_softmax, params_attention, params_ff
 
 
-def get_model(model_config):
+def get_model(model_config, train=False):
     if isinstance(model_config['n_head'], list) and len(model_config['n_head'])>1:
         model = MemTransformerLM_flex(**model_config)
     else:
         model = MemTransformerLM(**model_config)
-    model.forward = types.MethodType(forward_predict_memtransformer, model)
-    model.crit.forward = types.MethodType(predict, model.crit)
-    model = model.to(device='cpu')
-    model.eval()
+    
+    if not train:
+        model.forward = types.MethodType(forward_predict_memtransformer, model)
+        model.crit.forward = types.MethodType(predict, model.crit)
+        model = model.to(device='cpu')
+        model.eval()
 
     return model
 
