@@ -31,7 +31,6 @@ def train_test(conf_main:Config):
     elif "vit" in conf_trainer['model']:
         with open('confs/algos/simclr_vits.yaml', 'r') as f:
             conf_models = yaml.load(f, Loader=yaml.Loader)
-            conf_models = yaml.load(f, Loader=yaml.Loader)
     elif "densenet" in conf_trainer['model']:
         with open('confs/algos/simclr_densenets.yaml', 'r') as f:
             conf_models = yaml.load(f, Loader=yaml.Loader)
