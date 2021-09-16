@@ -1254,7 +1254,7 @@ if __name__ == '__main__':
 
         # sample run
         B = 1 # batch size
-        data_len = tgt_len
+        data_len = 8 #tgt_len
         data = torch.LongTensor(data_len*B).random_(0, args.n_token).unsqueeze(-1).to(device)
         output = model(data)
         print('Inference done')

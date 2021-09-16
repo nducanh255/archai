@@ -21,29 +21,50 @@ try:
 except ModuleNotFoundError:
     warnings.warn('APEX AMP is unavailable')
 
+
 from torch.nn.parallel import DistributedDataParallel
 
 from archai.nlp.nvidia_transformer_xl import lamb
 from archai.nlp.nvidia_transformer_xl.data_utils import get_lm_corpus
+from archai.nlp.nvidia_transformer_xl.mem_transformer import MemTransformerLM, MemTransformerLM_flex
 from archai.nlp.nvidia_transformer_xl.nvidia_utils import distributed as nv_distributed
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.data_parallel import BalancedDataParallel
 from archai.nlp.nvidia_transformer_xl.nvidia_utils import exp_utils
+# from archai.nlp.nvidia_transformer_xl.nvidia_utils import gpu_affinity
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import AverageMeter
+from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import TimeoutHandler
+from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import benchmark
+from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import create_exp_dir
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import l2_promote
+from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import log_env_info
+from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import register_ignoring_timeout_handler
 from archai.common import utils, common
 
-def get_args(config, config_file, max_step, experiment_name, scheduler):
-    config_file_path = utils.full_path(os.path.join('.', 'archai', 'nlp', 'nvidia_transformer_xl', config_file))
-    with open(config_file_path) as f:
-        config_from_yaml = yaml.load(f, Loader=yaml.FullLoader)[config]['train']
+from archai.nlp.nvidia_transformer_xl.mem_transformer import AdaptiveEmbedding, DecoderLayer, MultiHeadAttn, PositionwiseFF, ProjectedAdaptiveLogSoftmax
+from archai.nlp.nvidia_transformer_xl.utils import get_parameter_breakdown
 
+def parse_args():
     parent_parser = argparse.ArgumentParser(
         description='PyTorch Transformer-XL Language Model',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         add_help=False,
         )
+
     parser = argparse.ArgumentParser(parents=[parent_parser], add_help=True)
-    
+    cfg_parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+
+    cfg_parser.add_argument('--config', default='toy') # use 'dgx1_8gpu_fp16' for V100 16GB, dgx1_1gpu_fp16, default
+    cfg_parser.add_argument('--config_file', default='wt103_base.yaml')
+
+    config_args, _ = cfg_parser.parse_known_args()
+
+    if config_args.config is not None and config_args.config_file is not None:
+        config_file_path = utils.full_path(os.path.join('.', 'archai', 'nlp', 'nvidia_transformer_xl', config_args.config_file))
+        with open(config_file_path) as f:
+            config = yaml.load(f, Loader=yaml.FullLoader)[config_args.config]['train']
+    else:
+        config = {}
+
     general = parser.add_argument_group('general setup')
     general.add_argument('--work_dir', default='~/logdir', type=str,
                          help='Directory for the results')
@@ -106,6 +127,37 @@ def get_args(config, config_file, max_step, experiment_name, scheduler):
                          help='Size of vocabulary')
 
     model = parser.add_argument_group('model setup - defaults are for base model')
+    model.add_argument('--n_layer', type=int, default=16,
+                       help='Number of total layers')
+    model.add_argument('--n_head', type=lambda s: [int(item) for item in s.split(',')], default=[8],
+                       help='Number of heads')
+    model.add_argument('--d_head', type=lambda s: [int(item) for item in s.split(',')], default=None,
+                       help='Head dimension')
+    model.add_argument('--d_embed', type=int, default=-1, # will be set from d_model
+                       help='Embedding dimension')
+    model.add_argument('--d_model', type=int, default=512,
+                       help='Model dimension')
+    model.add_argument('--d_inner', type=lambda s: [int(item) for item in s.split(',')], default=[2048],
+                       help='Inner dimension in feedforward layer')
+    model.add_argument('--dropout', type=float, default=0.1,
+                       help='Global dropout rate')
+    model.add_argument('--dropatt', type=float, default=0.0,
+                       help='Attention probability dropout rate')
+    model.add_argument('--pre_lnorm', action='store_true',
+                       help='Apply LayerNorm to the input instead of the output')
+    model.add_argument('--attn_type', type=int, default=0,
+                       help='Attention type. 0 for ours, 1 for Shaw et al,'
+                       '2 for Vaswani et al, 3 for Al Rfou et al.')
+    model.add_argument('--not_tied', action='store_true',
+                       help='Do not tie the word embedding and softmax weights')
+    model.add_argument('--clamp_len', type=int, default=-1,
+                       help='Use the same pos embeddings after clamp_len')
+    model.add_argument('--adaptive', action='store_true',
+                       help='Use adaptive softmax')
+    model.add_argument('--div_val', type=int, default=1,
+                       help='Dividend value for adaptive input and softmax')
+    model.add_argument('--sample_softmax', type=int, default=-1,
+                       help='Number of samples in sampled softmax')
     model.add_argument('--init', default='normal', type=str,
                        help='Parameter initializer to use')
     model.add_argument('--emb_init', default='normal', type=str,
@@ -206,14 +258,15 @@ def get_args(config, config_file, max_step, experiment_name, scheduler):
                       default=os.getenv('LOCAL_RANK', 0),
                       help='Used for multi-process training.')
 
-    parser.set_defaults(**config_from_yaml)
+    parser.set_defaults(**config)
     args, _ = parser.parse_known_args()
     if args.ppl_threshold:
         args.ppl_threshold = np.sort(args.ppl_threshold)[::-1].tolist()
 
-    args.max_step = max_step
-    args.experiment_name = experiment_name
-    args.scheduler = scheduler
+    args.tied = not args.not_tied
+
+    if args.d_embed < 0:
+        args.d_embed = args.d_model
 
     if args.ext_len < 0:
         raise RuntimeError('Extended context length must be non-negative')
@@ -244,81 +297,6 @@ def get_args(config, config_file, max_step, experiment_name, scheduler):
         args.debug = utils.is_debugging()
 
     return args
-
-
-def save_checkpoint(args, model, model_config, optimizer, scheduler, scaler,
-                    vocab, epoch, batch, last_iter, train_step, best_val_loss,
-                    is_best, work_dir, is_fear=False, ppl_threshold=None):
-    if args.fp16:
-        if args.amp == 'pytorch':
-            amp_state = scaler.state_dict()
-        elif args.amp == 'apex':
-            amp_state = amp.state_dict()
-        else:
-            raise RuntimeError(f'args.amp should be pytorch or apex but was "{args.amp}"')
-    else:
-        amp_state = None
-
-    state = {
-        'args': args,
-        'model_config': model_config,
-        'model_state': model.state_dict(),
-        'optimizer_state': optimizer.state_dict(),
-        # 'scheduler_state': scheduler.state_dict(),
-        'vocab': vocab,
-        'amp_state': amp_state,
-        'epoch': epoch,
-        'batch': batch,
-        'last_iter': last_iter,
-        'train_step': train_step,
-        'best_val_loss': best_val_loss,
-        }
-    if scheduler:
-        state['scheduler_state'] = scheduler.state_dict()
-
-    # Saving intermediate checkpoint for FEAR step 1
-    if is_fear:
-        with nv_distributed.sync_workers() as rank:
-            fear_chkpt_fname = 'checkpoint_fear_threshold_'+str(ppl_threshold)+'.pt'
-            fear_chkpt_path = os.path.join(work_dir, fear_chkpt_fname)
-            if rank == 0:
-                # always save last checkpoint
-                logging.info(f'Saving checkpoint to {fear_chkpt_path}')
-                torch.save(state, fear_chkpt_path)
-    
-        return
-
-    last_chkpt_fname = 'checkpoint_last.pt'
-    with nv_distributed.sync_workers() as rank:
-        last_chkpt_path = os.path.join(work_dir, last_chkpt_fname)
-        if rank == 0:
-            # always save last checkpoint
-            logging.info(f'Saving checkpoint to {last_chkpt_path}')
-            torch.save(state, last_chkpt_path)
-
-            # save best checkpoint if better than previous best
-            if is_best:
-                best_chkpt_fname = 'checkpoint_best.pt'
-                best_chkpt_path = os.path.join(work_dir, best_chkpt_fname)
-                logging.info(f'Saving checkpoint to {best_chkpt_path}')
-                shutil.copy(last_chkpt_path, best_chkpt_path)
-
-            # save every checkpoint if save_all is true
-            if args.save_all:
-                step_chkpt_fname = f'checkpoint_{train_step}.pt'
-                step_chkpt_path = os.path.join(work_dir, step_chkpt_fname)
-                logging.info(f'Saving checkpoint to {step_chkpt_path}')
-                shutil.copy(last_chkpt_path, step_chkpt_path)
-
-
-def load_checkpoint(path):
-    if os.path.isdir(path):
-        path = os.path.join(path, 'checkpoint_last.pt')
-
-    dst = f'cuda:{torch.cuda.current_device()}'
-    logging.info(f'Loading checkpoint from {path}')
-    checkpoint = torch.load(path, map_location=dst)
-    return checkpoint
 
 
 def init_weight(weight, args):
@@ -579,7 +557,7 @@ def train(tr_iter, va_iter, model, para_model, optimizer,
             meters['train_throughput'].update(throughput)
             target_tokens = 0
 
-            print('| epoch {:3d} step {:>8d} | batches {:>6d} / {:d} | lr {:.3e} ' \
+            log_str = '| epoch {:3d} step {:>8d} | batches {:>6d} / {:d} | lr {:.3e} ' \
                 '| ms/batch {:5.1f} | tok/s {:7.0f} | loss {:5.2f}'.format(
                     epoch,
                     train_step,
@@ -589,16 +567,14 @@ def train(tr_iter, va_iter, model, para_model, optimizer,
                     avg_elapsed * 1000,
                     throughput,
                     cur_loss,
-                    ))
+                    )
 
-            if args.ppl_threshold is not None and len(args.ppl_threshold): # check to see if fear is enabled
-                if args.use_train:
-                    curr_ppl = math.exp(cur_loss)
-                
-                else: # use validation perplexity
-                    val_loss = evaluate(va_iter, model, args)
-                    val_loss = nv_distributed.all_reduce_item(val_loss, op='mean')
-                    curr_ppl = math.exp(val_loss)
+            if args.dataset in ['enwik8', 'text8']:
+                log_str += ' | bpc {:9.5f}'.format(cur_loss / math.log(2))
+            else:
+                log_str += ' | ppl {:9.2f}'.format(math.exp(cur_loss))
+
+            print(log_str)
 
         do_periodic_eval = train_step % args.eval_interval == 0
         is_final_step = train_step == args.max_step
@@ -609,9 +585,19 @@ def train(tr_iter, va_iter, model, para_model, optimizer,
             val_loss = evaluate(va_iter, model, args)
             val_loss = nv_distributed.all_reduce_item(val_loss, op='mean')
 
-            print('| Eval {:3d} at step {:>8d} | time: {:5.2f}s | valid loss {:5.2f}'.format(
+            log_str = '| Eval {:3d} at step {:>8d} | time: {:5.2f}s ' \
+                      '| valid loss {:5.2f}'.format(
                           train_step // args.eval_interval,
-                          train_step, (time.time() - eval_start_time), val_loss,))
+                          train_step,
+                          (time.time() - eval_start_time),
+                          val_loss,
+                          )
+
+            if args.dataset in ['enwik8', 'text8']:
+                log_str += ' | bpc {:9.5f}'.format(val_loss / math.log(2))
+            else:
+                log_str += ' | valid ppl {:9.3f}'.format(math.exp(val_loss))
+            print(log_str)
 
             last_iter = tr_iter.last_iter
 
@@ -641,37 +627,42 @@ def train(tr_iter, va_iter, model, para_model, optimizer,
 
 
 def train_during_evolution(model, config, config_file, max_step, experiment_name, scheduler):
-    # Disable profiling executor
-    try:
-        torch._C._jit_set_profiling_executor(False)
-        torch._C._jit_set_profiling_mode(False)
-    except AttributeError:
-        pass
+    args = parse_args()
+    args.max_step = max_step
 
-    # Before we do anything with models, we want to ensure that we get fp16
-    # execution of torch.einsum in APEX AMP.
-    # Otherwise it'll default to "promote" mode, and we'll get fp32 operations.
-    # Note that running `--apex_amp_opt_level O2` will remove the need for this
-    # code, but it is still valid.
-    if 'apex' in sys.modules:
-        amp.register_half_function(torch, 'einsum')
-        
-    args = get_args(config, config_file, max_step, experiment_name, scheduler)
+    # TODO: below is commented out because nvlm installation issues on Windows
+    # if args.affinity != 'disabled':
+    #     nproc_per_node = torch.cuda.device_count()
+    #     affinity = gpu_affinity.set_affinity(
+    #         args.local_rank,
+    #         nproc_per_node,
+    #         args.affinity
+    #     )
+    #     print(f'{args.local_rank}: thread affinity: {affinity}')
 
     # Initialize device and distributed backend
     torch.cuda.set_device(args.local_rank)
     l2_promote()
+    args.cuda = torch.cuda.is_available()
     device = torch.device('cuda' if args.cuda else 'cpu')
     nv_distributed.init_distributed(args.cuda)
 
     pt_data_dir, pt_output_dir = common.pt_dirs()
     args.data = args.data or pt_data_dir or common.default_dataroot()
     args.data = utils.full_path(os.path.join(args.data,'textpred', exp_utils.dataset_dir_name(args.dataset)))
-    
+    if pt_output_dir:
+        args.work_dir =  utils.full_path(os.path.join(pt_output_dir, args.experiment_name), create=True)
+    else:
+        args.work_dir =  utils.full_path(os.path.join(args.work_dir, args.experiment_name), create=True)
+
     if args.local_batch_size is not None: # default is None
         world_size = nv_distributed.get_world_size()
         args.batch_size = world_size * args.local_batch_size
-        
+        print(f'--local_batch_size was set, adjusting global batch size'
+                     f' to {args.batch_size} (local_batch_size * world_size)')
+
+    #register_ignoring_timeout_handler()
+
     # Set the random seed manually for reproducibility.
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -698,9 +689,23 @@ def train_during_evolution(model, config, config_file, max_step, experiment_name
                                   args.eval_tgt_len, device=device,
                                   mem_len=eval_mem_len, ext_len=args.ext_len)
 
+    # adaptive softmax / embedding
+    cutoffs, tie_projs = [], [False]
+    if args.adaptive:
+        assert args.dataset in ['wt103', 'wt2', 'lm1b']
+        if args.dataset in ['wt103', 'wt2']:
+            cutoffs = [19997, 39997, 199997]
+            tie_projs += [True] * len(cutoffs)
+        elif args.dataset == 'lm1b':
+            cutoffs = [59997, 99997, 639997]
+            tie_projs += [False] * len(cutoffs)
+
     model.apply(functools.partial(weights_init, args=args))
     # ensure embedding init is not overridden by out_layer in case of weight sharing
     model.word_emb.apply(functools.partial(weights_init, args=args))
+
+    args.n_all_param = sum([p.nelement() for p in model.parameters()])
+    args.n_nonemb_param = sum([p.nelement() for p in model.layers.parameters()])
 
     # optimizer
     if args.optim.lower() == 'sgd':
@@ -716,7 +721,7 @@ def train_during_evolution(model, config, config_file, max_step, experiment_name
         else:
             optimizer = optim.SGD(model.parameters(), lr=args.lr,
                                   momentum=args.mom)
-            optimizer_sparse = None    
+            optimizer_sparse = None
     elif args.optim.lower() == 'adam':
         if args.sample_softmax > 0:
             dense_params, sparse_params = [], []
@@ -731,14 +736,14 @@ def train_during_evolution(model, config, config_file, max_step, experiment_name
         else:
             optimizer = optim.Adam(model.parameters(), lr=args.lr,
                                    weight_decay=args.weight_decay)
-            optimizer_sparse = None   
+            optimizer_sparse = None
     elif args.optim.lower() == 'adagrad':
         optimizer = optim.Adagrad(model.parameters(), lr=args.lr)
-        optimizer_sparse = None    
+        optimizer_sparse = None
     elif args.optim.lower() == 'lamb':
         optimizer = lamb.Lamb(model.parameters(), lr=args.lr,
                               weight_decay=args.weight_decay)
-        optimizer_sparse = None    
+        optimizer_sparse = None
     elif args.optim.lower() == 'jitlamb':
         optimizer = lamb.JITLamb(model.parameters(), lr=args.lr,
                                  weight_decay=args.weight_decay)
@@ -767,7 +772,11 @@ def train_during_evolution(model, config, config_file, max_step, experiment_name
         if args.amp == 'pytorch':
             scaler = torch.cuda.amp.GradScaler()
         elif args.amp == 'apex':
-            model, optimizer = amp.initialize(model, optimizer, opt_level=args.apex_amp_opt_level,)
+            model, optimizer = amp.initialize(
+                model,
+                optimizer,
+                opt_level=args.apex_amp_opt_level,
+                )
 
     # by default this argument is not used, instead we spawn multiple instances
     # using command line:
@@ -779,7 +788,8 @@ def train_during_evolution(model, config, config_file, max_step, experiment_name
                                              device_ids=[args.local_rank],
                                              output_device=args.local_rank,
                                              broadcast_buffers=False,
-                                             find_unused_parameters=True,)
+                                             find_unused_parameters=True,
+                                             )
     elif args.multi_gpu == 'dp':
         if args.gpu0_bsz >= 0:
             para_model = BalancedDataParallel(args.gpu0_bsz // args.batch_chunk,
@@ -803,6 +813,7 @@ def train_during_evolution(model, config, config_file, max_step, experiment_name
                 eta_min=args.eta_min)
         else:
             scheduler_sparse = None
+    
     elif args.scheduler == 'inv_sqrt':
         # originally used for Transformer (in Attention is all you need)
         def lr_lambda(step):
@@ -853,7 +864,6 @@ def train_during_evolution(model, config, config_file, max_step, experiment_name
     # At any point you can hit Ctrl + C to break out of training early.
     start_time = time.time()
     fear_activated = 0
-    print('here', device)
     try:
         for epoch in itertools.count(start=start_epoch):
             if args.roll: # enable random shifts in datasets
@@ -870,13 +880,7 @@ def train_during_evolution(model, config, config_file, max_step, experiment_name
             last_iter = 0
 
             if train_step == args.max_step:
-                logging.info('-' * 100)
-                logging.info('End of training')
-                break
-
-            if fear_activated and args.fear_terminate:
-                logging.info('-' * 100)
-                logging.info('End of training')
+                print('End of training')
                 break
 
     except KeyboardInterrupt:
@@ -900,14 +904,18 @@ def train_during_evolution(model, config, config_file, max_step, experiment_name
         print('| End of training | test time: {:5.2f}s | test loss {:5.2f} | test ppl {:9.3f}'.format(
             test_elapsed, test_loss, math.exp(test_loss)))
 
-        if args.dataset in ['enwik8', 'text8']:
-            summary['test_bits_per_character'] = test_loss / math.log(2)
-        else:
-            summary['test_perplexity'] = math.exp(test_loss)
+    if args.dataset in ['enwik8', 'text8']:
+        summary['test_bits_per_character'] = test_loss / math.log(2)
+    else:
+        summary['test_perplexity'] = math.exp(test_loss)
 
     print(f'Training time: {(elapsed / 60):.2f} minutes')
     print(f'Training throughput: {meters["train_throughput"].avg:.2f} tok/s')
-    
+
+    if best_val_loss:
+        val_perplexity = math.exp(best_val_loss)
+    else:
+        val_perplexity = None
     if best_val_loss:
         val_perplexity = math.exp(best_val_loss)
     else:
@@ -921,3 +929,20 @@ def train_during_evolution(model, config, config_file, max_step, experiment_name
         })
 
     return summary
+
+
+if __name__ == "__main__":
+    # Disable profiling executor
+    try:
+        torch._C._jit_set_profiling_executor(False)
+        torch._C._jit_set_profiling_mode(False)
+    except AttributeError:
+        pass
+
+    # Before we do anything with models, we want to ensure that we get fp16
+    # execution of torch.einsum in APEX AMP.
+    # Otherwise it'll default to "promote" mode, and we'll get fp32 operations.
+    # Note that running `--apex_amp_opt_level O2` will remove the need for this
+    # code, but it is still valid.
+    if 'apex' in sys.modules:
+        amp.register_half_function(torch, 'einsum')

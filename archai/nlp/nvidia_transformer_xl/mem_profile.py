@@ -353,3 +353,28 @@ if __name__ == "__main__":
   
   if args.plot:
     plot(args)
+
+  # model_config = {'n_layer':16, 'd_model':512, 'n_head':8, 'd_head': 64, 'd_inner':2048, 'n_token': 267736, 'dropout': 0.1, 'dropatt': 0.0, \
+  #                       'd_embed': 512, 'div_val': 1, 'pre_lnorm': False, 'tgt_len': 192, 'ext_len': 0, 'mem_len': 192, \
+  #                       'same_length': False,'attn_type': 0,'clamp_len': -1, 'sample_softmax': -1, \
+  #                       'cutoffs': [19997, 39997, 199997], 'tie_projs': [False, True, True, True], 'tie_weight': True, 'dtype': None}
+  
+  # # model_config.update({'d_model': 256, 'n_layer': 5, 'd_inner': '1885,485,1335,1935,1835', 'n_head': '2,2,2,2,2'})
+  # # model_config['div_val'] = 4
+  # # model_config['d_head'] = get_yaml_values([model_config['d_model']//int(n_head) for n_head in model_config['n_head'].split(',')])
+  # # model_config['d_embed'] = model_config['d_model']
+
+  # command = 'syrupy.py -i 0.0001 --title test -C --no-raw-process-log --separator=";" --no-align python archai/nlp/nvidia_transformer_xl/mem_transformer.py --n_layer {n_layer} --n_token {n_token} --n_head {n_head} \
+  #                 --d_head {d_head} --d_model {d_model} --d_inner {d_inner} --div_val {div_val} --d_embed {d_embed}'.format(**model_config)
+
+  # curr_peak_memories = []
+  # for iter in range(5):
+  #   curr_setup_mem = measure_memory(args, run_command=(command + ' --setup_only'))
+  #   curr_model_mem = measure_memory(args, run_command=command)
+    
+  #   if curr_model_mem < curr_setup_mem:
+  #     iter -=1 
+  #     pass
+  #   curr_peak_memories.append(curr_model_mem - curr_setup_mem)
+  # print(curr_peak_memories)
+  # print(np.mean(curr_peak_memories))
