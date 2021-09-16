@@ -1,23 +1,24 @@
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_25.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_26.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_27.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_28.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_29.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_30.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_31.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_32.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_33.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_34.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_35.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_36.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_37.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_38.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_39.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_40.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_41.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_42.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_43.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_44.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_45.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_46.yaml evolution_5000 -t NLX-NDv2
-amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_47.yaml evolution_5000 -t NLX-NDv2
+# amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_48.yaml evolution_5000 -t NLX-NDv2
+# amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_49.yaml evolution_5000 -t NLX-NDv2
+# amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_50.yaml evolution_5000 -t NLX-NDv2
+# amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_51.yaml evolution_5000 -t NLX-NDv2
+# amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_52.yaml evolution_5000 -t NLX-NDv2
+# amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_53.yaml evolution_5000 -t NLX-NDv2
+# amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_54.yaml evolution_5000 -t NLX-NDv2
+# amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_55.yaml evolution_5000 -t NLX-NDv2
+# amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_56.yaml evolution_5000 -t NLX-NDv2
+# amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_57.yaml evolution_5000 -t NLX-NDv2
+# amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_58.yaml evolution_5000 -t NLX-NDv2
+# amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_59.yaml evolution_5000 -t NLX-NDv2
+amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_60.yaml evolution_5000 -t itpscusv100cl
+amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_61.yaml evolution_5000 -t itpscusv100cl
+amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_62.yaml evolution_5000 -t itpscusv100cl
+amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_63.yaml evolution_5000 -t itpscusv100cl
+amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_64.yaml evolution_5000 -t itpscusv100cl
+amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_65.yaml evolution_5000 -t itpscusv100cl
+# amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_66.yaml evolution_5000 -t itpeastusv100cl
+# amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_67.yaml evolution_5000 -t itpeastusv100cl
+# amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_68.yaml evolution_5000 -t itpeastusv100cl
+# amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_69.yaml evolution_5000 -t itpeastusv100cl
+# amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_70.yaml evolution_5000 -t itpeastusv100cl
+# amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_71.yaml evolution_5000 -t itpeastusv100cl

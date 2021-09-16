@@ -1004,12 +1004,11 @@ def main(args):
       common_configs = np.intersect1d(list(results_gt.keys()), list(n_all_params.keys()))
       print('analyzing {} architectures'.format(len(common_configs)))
 
-      min = 100
-      for k in common_configs:
-        if abs(n_all_params[k]['total']-5e7)<0.1*5e7 and results_gt[k]['valid_perplexity']<min:
-          min = results_gt[k]['valid_perplexity']
-          print(min, n_all_params[k]['total']/1e6)
-      exit()
+      # min = 100
+      # for k in common_configs:
+      #   if abs(n_all_params[k]['total']-5e7)<0.1*5e7 and results_gt[k]['valid_perplexity']<min:
+      #     min = results_gt[k]['valid_perplexity']
+      #     print(min, n_all_params[k]['total']/1e6)
 
       # fear_stage_1 results:
       val_ppl_list_gt[legend_key] = []
@@ -1035,7 +1034,6 @@ def main(args):
         sorted_ground_truth[legend_key] = np.argsort(val_ppl_list_gt[legend_key])
         sorted_nparams = np.argsort(n_params[legend_key])
         sorted_nparams_total = np.argsort(n_params_total[legend_key])
-
 
       # extract common ratio and spearmanrank
       common_ratios[legend_key] = []
@@ -1189,13 +1187,17 @@ def main(args):
       
     colors = ['b', 'g', 'r', 'm', 'y', 'c', 'k']
     markers = {'n_layer':'.', 'd_inner':'^', 'd_model':'s', 'd_model_d_inner': 'd', 'n_layer_d_model': 'P'}
+
+    valid_labels = ['n_layer', 'd_inner', 'd_model', 'd_model_d_inner']
     for idx, k in enumerate(val_ppl_list_gt.keys()):
       plt.figure()
       plt.scatter(baseline_configs[k]['FFN']+baseline_configs[k]['Attn'], baseline_configs[k]['valid_perplexity'], \
                     color=colors[idx], marker='*', s=250, label='base config')
 
       for i in range(len(labels[k])):
-        c = 'r' if labels[k][i]=='d_model_d_inner' else colors[idx]
+        if labels[k][i] not in valid_labels:
+          continue
+        c = 'b' if labels[k][i]=='d_model_d_inner' else colors[idx]
         plt.scatter(n_params[k][i], val_ppl_list_gt[k][i], color=c, \
                     marker=markers[labels[k][i]], s=100, label='scaled '+labels[k][i], zorder=3)
       plt.ylabel('Validation PPL')
