@@ -12,7 +12,7 @@ import json
 
 from archai.nlp.nvidia_transformer_xl.mem_transformer import MemTransformerLM, MemTransformerLM_flex
 from archai.nlp.nvidia_transformer_xl.utils import recurse_dir, get_model_and_params
-from gather_results import get_config_name, get_info_from_json, get_info_from_logs, process_parameters
+from archai.nlp.nvidia_transformer_xl.gather_results import get_config_name, get_info_from_json, get_info_from_logs, process_parameters
 
 _mapping_tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
 

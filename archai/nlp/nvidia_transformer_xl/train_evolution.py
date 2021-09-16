@@ -1,47 +1,37 @@
 import argparse
 import functools
 import itertools
-import logging
-import logging.config
+import copy
 import math
 import os
-import shutil
 import sys
 import time
+import pickle
 import warnings
-
-import dllogger
 import numpy as np
-import torch
-import torch.nn as nn
-import torch.optim as optim
 import yaml
 try:
     from apex import amp
 except ModuleNotFoundError:
     warnings.warn('APEX AMP is unavailable')
 
-
+import torch
+import torch.nn as nn
+import torch.optim as optim
 from torch.nn.parallel import DistributedDataParallel
 
 from archai.nlp.nvidia_transformer_xl import lamb
 from archai.nlp.nvidia_transformer_xl.data_utils import get_lm_corpus
 from archai.nlp.nvidia_transformer_xl.mem_transformer import MemTransformerLM, MemTransformerLM_flex
+from archai.nlp.nvidia_transformer_xl.mem_transformer import AdaptiveEmbedding, DecoderLayer, MultiHeadAttn, PositionwiseFF, ProjectedAdaptiveLogSoftmax
 from archai.nlp.nvidia_transformer_xl.nvidia_utils import distributed as nv_distributed
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.data_parallel import BalancedDataParallel
 from archai.nlp.nvidia_transformer_xl.nvidia_utils import exp_utils
 # from archai.nlp.nvidia_transformer_xl.nvidia_utils import gpu_affinity
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import AverageMeter
-from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import TimeoutHandler
-from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import benchmark
-from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import create_exp_dir
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import l2_promote
-from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import log_env_info
-from archai.nlp.nvidia_transformer_xl.nvidia_utils.exp_utils import register_ignoring_timeout_handler
 from archai.common import utils, common
-
-from archai.nlp.nvidia_transformer_xl.mem_transformer import AdaptiveEmbedding, DecoderLayer, MultiHeadAttn, PositionwiseFF, ProjectedAdaptiveLogSoftmax
-from archai.nlp.nvidia_transformer_xl.utils import get_parameter_breakdown
+from archai.nlp.nvidia_transformer_xl.evolution import model_config_defaults
 
 def parse_args():
     parent_parser = argparse.ArgumentParser(
@@ -68,6 +58,8 @@ def parse_args():
     general = parser.add_argument_group('general setup')
     general.add_argument('--work_dir', default='~/logdir', type=str,
                          help='Directory for the results')
+    general.add_argument('--summary_path', default=None, type=str,
+                         help='Directory for training log')
     general.add_argument('--experiment_name', default='nv_xformer_xl', type=str,
                          help='Directory for the results')
     general.add_argument('--append_dataset', action='store_true',
@@ -626,9 +618,8 @@ def train(tr_iter, va_iter, model, para_model, optimizer,
     return train_step, best_val_loss, fear_activated
 
 
-def train_during_evolution(model, config, config_file, max_step, experiment_name, scheduler):
+def main():
     args = parse_args()
-    args.max_step = max_step
 
     # TODO: below is commented out because nvlm installation issues on Windows
     # if args.affinity != 'disabled':
@@ -699,6 +690,23 @@ def train_during_evolution(model, config, config_file, max_step, experiment_name
         elif args.dataset == 'lm1b':
             cutoffs = [59997, 99997, 639997]
             tie_projs += [False] * len(cutoffs)
+
+    ###########################################################################
+    # Build the model
+    ###########################################################################
+    model_config = copy.deepcopy(model_config_defaults)
+    model_config['n_layer'] = args.n_layer
+    model_config['n_head'] = args.n_head
+    model_config['d_model'] = args.d_model
+    model_config['d_inner'] = args.d_inner
+    model_config['d_embed'] = args.d_embed
+    model_config['div_val'] = args.div_val
+
+    if isinstance(args.n_head, list):
+        model = MemTransformerLM_flex(**model_config)
+    else:
+        model = MemTransformerLM(**model_config)
+    # print(model)
 
     model.apply(functools.partial(weights_init, args=args))
     # ensure embedding init is not overridden by out_layer in case of weight sharing
@@ -928,7 +936,8 @@ def train_during_evolution(model, config, config_file, max_step, experiment_name
         'valid_perplexity': val_perplexity,
         })
 
-    return summary
+    with open(os.path.join(args.summary_path, 'train_log.pkl'), 'wb') as f:
+        pickle.dump(summary, f)
 
 
 if __name__ == "__main__":
@@ -946,3 +955,5 @@ if __name__ == "__main__":
     # code, but it is still valid.
     if 'apex' in sys.modules:
         amp.register_half_function(torch, 'einsum')
+
+    main()
