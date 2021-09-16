@@ -560,13 +560,13 @@ def train(tr_iter, va_iter, model, para_model, optimizer,
                     throughput,
                     cur_loss,
                     )
-
             if args.dataset in ['enwik8', 'text8']:
                 log_str += ' | bpc {:9.5f}'.format(cur_loss / math.log(2))
             else:
                 log_str += ' | ppl {:9.2f}'.format(math.exp(cur_loss))
-
-            print(log_str)
+            with nv_distributed.sync_workers() as rank:
+                if rank==0:
+                    print(log_str)
 
         do_periodic_eval = train_step % args.eval_interval == 0
         is_final_step = train_step == args.max_step
@@ -589,7 +589,9 @@ def train(tr_iter, va_iter, model, para_model, optimizer,
                 log_str += ' | bpc {:9.5f}'.format(val_loss / math.log(2))
             else:
                 log_str += ' | valid ppl {:9.3f}'.format(math.exp(val_loss))
-            print(log_str)
+            with nv_distributed.sync_workers() as rank:
+                if rank==0:
+                    print(log_str)
 
             last_iter = tr_iter.last_iter
 
@@ -888,7 +890,9 @@ def main():
             last_iter = 0
 
             if train_step == args.max_step:
-                print('End of training')
+                with nv_distributed.sync_workers() as rank:
+                    if rank==0:
+                        print('End of training')
                 break
 
     except KeyboardInterrupt:
@@ -906,19 +910,25 @@ def main():
     test_elapsed = time.time() - test_start_time
 
     if args.dataset in ['enwik8', 'text8']:
-        print('| End of training | test time: {:5.2f}s | test loss {:5.2f} | test bpc {:9.5f}'.format(
-            test_elapsed, test_loss, test_loss / math.log(2)))
+        with nv_distributed.sync_workers() as rank:
+            if rank==0:
+                print('| End of training | test time: {:5.2f}s | test loss {:5.2f} | test bpc {:9.5f}'.format(
+                    test_elapsed, test_loss, test_loss / math.log(2)))
     else:
-        print('| End of training | test time: {:5.2f}s | test loss {:5.2f} | test ppl {:9.3f}'.format(
-            test_elapsed, test_loss, math.exp(test_loss)))
+        with nv_distributed.sync_workers() as rank:
+            if rank==0:
+                print('| End of training | test time: {:5.2f}s | test loss {:5.2f} | test ppl {:9.3f}'.format(
+                    test_elapsed, test_loss, math.exp(test_loss)))
 
     if args.dataset in ['enwik8', 'text8']:
         summary['test_bits_per_character'] = test_loss / math.log(2)
     else:
         summary['test_perplexity'] = math.exp(test_loss)
 
-    print(f'Training time: {(elapsed / 60):.2f} minutes')
-    print(f'Training throughput: {meters["train_throughput"].avg:.2f} tok/s')
+    with nv_distributed.sync_workers() as rank:
+        if rank==0:
+            print(f'Training time: {(elapsed / 60):.2f} minutes')
+            print(f'Training throughput: {meters["train_throughput"].avg:.2f} tok/s')
 
     if best_val_loss:
         val_perplexity = math.exp(best_val_loss)
