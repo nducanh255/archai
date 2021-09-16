@@ -14,7 +14,7 @@ import torch
 
 from archai.nlp.nvidia_transformer_xl.utils import get_model, process_parameters, get_latency
 from archai.nlp.nvidia_transformer_xl.generate_archs import gather_results
-from archai.nlp.nvidia_transformer_xl.train_evolution import train_during_evolution
+# from archai.nlp.nvidia_transformer_xl.train_evolution import train_during_evolution
 from archai.nlp.nvidia_transformer_xl.mem_transformer import forward_predict_memtransformer, predict
 
 
@@ -340,13 +340,27 @@ class Evolution(object):
             
             if do_train:
                 if train_local:
+                    path_to_results = './amlt_logs'
+                    os.makedirs(path_to_results, exist_ok=True)
+
                     t0 = time.time()
-                    # command = 'python archai/nlp/nvidia_transformer_xl/train.py --config %s \
-                    #             --config_file wt103_base.yaml --n_layer %s --n_head %s --d_model %s \
-                    #             --d_inner %s --d_embed %s --div_val %s --max_step %d' % (gpu_config, model_config['n_layer'], get_yaml_values(model_config['n_head']), model_config['d_model'], \
-                    #             get_yaml_values(model_config['d_inner']), model_config['d_model'], model_config_defaults['div_val'], max_step)
-                    # os.system(command)
-                    summary = train_during_evolution(model, gpu_config, config_file, max_step, experiment_name, scheduler)
+                    if n_gpus==1:
+                        command = 'python '
+                    else:
+                        command = 'python -m torch.distributed.launch --nproc_per_node="%s" ' % n_gpus
+                    command += 'archai/nlp/nvidia_transformer_xl/train_evolution.py --config %s --config_file wt103_base.yaml --n_layer %s --n_head %s --d_model %s --d_inner %s --d_embed %s --div_val %s --max_step %d --scheduler constant --summary_path %s' \
+                                % (gpu_config, model_config['n_layer'], get_yaml_values(model_config['n_head']), model_config['d_model'], \
+                                get_yaml_values(model_config['d_inner']), model_config['d_model'], model_config_defaults['div_val'], max_step, path_to_results)
+                    os.system(command)
+                    
+                    log_file = os.path.join(path_to_results, 'train_log.pkl')
+                    while not os.path.exists(log_file):
+                        pass
+                    with open(log_file, 'rb') as f:
+                        summary = pickle.load(f)
+                    
+                    # summary = train_during_evolution(model, gpu_config, config_file, max_step, experiment_name, scheduler)
+                    
                     t1 = time.time()
                     avg_time.append(t1-t0)
 
@@ -357,6 +371,8 @@ class Evolution(object):
                     model.crit.forward = types.MethodType(predict, model.crit)
                     model = model.to(device='cpu')
                     model.eval()
+
+                    os.system(f'rm {log_file}')
             else:
                 curr_n_all_param, _, _, params_attention, params_ff = process_parameters(model, verbose=False)
                 params.append(params_attention + params_ff)
@@ -888,7 +904,7 @@ def create_jobs(all_population, start_config=0, bundle_count=50, max_step=500, n
         del amlt_config['search']
         amlt_config['jobs'] = [{}]
         amlt_config['jobs'][0]['name'] = 'config_{}'.format(str(config_idx))
-        amlt_config['jobs'][0]['sku'] = 'G8'
+        amlt_config['jobs'][0]['sku'] = f'G{n_gpus}'
         amlt_config['jobs'][0]['command'] = ['set -e -o xtrace', 'pip install --user -e .']
         amlt_config['jobs'][0]['command'] += get_bundle_run_command(copy.deepcopy(all_population[c:c+bundle_count]), max_step, n_gpus, gpu_config, is_pareto=None)
 
@@ -1142,7 +1158,7 @@ if __name__=='__main__':
     torch.manual_seed(seed)
 
 
-    args = {'default_path': '/home/t-mojanj/Projects/archai/evo_search','population_size':50, 'parent_size':10, 'mutation_size':20, 'mutation_prob':0.3, 'crossover_size':20, 
+    args = {'default_path': './evo_search','population_size':10, 'parent_size':2, 'mutation_size':4, 'mutation_prob':0.3, 'crossover_size':4, 
             'n_iter':30, 'n_layer_choice':[3,4,5,6,7,8], 'd_model_choice':[128, 256, 512], 'd_inner_choice':list(range(512, 2049, 50))+[2048], 'n_head_choice':[2,4,8],
             'param_constraint':5e6, 'latency_scale':2., 'n_threads':1, 'latency_repeat':5, 'pareto_search':True,
             ################### extracting pareto
@@ -1150,7 +1166,7 @@ if __name__=='__main__':
             ################### brute_force
             'nsamples':20000, 'batch':1000, 'do_train':False,
             ################### evaluation scheme  (set start_train to bigger than n_iter to disable training for evaluation)
-            'start_train':15, 'train_local':True, 'n_gpus':4, 'gpu_config':'dgx1_4gpu_fp32', 'config_file':'wt103_base.yaml', 'max_step':500, 'experiment_name':'evolution', 
+            'start_train':0, 'train_local':True, 'n_gpus':1, 'gpu_config':'dgx1_1gpu_fp32', 'config_file':'wt103_base.yaml', 'max_step':10, 'experiment_name':'evolution', 
             'scheduler':'constant', 'use_valid':True}
     
     dir_name = 'param_threshold_{}'.format(args['param_constraint']/1e6)
@@ -1159,7 +1175,7 @@ if __name__=='__main__':
     if args['use_convex_hull']:
         dir_name += '_convex_hull'
 
-    dir_name='test'
+    # dir_name='test'
     args['results_path'] = os.path.join(args['default_path'], dir_name)
     # args['results_path'] = os.path.join(args['default_path'], 'param_threshold_5000000_D3_V2')
     # args['results_path'] = os.path.join(args['default_path'], 'param_threshold_5000000.0_old_pareto')
