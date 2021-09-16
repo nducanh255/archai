@@ -1166,7 +1166,7 @@ if __name__=='__main__':
             ################### brute_force
             'nsamples':20000, 'batch':1000, 'do_train':False,
             ################### evaluation scheme  (set start_train to bigger than n_iter to disable training for evaluation)
-            'start_train':0, 'train_local':True, 'n_gpus':1, 'gpu_config':'dgx1_1gpu_fp32', 'config_file':'wt103_base.yaml', 'max_step':10, 'experiment_name':'evolution', 
+            'start_train':0, 'train_local':True, 'n_gpus':4, 'gpu_config':'dgx1_4gpu_fp32', 'config_file':'wt103_base.yaml', 'max_step':500, 'experiment_name':'evolution', 
             'scheduler':'constant', 'use_valid':True}
     
     dir_name = 'param_threshold_{}'.format(args['param_constraint']/1e6)
