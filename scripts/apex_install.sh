@@ -6,8 +6,8 @@ set -o xtrace
 if python -c "import apex" &> /dev/null; then
     echo 'NVidia Apex is already installed'
 else
-    mkdir -p ~/GitHubSrc
-    pushd ~/GitHubSrc
+    mkdir -p ~/nvidia_apex
+    pushd ~/nvidia_apex
     rm -rf ./apex # for some reason this exist in amlk8s
     git clone https://github.com/NVIDIA/apex
     cd apex

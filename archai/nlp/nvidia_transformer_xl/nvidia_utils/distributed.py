@@ -29,6 +29,7 @@ def init_distributed(cuda):
     distributed = (world_size > 1)
     if distributed:
         backend = 'nccl' if cuda else 'gloo'
+        #backend = 'gloo' # on A6000 nccl hangs for yet unknown reason
         torch.distributed.init_process_group(backend=backend,
                                              init_method='env://')
         assert torch.distributed.is_initialized()
