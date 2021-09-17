@@ -27,31 +27,34 @@ def meta_constructor_sequence(loader, node):
 yaml.add_constructor(u'tag:yaml.org,2002:python/object/apply:numpy.core.multiarray.scalar', meta_constructor_sequence)
 yaml.add_constructor(u'tag:yaml.org,2002:python/object/apply:numpy.dtype', meta_constructor_mapping)
 
-generation_seed = 1111
+generation_seed = 4568
 np.random.seed(generation_seed)
 random.seed(generation_seed)
 
-fear_stage = 4   #3: baseline, 4: parameter exploration
-n_unfreeze = 3
+phase = 1   # 1: submit jobs (optionally with fear stage 1 activated), 2: fear stage 2, 3: baseline, 4: similar parameter exploration
+activate_fear = False
+n_unfreeze = 3  # used in phase 2
 different_seeds = None #[1111,1009,1200,1234,1302,1562,2222,3334,3425,4567]
 max_step = 500
 
-targets = ['itpseasiav100cl', 'itplabrr1cl1', 'itpscusv100cl']  # amulet targets
-gpu_config = ['dgx1_4gpu_fp32'] # dgx1_8gpu_fp16, dgx1_1gpu_fp16, toy, default, dgx1_4gpu_fp16
+targets = ['itpeastusv100cl', 'itplabrr1cl1', 'itpscusv100cl', 'itpseasiav100cl']  # amulet targets
+gpu_config = 'dgx1_4gpu_fp32' # dgx1_8gpu_fp16, dgx1_1gpu_fp16, toy, default, dgx1_4gpu_fp16
 n_gpus = 4
+bundle_count = 4
 
 n_configs = 100 # number fo configs to generate
-batch_configs = 10 #how many configs in the same bash file
-start_config = 0
-indep_dhead = True # if set to False, n_head is determined based on n_head and d_model so that n_head * d_head = d_model
+batch_configs = 50 #how many configs in the same bash file
+start_config = 0 #index for the starting job name, careful not to override previous jobs in the same experiment
+bash_start_config = start_config
+indep_dhead = False # if set to False, d_head is determined based on n_head and d_model so that n_head * d_head = d_model
 homogeneous_layers = False # if set to True, all decoder layers will have the same config within a model
 
-n_layers = [5, 8]
+n_layers = [4, 8]
 n_heads = [2, 8]
 d_models = [64, 512]
 #-----embedding layer
 d_embeds = [128, 512]
-div_vals = [4] #[1, 2, 4]
+div_vals = [1, 2, 4]
 #-----optional
 d_heads = [16, 64]
 d_inners = [512, 2048]
@@ -74,7 +77,7 @@ def generate_bash_files(path_to_configs, f_name, bash_start=0, exp_name=None):
         if job_idx >= n_configs:
           break
         
-        bash_file = os.path.join(path_to_configs, f_name+'_'+str(bash_idx + bash_start)+'.sh')
+        bash_file = os.path.join(path_to_configs, f_name+'_'+str(bash_idx+bash_start)+'.sh')
         if job_idx==0 and os.path.exists(bash_file):
               os.remove(bash_file)  
         with open(bash_file, 'a') as f:
@@ -156,7 +159,7 @@ def gather_results(exp_name, path_to_dir, filetypes='.json', verbose=True):
   return results
 
 
-def get_bundle_run_command(configs, parallel=True):
+def get_bundle_run_command(configs, parallel=True, default_config='wt103_base.yaml'):
   for k in configs.keys():
     configs[k] = [str(get_yaml_values(v)) for v in configs[k]]
   print(configs)
@@ -169,14 +172,14 @@ def get_bundle_run_command(configs, parallel=True):
     if parallel:
       command += 'export CUDA_VISIBLE_DEVICES=%s && \
                   python -m torch.distributed.launch --master_port=%d --nproc_per_node="%s" archai/nlp/nvidia_transformer_xl/train.py --config %s \
-                  --config_file wt103_base.yaml --n_layer %s --n_head %s --d_model %s --d_head %s \
+                  --config_file %s --n_layer %s --n_head %s --d_model %s --d_head %s \
                   --d_inner %s --d_embed %s --div_val %s --experiment_name j%d &\n' \
-                  % (gpu_range, master_ports[i], str(n_gpus), gpu_config, configs['n_layer'][i], configs['n_head'][i], configs['d_model'][i], configs['d_head'][i], configs['d_inner'][i], configs['d_embed'][i], configs['div_val'][i], i)
+                  % (gpu_range, master_ports[i], str(n_gpus), gpu_config, default_config, configs['n_layer'][i], configs['n_head'][i], configs['d_model'][i], configs['d_head'][i], configs['d_inner'][i], configs['d_embed'][i], configs['div_val'][i], i)
     else:
       command.append('python -m torch.distributed.launch --nproc_per_node="%s" archai/nlp/nvidia_transformer_xl/train.py --config %s \
-                  --config_file wt103_base.yaml --n_layer %s --n_head %s --d_model %s --d_head %s \
+                  --config_file %s --n_layer %s --n_head %s --d_model %s --d_head %s \
                   --d_inner %s --d_embed %s --div_val %s --experiment_name j%d' \
-                  % (str(n_gpus), gpu_config, configs['n_layer'][i], configs['n_head'][i], configs['d_model'][i], configs['d_head'][i], configs['d_inner'][i], configs['d_embed'][i], configs['div_val'][i], i))
+                  % (str(n_gpus), gpu_config, default_config, configs['n_layer'][i], configs['n_head'][i], configs['d_model'][i], configs['d_head'][i], configs['d_inner'][i], configs['d_embed'][i], configs['div_val'][i], i))
   if parallel:
     command += 'wait'
   return command
@@ -306,7 +309,7 @@ if __name__ == '__main__':
   if not os.path.exists(path_to_configs):
       os.mkdir(path_to_configs)
   
-  if fear_stage==1:
+  if phase==1:
       # generate random architectures
       count = 0
       param_values = {}
@@ -337,21 +340,25 @@ if __name__ == '__main__':
       # pprint.pprint(param_values)
     
       # create corresponding yaml files for amulet jobs
-      for c in range(n_configs): 
+      default_config = 'wt103_base_FEAR.yaml' if activate_fear else 'wt103_base.yaml'
+      c = 0
+      yaml_idx = start_config
+      while c < n_configs: 
         with open('/home/t-mojanj/Projects/archaiphilly/nv_train.yaml') as file:
           amlt_config = yaml.load(file)
           if c==0:
             pprint.pprint(amlt_config)
 
+        ''' # run one job per sku
         amlt_config['search']['job_template']['sku']= 'G'+str(n_gpus)
         amlt_config['search']['job_template']['name']= 'train_xl_config_'+str(c + start_config)
         # TODO: add vocab_size when there is support for it
         amlt_config['search']['job_template']['command'][3] = 'python -m torch.distributed.launch --nproc_per_node="%s" archai/nlp/nvidia_transformer_xl/train.py \
-                                        --config {config} --config_file wt103_base_FEAR.yaml \
+                                        --config {config} --config_file {default_config} \
                                         --n_layer {n_layer} --n_head {n_head} --d_model {d_model} --d_head {d_head} \
                                         --d_inner {d_inner} --d_embed {d_embed} --div_val {div_val}' % (str(n_gpus)) #--vocab_size {vocab_size} --attn_type 2 
         amlt_config['search']['params'][0]['values'] = gpu_config
-        
+
         names = list(param_values.keys())   #['n_layer', 'n_head', 'd_model', 'd_head', 'd_inner', 'd_embed', 'div_val']
         for n in names:
           values = get_yaml_values(param_values[n][c])
@@ -359,13 +366,31 @@ if __name__ == '__main__':
             amlt_config['search']['params'].append({'name':n, 'spec':'discrete', 'values': [values]})
           except:
             amlt_config['search']['params'] = [{'name':n, 'spec':'discrete', 'values': [values]}]
+        '''
+        # run bundle_count jobs per sku
+        amlt_config['environment']['image'] = 'debadeepta/pytorch:1.7.0-cuda11.0-cudnn8-devel'
 
-        config_file = 'nv_train_'+str(int(start_config + c))+'.yaml'
+        curr_configs = {k:param_values[k][c:c+bundle_count] for k in param_values.keys()}
+        del amlt_config['search']
+        amlt_config['jobs'] = [{}]
+        amlt_config['jobs'][0]['name'] = f'config_{yaml_idx}'
+        amlt_config['jobs'][0]['sku'] = f'G{n_gpus}'
+        amlt_config['jobs'][0]['command'] = ['set -e -o xtrace', 'pip install --user -e .']
+        amlt_config['jobs'][0]['command'] += get_bundle_run_command(curr_configs, parallel=False, default_config=default_config)
+
+        config_file = f'nv_train_{yaml_idx}.yaml'
         f_name = os.path.join(path_to_configs, config_file)
         with open(f_name, 'w') as file:
             yaml.dump(amlt_config, file)
+        
+        c += bundle_count
+        yaml_idx += 1
 
-      generate_bash_files(path_to_configs, f_name='amlt_run_fear_stage1', exp_name='fear_stage_1_heterogeneous2')
+      n_configs = yaml_idx
+      fname = 'amlt_run' + ('_fear_stage1' if activate_fear else '')
+      exp_name = 'homogeneous' if homogeneous_layers else 'heterogeneous'
+      exp_name = ('fear_stage_1_' if activate_fear else '') + exp_name
+      generate_bash_files(path_to_configs, f_name=fname, exp_name=exp_name)
 
       local_test_bashfile = os.path.join(path_to_configs, 'local_test.sh')
       if os.path.exists(local_test_bashfile):
@@ -380,7 +405,7 @@ if __name__ == '__main__':
           f.write(command) 
           f.write('if [ $? -ne 0 ]; then \n echo FAIL \n exit \n fi \n')
 
-  elif fear_stage==2:
+  elif phase==2:
     bash_idx = 0
     while True:
       bash_file = os.path.join(path_to_configs, 'amlt_run_fear_stage2_'+str(bash_idx)+'.sh')
@@ -408,7 +433,7 @@ if __name__ == '__main__':
 
       bash_idx += 1
       
-  elif fear_stage==3:
+  elif phase==3:
     files = os.listdir(path_to_configs)
     ref_exp_name = 'fear_stage_1_heterogeneous' # name of the amlt experiment with full runs to use as the ground-truth configutation
     for f in files:
@@ -471,7 +496,6 @@ if __name__ == '__main__':
     target_ppl_range = [40, 50]
     
     start_config = 63
-    bash_start_config = start_config
     n_gpus = 8
     parallel_run = False
     gpu_config = 'dgx1_8gpu_fp32'
