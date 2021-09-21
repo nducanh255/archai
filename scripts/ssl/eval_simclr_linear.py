@@ -4,15 +4,17 @@
 import os
 import yaml
 import torch
+import shutil
 import torch.nn as nn
 from archai.common import utils
 from archai.algos.darts.darts_model_desc_builder_ssl import DartsModelDescBuilderSimClr
 from archai.networks_ssl.simclr import ModelSimCLRResNet, ModelSimCLRVGGNet, ModelSimCLRViT, ModelSimCLRDenseNet, ModelSimCLREfficientNet
 from archai.common.trainer import TrainerLinear
 from archai.common.config import Config
-from archai.common.common import _create_sysinfo, common_init, create_conf, get_state, init_from, update_envvars
+from archai.common.common import _create_sysinfo, common_init, create_conf, expdir_abspath, get_expdir, get_state, init_from, update_envvars
 from archai.datasets import data
 from archai.nas.model_desc import ModelDesc
+from archai.common.apex_utils import ApexUtils
 from archai.nas.model_ssl import ModelSimCLRDarts
 from archai.common.checkpoint import CheckPoint
 from archai.nas.model_desc_builder import ModelDescBuilder
@@ -81,7 +83,6 @@ def train_test(conf:Config):
         conf_model['compress'] = conf_loader['dataset']['input_height']<=64
 
     _create_sysinfo(conf)
-    # create model
     if "resnet" in conf_trainer['model']:
         model = ModelSimCLRResNet(config_train['dataset']['name'], conf_model['depth'], conf_model['layers'], conf_model['bottleneck'],
             conf_model['compress'], conf_model['hidden_dim'], conf_model['out_features'], groups = conf_model['groups'],
@@ -106,7 +107,6 @@ def train_test(conf:Config):
                 )
     model = model.to(torch.device('cuda', 0))
     ckpt = torch.load(conf['common']['load_checkpoint'])
-    print(ckpt['trainer']['last_epoch']+1)
     if "darts" in conf['common']['load_checkpoint']:
         if ckpt['trainer']['last_epoch'] +1 != config_train['nas']['eval']['trainer']['epochs']:
             raise Exception("Model training not finished, exiting evaluation...")
@@ -148,9 +148,28 @@ def train_test(conf:Config):
 
     # get data
     data_loaders = data.get_data(conf_loader)
-
     # train!
     ckpt = CheckPoint(conf_checkpoint, load_existing=False)
+    apex = ApexUtils(conf['common']['apex'], logger=None)
+    apex.sync_devices()
+    apex.barrier()
+
+    if apex.is_master():
+        conf_wandb = conf['common']['wandb']
+        if conf_wandb['enabled']:
+            import wandb
+            import hashlib
+            id = hashlib.md5(conf_wandb['run_name'].encode('utf-8')).hexdigest()
+            wandb.init(project=conf_wandb['project_name'],
+                        name=conf_wandb['run_name'],
+                        config=conf,
+                        id=id,
+                        resume=False,
+                        dir=os.path.join(conf['common']['logdir']),
+                        entity=conf_wandb['entity'])
+
+    if apex.is_master():
+        shutil.copyfile(train_config_path,expdir_abspath('config_used_train.yaml'))
     trainer = TrainerLinear(conf_trainer, model)
     trainer.fit(data_loaders)
 

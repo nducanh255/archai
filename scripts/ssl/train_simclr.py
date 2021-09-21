@@ -106,7 +106,8 @@ def train_test(conf_main:Config):
                         config=conf_main,
                         id=id,
                         resume=conf_common['resume'],
-                        dir=os.path.join(conf_common['logdir']))
+                        dir=os.path.join(conf_common['logdir']),
+                        entity=conf_wandb['entity'])
     trainer = TrainerSimClr(conf_trainer, model, ckpt)
     st = time.time()
     trainer.fit(data_loaders)

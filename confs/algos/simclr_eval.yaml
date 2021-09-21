@@ -1,4 +1,4 @@
-__include__: "../datasets/cifar10.yaml" # default dataset settings are for cifar
+# __include__: "../datasets/cifar10.yaml" # default dataset settings are for cifar
 
 common:
   experiment_name: 'SimClr_Cifar10' # you should supply from command line
@@ -49,6 +49,12 @@ common:
       local_mode: False # if True then ray runs in serial mode
     resume: '_copy: /common/checkpoint/resume'
 
+  wandb:
+    enabled: False
+    project_name: 'test' # specify experiment name from command line
+    run_name: 'cifar10_simclr' # specify job name from command line
+    entity: 'sgirish'
+
   smoke_test: False
   only_eval: False
 
@@ -77,6 +83,8 @@ loader:
 trainer:
   title: 'eval_train'
   resume: '_copy: /common/checkpoint/resume'
+  wandb:
+    _copy: '/common/wandb'
   apex:
     _copy: '/common/apex'
   epochs: 100

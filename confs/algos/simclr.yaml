@@ -51,6 +51,7 @@ common:
     enabled: False
     project_name: 'test' # specify experiment name from command line
     run_name: 'cifar10_simclr' # specify job name from command line
+    entity: 'sgirish'
 
   smoke_test: False
   only_eval: False

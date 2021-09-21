@@ -4,6 +4,7 @@
 from typing import Callable, Tuple, Optional
 from overrides.overrides import overrides
 
+import wandb
 import torch
 from torch import nn, Tensor
 from torch.optim.optimizer import Optimizer
@@ -352,6 +353,19 @@ class TrainerLinear(Trainer):
         super(TrainerLinear, self).__init__(conf_train, model, checkpoint)
         self._tester = TesterLinear(conf_train['validation'], model, self._apex) \
                         if conf_train['validation'] else None
+        conf_wandb = conf_train['wandb']
+        self.is_wandb_enabled = conf_wandb['enabled']
+
+        if self.is_wandb_enabled and self._apex.is_master():
+            wandb.define_metric("global_step")
+            wandb.define_metric("epoch")
+            wandb.define_metric("lr", step_metric="global_step")
+            wandb.define_metric("loss", step_metric="global_step")
+            wandb.define_metric("epoch_loss_train", step_metric="epoch")
+            wandb.define_metric("epoch_loss_val", step_metric="epoch")
+            wandb.define_metric("epoch_top1_train", step_metric="epoch")
+            wandb.define_metric("epoch_top1_val", step_metric="epoch")
+            wandb.define_metric("epoch_timings", step_metric="epoch")
 
     @overrides
     def _train_epoch(self, train_dl: DataLoader)->None:
@@ -461,6 +475,80 @@ class TrainerLinear(Trainer):
 
         self._multi_optim.epoch()
         logger.popd()
+
+
+    @overrides
+    def post_step(self, x:Tensor, y:Tensor, logits:Tensor, loss:Tensor,
+                  steps:int)->None:
+        self._metrics.post_step(x, y, logits, loss, steps)
+        if self.is_wandb_enabled and self._apex.is_master():
+            wandb.log({"lr":self._multi_optim.get_lr(0, 0),
+                       "loss":loss,
+                       "global_step":self._metrics.global_step})
+
+    @overrides
+    def post_epoch(self, data_loaders:data.DataLoaders)->None:
+        val_metrics = None
+        # first run test before checkpointing, otherwise we won't have val metrics
+        if data_loaders.val_dl and self._tester and self._validation_freq > 0:
+            if self._metrics.epochs() % self._validation_freq == 0 or \
+                    self._metrics.epochs() >= self._epochs: # last epoch
+
+                # these asserts makes sure train and val are not ovrlapiing
+                # assert train_dl.sampler.epoch == val_dl.sampler.epoch
+                # tidx = list(train_dl.sampler)
+                # vidx = list(val_dl.sampler)
+                # assert all(ti not in vidx for ti in tidx)
+
+                val_metrics = self._tester.test(data_loaders.val_dl)
+
+        # update val metrics
+        self._metrics.post_epoch(lr=self._multi_optim.get_lr(0, 0), val_metrics=val_metrics)
+        if self.is_wandb_enabled and self._apex.is_master():
+            epoch_metric = self._metrics.run_metrics.cur_epoch()
+            wandb.log({'epoch_loss_train':epoch_metric.loss.avg,
+                       'epoch_top1_train':epoch_metric.top1.avg,
+                       'epoch_timings':epoch_metric.duration(),
+                       'epoch':self._metrics.epochs()})
+            if val_metrics is not None:
+                wandb.log({'epoch_loss_val':val_metrics.run_metrics.epochs_metrics[0].loss.avg,
+                        'epoch_top1_val':val_metrics.run_metrics.epochs_metrics[0].top1.avg,
+                        'epoch':self._metrics.epochs()})
+
+        # checkpoint if enabled with given freq or if this is the last epoch
+        if self._checkpoint is not None and self._apex.is_master() and \
+            self._checkpoint.freq > 0 and (self._metrics.epochs() % self._checkpoint.freq == 0 or \
+                    self._metrics.epochs() >= self._epochs):
+            self._checkpoint.new()
+            self.update_checkpoint(self._checkpoint)
+            self._checkpoint.commit()
+
+    @overrides
+    def post_fit(self, data_loaders:data.DataLoaders)->None:
+        test_metrics = None
+        # first run test before checkpointing, otherwise we won't have val metrics
+        if data_loaders.test_dl and self._tester:
+            test_metrics = self._tester.test(data_loaders.test_dl)
+            run_metrics = test_metrics.run_metrics
+            if self.is_wandb_enabled and self._apex.is_master():
+                wandb.run.summary[f'duration_test'] = run_metrics.duration()
+
+        self._metrics.post_run(test_metrics=test_metrics)
+        run_metrics = self._metrics.run_metrics
+        best_train, best_val, best_test = run_metrics.best_epoch()
+        if self.is_wandb_enabled and self._apex.is_master():
+            wandb.run.summary[f'duration_train'] = run_metrics.duration()
+            if best_train:
+                wandb.run.summary['best_train_epoch'] = best_train.index
+                wandb.run.summary['best_train_loss'] = best_train.loss.avg
+                wandb.run.summary['best_train_top1'] = best_train.top1.avg
+            if best_val:
+                wandb.run.summary['best_val_loss'] = best_val.loss.avg
+                wandb.run.summary['best_val_top1'] = best_val.top1.avg
+            if best_test:
+                wandb.run.summary['best_test_loss'] = best_test.loss.avg
+                wandb.run.summary['best_test_top1'] = best_test.top1.avg
+
 
 class TrainerFinetune(Trainer):
     
