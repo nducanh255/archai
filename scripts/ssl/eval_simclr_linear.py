@@ -164,7 +164,7 @@ def train_test(conf:Config):
                         name=conf_wandb['run_name'],
                         config=conf,
                         id=id,
-                        resume=False,
+                        resume=True,
                         dir=os.path.join(conf['common']['logdir']),
                         entity=conf_wandb['entity'])
 
