@@ -3,7 +3,7 @@
 import os
 from overrides import overrides
 from archai.datasets.dataset_provider import DatasetProvider, register_dataset_provider, TrainTestDatasets
-from archai.datasets.transforms.simclr_transforms import SimCLRTrainDataTransform,SimCLREvalDataTransform
+from archai.datasets.transforms.simclr_transforms import SimCLREvalLinearTransform,SimCLRTrainDataTransform,SimCLREvalDataTransform
 from archai.common.config import Config
 from archai.common import utils
 from torchvision import transforms
@@ -17,6 +17,7 @@ class SimClrImageNetProvider(DatasetProvider):
         self.jitter_strength = conf_dataset['jitter_strength']
         self.input_height = conf_dataset['input_height']
         self.gaussian_blur = conf_dataset['gaussian_blur']
+        self.mode = conf_dataset['mode'] if 'mode' in conf_dataset else 'pretrain'
         if conf_dataset['normalize']:
             self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         else:
@@ -41,10 +42,22 @@ class SimClrImageNetProvider(DatasetProvider):
 
     @overrides
     def get_transforms(self)->tuple:
-        train_transform = SimCLRTrainDataTransform(self.input_height,
-            self.gaussian_blur, self.jitter_strength, self.normalize)
-        test_transform = SimCLREvalDataTransform(self.input_height,
-            self.gaussian_blur, self.jitter_strength, self.normalize)
+
+        if self.mode == 'pretrain':
+            train_transform = SimCLRTrainDataTransform(self.input_height,
+                self.gaussian_blur, self.jitter_strength, self.normalize)
+            test_transform = SimCLREvalDataTransform(self.input_height,
+                self.gaussian_blur, self.jitter_strength, self.normalize)
+        elif self.mode == 'eval_linear':
+            train_transform = SimCLREvalLinearTransform(self.input_height,
+                self.normalize, is_train=True)
+            test_transform = SimCLREvalLinearTransform(self.input_height,
+                self.normalize, is_train=False)
+        elif self.mode == 'transfer':
+            train_transform = SimCLREvalLinearTransform(self.input_height,
+                self.normalize, is_transfer=True)
+            test_transform = SimCLREvalLinearTransform(self.input_height,
+                self.normalize, is_transfer=True)
 
         return train_transform, test_transform
 

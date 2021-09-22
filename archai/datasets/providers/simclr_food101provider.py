@@ -11,7 +11,7 @@ import torchvision
 from torchvision.transforms import transforms
 
 from archai.datasets.dataset_provider import DatasetProvider, register_dataset_provider, TrainTestDatasets
-from archai.datasets.transforms.simclr_transforms import SimCLRTrainDataTransform,SimCLREvalDataTransform
+from archai.datasets.transforms.simclr_transforms import SimCLREvalLinearTransform,SimCLRTrainDataTransform,SimCLREvalDataTransform
 from archai.common.config import Config
 from archai.common import utils
 
@@ -23,6 +23,7 @@ class SimClrFood101Provider(DatasetProvider):
         self.jitter_strength = conf_dataset['jitter_strength']
         self.input_height = conf_dataset['input_height']
         self.gaussian_blur = conf_dataset['gaussian_blur']
+        self.mode = conf_dataset['mode'] if 'mode' in conf_dataset else 'pretrain'
         MEAN = [0.5451, 0.4435, 0.3436]
         STD = [0.2171, 0.2251, 0.2260] # TODO: should be [0.2517, 0.2521, 0.2573]
         
@@ -45,17 +46,38 @@ class SimClrFood101Provider(DatasetProvider):
 
         return trainset, testset
 
+    # @overrides
+    # def get_transforms(self)->tuple:
+    #     # TODO: Need to rethink the food101 transforms
+    #     custom_transf = [
+    #         transforms.Resize((32,32)),
+    #         transforms.RandomCrop(32, padding=4),
+    #     ]
+    #     train_transform = SimCLRTrainDataTransform(self.input_height,
+    #         self.gaussian_blur, self.jitter_strength, self.normalize, custom_transf)
+    #     test_transform = SimCLREvalDataTransform(self.input_height,
+    #         self.gaussian_blur, self.jitter_strength, self.normalize, custom_transf)
+
+    #     return train_transform, test_transform
+
     @overrides
     def get_transforms(self)->tuple:
-        # TODO: Need to rethink the food101 transforms
-        custom_transf = [
-            transforms.Resize((32,32)),
-            transforms.RandomCrop(32, padding=4),
-        ]
-        train_transform = SimCLRTrainDataTransform(self.input_height,
-            self.gaussian_blur, self.jitter_strength, self.normalize, custom_transf)
-        test_transform = SimCLREvalDataTransform(self.input_height,
-            self.gaussian_blur, self.jitter_strength, self.normalize, custom_transf)
+
+        if self.mode == 'pretrain':
+            train_transform = SimCLRTrainDataTransform(self.input_height,
+                self.gaussian_blur, self.jitter_strength, self.normalize)
+            test_transform = SimCLREvalDataTransform(self.input_height,
+                self.gaussian_blur, self.jitter_strength, self.normalize)
+        elif self.mode == 'eval_linear':
+            train_transform = SimCLREvalLinearTransform(self.input_height,
+                self.normalize, is_train=True)
+            test_transform = SimCLREvalLinearTransform(self.input_height,
+                self.normalize, is_train=False)
+        elif self.mode == 'transfer':
+            train_transform = SimCLREvalLinearTransform(self.input_height,
+                self.normalize, is_transfer=True)
+            test_transform = SimCLREvalLinearTransform(self.input_height,
+                self.normalize, is_transfer=True)
 
         return train_transform, test_transform
 
