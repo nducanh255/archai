@@ -147,7 +147,7 @@ def train_test(conf:Config):
     model = model.to(torch.device('cuda', 0))
 
     # get data
-    data_loaders = data.get_data(conf_loader)
+    data_loaders = data.get_data_ssl(conf_loader)
     # train!
     ckpt = CheckPoint(conf_checkpoint, load_existing=False)
     apex = ApexUtils(conf['common']['apex'], logger=None)

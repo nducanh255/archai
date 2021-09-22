@@ -78,6 +78,7 @@ loader:
     input_height: 32
     gaussian_blur: False
     normalize: True
+    mode: eval_linear
   # dataset:
   #   max_batches: 2
 trainer:

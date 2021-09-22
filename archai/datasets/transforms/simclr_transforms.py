@@ -172,6 +172,55 @@ class SimCLRFinetuneTransform(object):
     def __call__(self, sample):
         return self.transform(sample)
 
+class SimCLREvalLinearTransform(object):
+    """
+    Transforms for SimCLR
+
+    Transform::
+
+        RandomResizedCrop(size=self.input_height)
+        RandomHorizontalFlip()
+        transforms.ToTensor()
+    """
+
+    def __init__(
+        self, input_height: int = 224, normalize: bool = None, is_train=True, is_transfer=False) -> None:
+
+        self.input_height = input_height
+        self.normalize = normalize
+        self.is_train = is_train
+        self.is_transfer = is_transfer
+        data_transforms = [
+            transforms.RandomResizedCrop(size=self.input_height),
+            transforms.RandomHorizontalFlip(p=0.5),
+        ]
+
+        data_transforms = transforms.Compose(data_transforms)
+
+        if normalize is None:
+            self.final_transform = transforms.ToTensor()
+        else:
+            self.final_transform = transforms.Compose([transforms.ToTensor(), normalize])
+
+        self.train_transform = transforms.Compose([data_transforms, self.final_transform])
+
+        # add online train transform of the size of global view
+        resize_dim = int(self.input_height + 0.1 * self.input_height)
+        data_transforms= transforms.Compose([
+            transforms.Resize((resize_dim,resize_dim)),
+            transforms.CenterCrop(self.input_height)])
+        self.eval_transform = transforms.Compose([data_transforms, self.final_transform])
+
+        data_transforms= transforms.Compose([
+            transforms.Resize(int(self.input_height)),
+            transforms.CenterCrop(self.input_height)])
+        self.transfer_transform = transforms.Compose([data_transforms, self.final_transform])
+
+    def __call__(self, sample):
+        transform = self.train_transform if self.is_train else self.eval_transform
+        transform = self.transfer_transform if self.is_transfer else transform
+
+        return transform(sample)
 
 class GaussianBlur(object):
     # Implements Gaussian blur as described in the SimCLR paper
