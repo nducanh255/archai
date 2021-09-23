@@ -310,8 +310,8 @@ class Evolution(object):
 
             # download the log file from jobs to get the ppls
             path_to_results = './amlt_logs'
-            if os.path.exists(path_to_results):
-                os.system(f'rm -r {path_to_results}')
+            # if os.path.exists(path_to_results):
+            #     os.system(f'rm -r {path_to_results}')
             os.mkdir(path_to_results)
             command = 'amlt results {} -I "*.json"  -o {} --no-md5'.format(exp_name, path_to_results)
             os.system(command)
@@ -533,7 +533,7 @@ class Evolution(object):
         
         return
 
-    def get_convex_hull(self, xs, ys, eps=None, allow_decrease=True):
+    def get_convex_hull(self, xs, ys, eps=None, allow_decrease=False, allow_increase=False):
         """
         Andrew's Monotone Chain Algorithm: (https://en.wikipedia.org/wiki/Graham_scan)
         Assume the data are sorted in order of xs, then the computation complexity is O(n)
@@ -542,6 +542,9 @@ class Evolution(object):
         hull_indices (list): indices for the points on the hull exactly
         eps_indices (list): indices for the points on the hull + eps tolerance
         """
+        xs = list(xs)
+        ys = list(ys)
+
         indices = list(range(len(xs)))
         # check xs is sorted
         is_monotone = True
@@ -575,11 +578,20 @@ class Evolution(object):
             return idxs
 
         hull_indices = []
-        max_y = -float('inf')
+
+        if not allow_decrease:
+            xs.insert(0, xs[indices[0]]/2)
+            ys.insert(0, np.min(ys).tolist())
+            indices = (np.asarray(indices)+1).tolist()
+            indices.insert(0, 0)
+            # x1, y1 = xs[indices[0]] / 2, np.min(ys)
+            # hull_indices = _remove_non_hull_idx(x1, y1, hull_indices)
+
         c = 0
+        min_y = float('inf')
         for idx in indices:
             x1, y1 = xs[idx], ys[idx]
-            max_y = max(y1, max_y)
+            min_y = min(y1, min_y)
             hull_indices = _remove_non_hull_idx(x1, y1, hull_indices)
             hull_indices.append(idx)
 
@@ -590,9 +602,9 @@ class Evolution(object):
             # plt.savefig(os.path.join(self.results_path, 'debug_convex_hull_{}.png'.format(c)), dpi=plt.gcf().dpi, bbox_inches='tight')
             # c += 1
 
-        if not allow_decrease:
-            # use a fake final point at (2 * x_max , y_max) to remove decreasing.
-            x1, y1 = xs[indices[-1]] * 2, max_y
+        if not allow_increase:
+            # use a fake final point at (2 * x_max , y_min) to remove increasing.
+            x1, y1 = xs[indices[-1]] * 2, min_y
             hull_indices = _remove_non_hull_idx(x1, y1, hull_indices)
 
         # compute epsilon hull (convex hull + (1+eps) band)
@@ -630,6 +642,12 @@ class Evolution(object):
                     eps_indices.append(idx)
                     assert x1 <= x and x2 >= x, "idx={} idx[h_idx-1]={} idx[h_idx]={}  x={} y={} x1={} x2={} y1={} y2={} y_interp={}".format(\
                         idx, hull_indices[h_idx-1], hull_indices[h_idx], x, y, x1, x2, y1, y2, y_interp)
+
+        if not allow_decrease:
+            hull_indices.pop(0)
+            hull_indices = (np.asarray(hull_indices)-1).tolist()
+            eps_indices.pop(0)
+            eps_indices = (np.asarray(eps_indices)-1).tolist()
 
         return hull_indices, eps_indices
     
@@ -763,11 +781,11 @@ def test_convex_hull(args):
     np.random.seed(0)
     xs = np.random.uniform(size=100)
     ys = np.random.uniform(size=100) + xs + 1.0
-    eps = np.random.uniform(low=0.0, high=0.3)
+    eps = 0#np.random.uniform(low=0.0, high=0.3)
     print(eps)
 
     # compute eps convex hull.
-    hull_indices, indices = alg.get_convex_hull(xs, ys, eps, allow_decrease=True)
+    hull_indices, indices = alg.get_convex_hull(xs, ys, eps, allow_decrease=True, allow_increase=False)
 
     # plot
     hull_xs = [xs[i] for i in indices]
@@ -874,6 +892,8 @@ def get_bundle_run_command(configs, max_step, n_gpus, gpu_config, is_pareto=None
         curr_config[k] = str(get_yaml_values(v))
     
     exp_name = 'j' + str(i) + ('_pareto' if (is_pareto is not None and is_pareto[i]) else '')
+    if is_pareto is not None and is_pareto[i]:
+        print(exp_name)
     command.append('python -m torch.distributed.launch --nproc_per_node="%s" archai/nlp/nvidia_transformer_xl/train.py --config %s \
                   --config_file wt103_base.yaml --n_layer %s --n_head %s --d_model %s --d_head %s \
                   --d_inner %s --d_embed %s --div_val %s --max_step %d --experiment_name %s' \
@@ -883,7 +903,7 @@ def get_bundle_run_command(configs, max_step, n_gpus, gpu_config, is_pareto=None
   return command
 
 
-def create_jobs(all_population, start_config=0, bundle_count=50, max_step=500, n_gpus=8, gpu_config='dgx1_8gpu_fp32', target='NLX-NDv2', exp_name='midevolution_training_'):
+def create_jobs(all_population, start_config=0, bundle_count=50, max_step=500, n_gpus=8, gpu_config='dgx1_8gpu_fp32', target='NLX-NDv2', exp_name='midevolution_training_', is_pareto=None):
     # create corresponding yaml files for amulet jobs
     n_configs = len(all_population)
     c = 0
@@ -906,7 +926,7 @@ def create_jobs(all_population, start_config=0, bundle_count=50, max_step=500, n
         amlt_config['jobs'][0]['name'] = 'config_{}'.format(str(config_idx))
         amlt_config['jobs'][0]['sku'] = f'G{n_gpus}'
         amlt_config['jobs'][0]['command'] = ['set -e -o xtrace', 'pip install --user -e .']
-        amlt_config['jobs'][0]['command'] += get_bundle_run_command(copy.deepcopy(all_population[c:c+bundle_count]), max_step, n_gpus, gpu_config, is_pareto=None)
+        amlt_config['jobs'][0]['command'] += get_bundle_run_command(copy.deepcopy(all_population[c:c+bundle_count]), max_step, n_gpus, gpu_config, is_pareto=is_pareto[c:c+bundle_count])
 
         config_file = 'nv_train_'+str(config_idx)+'.yaml'
         path_to_configs = os.path.join('/home/t-mojanj/Projects/archai/archai/nlp/nvidia_transformer_xl', 'configs')
@@ -952,6 +972,7 @@ def submit_gt_jobs(args, max_step=500, start_config=0, bundle_count=50, n_gpus=8
     seen = {}
     all_population = []
     is_pareto = []
+    is_pareto_dict = {}
     all_latencies = {}
     for iter, pop in enumerate(logs['population']):
         unseen = 0
@@ -970,14 +991,19 @@ def submit_gt_jobs(args, max_step=500, start_config=0, bundle_count=50, n_gpus=8
                 
                 if iter < len(logs['latencies']):
                     all_latencies[key] = logs['latencies'][iter][idx]
+                    is_pareto_dict[key] = is_pareto[-1]
         # print('unseen here:', unseen)
     print('{} total configs and {} on the pareto'.format(len(all_population), np.sum(is_pareto)))
+    assert np.sum(list(is_pareto_dict.values())) == np.sum(is_pareto)
     
     path_to_pkl = os.path.join(results_path, 'latencies.pkl')
     with open(path_to_pkl, 'wb') as f:
         pickle.dump(all_latencies, f)
+    path_to_pkl = os.path.join(results_path, 'pareto.pkl')
+    with open(path_to_pkl, 'wb') as f:
+        pickle.dump(is_pareto_dict, f)
     
-    create_jobs(all_population, start_config, bundle_count, max_step, n_gpus, gpu_config, targets[0], exp_name='evolution_')
+    create_jobs(all_population, start_config, bundle_count, max_step, n_gpus, gpu_config, targets[0], exp_name='evolution_', is_pareto=is_pareto)
 
 
 def get_diff_with_pareto(gt_latencies, gt_val_ppls, is_gt_pareto, is_proxy_pareto):
@@ -989,6 +1015,7 @@ def get_diff_with_pareto(gt_latencies, gt_val_ppls, is_gt_pareto, is_proxy_paret
         if not is_proxy_pareto[idx]:
             continue
         if is_gt_pareto[idx]:
+            pass
             ppl_diff.append(0.)
         else:
             idx_fwd, idx_bkwd = None, None
@@ -1003,8 +1030,10 @@ def get_diff_with_pareto(gt_latencies, gt_val_ppls, is_gt_pareto, is_proxy_paret
                     diff_bkwd = np.absolute(latency-gt_latencies[j])
                     idx_bkwd = j
                     break
-            if idx_fwd is not None and diff_frwd<diff_bkwd:
-                closest_idx = idx_fwd 
+            if idx_fwd is None:
+                closest_idx = idx_bkwd
+            elif idx_bkwd is None or diff_frwd<diff_bkwd:
+                closest_idx = idx_fwd
             else:
                 closest_idx = idx_bkwd
             print('latency difference with closest pareto point: {:1f} ms'.format(np.absolute(latency-gt_latencies[closest_idx])*1000))
@@ -1014,7 +1043,7 @@ def get_diff_with_pareto(gt_latencies, gt_val_ppls, is_gt_pareto, is_proxy_paret
     return np.mean(ppl_diff)
 
 
-def get_gt_pareto(args, exp_name, path_to_dir, start_config, eps=0.05):
+def get_gt_pareto(args, exp_name, path_to_dir, start_config, ppl_eps=0.1, hybrid=False, use_convex_hull=False):
     gt_results = gather_results(exp_name, path_to_dir, filetypes=['.yaml', '.json'], verbose=False)
     print('found %d model configurations' % len(gt_results.keys()))
 
@@ -1026,8 +1055,12 @@ def get_gt_pareto(args, exp_name, path_to_dir, start_config, eps=0.05):
     
     # load previous pareto
     loaded_pareto = None
-    path_to_pkl = os.path.join(results_path, 'pareto.pkl')
+    fname = 'pareto{}'.format('' if hybrid else '_params')
+    fname += '_convexHull' if use_convex_hull else ''
+    path_to_pkl = os.path.join(results_path, fname+'.pkl')
+    
     if os.path.exists(path_to_pkl):
+        print('Loading proxy pareto')
         with open(path_to_pkl, 'rb') as f:
             loaded_pareto = pickle.load(f)
     
@@ -1041,7 +1074,7 @@ def get_gt_pareto(args, exp_name, path_to_dir, start_config, eps=0.05):
         key = alg.converter.gene2key(gene) #','.join([str(g) for g in gene])
         if key in latencies.keys():
             config_number = re.search('config_([0-9]+)_', job_name).group(1)
-            print(job_name, config_number)
+            # print(job_name, config_number)
             if int(config_number) < start_config:
                 continue
             try:
@@ -1055,23 +1088,47 @@ def get_gt_pareto(args, exp_name, path_to_dir, start_config, eps=0.05):
                 pass
             
     is_pareto = np.asarray(is_pareto)
-    print(f'found {len(gt_val_ppls)} models with {np.sum(is_pareto)} on the pareto')
+    print(f'found {len(gt_val_ppls)} models with {np.sum(is_pareto)} on the proxy pareto')
     # assert len(gt_val_ppls)>=len(latencies.keys()), print(len(gt_val_ppls), len(latencies.keys()))
 
-    # extract the actual pareto front based on val ppl and latency
-    range_val_ppl = np.max(gt_val_ppls) - np.min(gt_val_ppls)
-    sorted_indices = np.argsort(gt_val_ppls)[::-1]
-    is_gt_pareto = np.zeros_like(is_pareto)
-    for i in range(len(sorted_indices)):
-        this_is_pareto = True
-        for j in sorted_indices[i:]:
-            val_ppl_diff = abs(gt_val_ppls[sorted_indices[i]]-gt_val_ppls[j])*1./range_val_ppl
-            if val_ppl_diff <= eps and gt_latencies[sorted_indices[i]] > gt_latencies[j]:
-                this_is_pareto = False
-                break
-        is_gt_pareto[sorted_indices[i]] = this_is_pareto
+    if use_convex_hull:
+        ################# pareto extraction via convex hull ################# 
+        assert len(gt_val_ppls)==len(is_pareto)
+        is_gt_pareto = np.zeros_like(is_pareto)
+        xs = gt_latencies
+        ys = np.asarray(gt_val_ppls)
+        gt_pareto_indices, _ = alg.get_convex_hull(xs, ys, eps=0., allow_decrease=True, allow_increase=False)
+        is_gt_pareto[gt_pareto_indices] = 1.0
+    else:
+        # extract the actual pareto front based on val ppl and latency
+        ################# faster vanilla pareto extraction on sorted values ################# 
+        '''
+        range_val_ppl = np.max(gt_val_ppls) - np.min(gt_val_ppls)
+        sorted_indices = np.argsort(gt_val_ppls)[::-1]
+        is_gt_pareto = np.zeros_like(is_pareto)
+        for i in range(len(sorted_indices)):
+            this_is_pareto = True
+            for j in sorted_indices[i:]:
+                val_ppl_diff = abs(gt_val_ppls[sorted_indices[i]]-gt_val_ppls[j])*1./range_val_ppl
+                if val_ppl_diff <= eps and gt_latencies[sorted_indices[i]] > gt_latencies[j]:
+                    this_is_pareto = False
+                    break
+            is_gt_pareto[sorted_indices[i]] = this_is_pareto
+        '''
 
-    print(len(is_gt_pareto), len(np.nonzero(is_gt_pareto)[0]))
+        ################# vanilla pareto extraction ################# 
+        assert len(gt_val_ppls)==len(is_pareto)
+        is_gt_pareto = np.zeros_like(is_pareto)
+        for i in range(len(gt_val_ppls)):
+            is_pareto_ppl = True
+            # is_pareto_latency = True
+            for j in range(len(gt_val_ppls)):
+                val_ppl_diff = abs(gt_val_ppls[i]-gt_val_ppls[j])
+                if val_ppl_diff <= ppl_eps and gt_latencies[i] > gt_latencies[j]:
+                    is_pareto_ppl = False
+            is_gt_pareto[i] = is_pareto_ppl
+
+    print('{} points on the groud-truth pareto'.format(len(np.nonzero(is_gt_pareto)[0])))
     TPR = len(np.intersect1d(np.nonzero(is_gt_pareto)[0], np.nonzero(is_pareto)[0]))*100./len(np.nonzero(is_gt_pareto)[0])
     TNR = len(np.intersect1d(np.nonzero(~is_gt_pareto)[0], np.nonzero(~is_pareto)[0]))*100./len(np.nonzero(~is_gt_pareto)[0])
     print(f'TPR={TPR}% and TNR={TNR}%')
@@ -1079,9 +1136,9 @@ def get_gt_pareto(args, exp_name, path_to_dir, start_config, eps=0.05):
     print('mean ppl difference between proxy and gt pareto: {:.1f}%'.format(mean_ppl_difference))
     
     plt.figure()
-    plt.scatter(np.asarray(gt_latencies)[~is_pareto] * 1000., np.asarray(gt_val_ppls)[~is_pareto], s=10)
-    plt.scatter(np.asarray(gt_latencies)[is_pareto] * 1000., np.asarray(gt_val_ppls)[is_pareto], s=10)
-    plt.scatter(np.asarray(gt_latencies)[is_gt_pareto] * 1000., np.asarray(gt_val_ppls)[is_gt_pareto], s=10)
+    plt.scatter(np.asarray(gt_latencies)[~is_pareto] * 1000., np.asarray(gt_val_ppls)[~is_pareto], s=5)
+    plt.scatter(np.asarray(gt_latencies)[is_pareto] * 1000., np.asarray(gt_val_ppls)[is_pareto], s=5)
+    plt.scatter(np.asarray(gt_latencies)[is_gt_pareto] * 1000., np.asarray(gt_val_ppls)[is_gt_pareto], s=5)
     # plt.scatter(np.asarray(gt_val_ppls)[~is_pareto], np.asarray(gt_latencies)[~is_pareto] * 1000., s=10)
     # plt.scatter(np.asarray(gt_val_ppls)[is_pareto], np.asarray(gt_latencies)[is_pareto] * 1000., s=10)
     plt.xlabel('Latency (ms)')
@@ -1089,12 +1146,15 @@ def get_gt_pareto(args, exp_name, path_to_dir, start_config, eps=0.05):
     plt.xlim((np.min(gt_latencies)*1000-10, np.max(gt_latencies)*1000+10))
     plt.title('Pareto Curve')
     plt.grid(axis='y')
-
-    fname = 'gt_pareto_latency.png'
+    fname = 'gt_pareto_latency{}.png'.format('' if hybrid else '_params')
     plt.savefig(os.path.join(results_path, fname), bbox_inches="tight")
 
 
-def get_final_pareto_front(args, eps=0.05):
+def get_final_pareto_front(args, eps=0.05, hybrid=False, use_convex_hull=False):
+    if use_convex_hull:
+        print(f'extracting the pareto using the convex hull')
+    else:
+        print(f'extracting the pareto with eps={eps}')
     alg = Evolution(**args)
 
     results_path = args['results_path']
@@ -1105,50 +1165,126 @@ def get_final_pareto_front(args, eps=0.05):
     # get all population
     seen_keys = []
     all_population = []
-    all_scores = []
     all_params = []
     all_latencies = []
-    for i, pop in enumerate(logs['population']):
+    idx = 0
+    for i in range(len(logs['params'])):
+        pop = logs['population'][i]
+        if (args['start_train'] < args['n_iter']) and (i == args['start_train']) and hybrid:
+            idx = len(all_population)
         for j, gene in enumerate(pop):
             key = alg.converter.gene2key(gene)
             if not key in seen_keys:
                 seen_keys.append(key)
                 all_population.append(gene)
-                all_scores.append((logs['params'][i][j]*1./alg.max_n_params) - (logs['latencies'][i][j]*1./alg.max_latency) * alg.latency_scale)
-                all_params.append(logs['params'][i][j])
                 all_latencies.append(logs['latencies'][i][j])
 
+                if hybrid:
+                    all_params.append(logs['params'][i][j])
+                else:
+                    if (args['start_train'] < args['n_iter']) and (i >= args['start_train']):
+                        model_config = copy.deepcopy(model_config_defaults)
+                        model_config.update(alg.converter.gene2config(gene))
+                        model = get_model(model_config, train=False)
+                        curr_n_all_param, _, _, params_attention, params_ff = process_parameters(model, verbose=False)
+                        all_params.append(params_attention + params_ff)
+                    else:
+                        all_params.append(logs['params'][i][j])
+                
     range_params = np.max(all_params) - np.min(all_params)
     pareto = {'population':[], 'params':[], 'latencies':[]}
-    sorted_indices = np.argsort(all_params)
-    is_pareto_dict = {}
-    for i in range(len(sorted_indices)):
-        is_pareto = True
-        for j in sorted_indices[i:]:
-            param_diff = abs(all_params[sorted_indices[i]]-all_params[j])*1./range_params
-            if param_diff <= eps and all_latencies[sorted_indices[i]] > all_latencies[j]:
-                is_pareto = False
-                break
-        if is_pareto:
-            pareto['population'].append(all_population[sorted_indices[i]])
-            pareto['params'].append(all_params[sorted_indices[i]])
-            pareto['latencies'].append(all_latencies[sorted_indices[i]])
-        
-        is_pareto_dict[seen_keys[sorted_indices[i]]] = is_pareto
+    
+    if not hybrid:
+        assert idx==0
 
-    path_to_logs = os.path.join(results_path, 'pareto.pkl')
+    is_pareto_dict = {}
+    if use_convex_hull:
+        ################# pareto extraction via convex hull ################# 
+        if hybrid:
+            xs = all_latencies[idx:]
+            ys = all_params[idx:]
+        else:
+            xs = all_params[idx:]
+            ys = all_latencies[idx:]
+        pareto_indices, _ = alg.get_convex_hull(xs, ys, eps=0., allow_decrease=False)
+        for i in range(len(all_params)):
+            if i < idx and hybrid:
+                is_pareto_dict[seen_keys[i]] = False
+            else:
+                is_pareto = (i in pareto_indices)
+                if is_pareto:
+                    pareto['population'].append(all_population[i])
+                    pareto['params'].append(all_params[i])
+                    pareto['latencies'].append(all_latencies[i])
+                is_pareto_dict[seen_keys[i]] = is_pareto
+    else:
+        ################# faster vanilla pareto extraction on sorted values ################# 
+        '''
+        sorted_indices = np.argsort(all_params)
+        for i in range(len(sorted_indices)):
+            is_pareto = True
+            for j in sorted_indices[i:]:
+                param_diff = abs(all_params[sorted_indices[i]]-all_params[j])*1./range_params
+                if param_diff <= eps and all_latencies[sorted_indices[i]] > all_latencies[j]:
+                    is_pareto = False
+                    break
+            if is_pareto:
+                pareto['population'].append(all_population[sorted_indices[i]])
+                pareto['params'].append(all_params[sorted_indices[i]])
+                pareto['latencies'].append(all_latencies[sorted_indices[i]])
+            is_pareto_dict[seen_keys[sorted_indices[i]]] = is_pareto
+        '''
+        ################# vanilla pareto extraction ################# 
+        for i in range(len(all_params)):
+            if i < idx and hybrid:
+                is_pareto_dict[seen_keys[i]] = False
+            else:
+                is_pareto = True
+                for j in range(len(all_params)):
+                    if (args['start_train'] < args['n_iter']) and hybrid:
+                        param_diff = abs(all_params[i]-all_params[j])
+                    else:
+                        param_diff = abs(all_params[i]-all_params[j])*1./range_params
+                    if param_diff <= eps and all_latencies[i] > all_latencies[j]:
+                        is_pareto = False
+                        break
+                if is_pareto:
+                    pareto['population'].append(all_population[i])
+                    pareto['params'].append(all_params[i])
+                    pareto['latencies'].append(all_latencies[i])
+                is_pareto_dict[seen_keys[i]] = is_pareto
+
+    fname = 'pareto{}'.format('' if hybrid else '_params')
+    fname += '_convexHull' if use_convex_hull else ''
+    path_to_logs = os.path.join(results_path, fname+'.pkl')
     with open(path_to_logs, 'wb') as f:
         pickle.dump(is_pareto_dict, f)
 
+    print(f'found {np.sum(list(is_pareto_dict.values()))} points on the proxy pareto')
+
     plt.figure()
-    plt.scatter(all_params, np.asarray(all_latencies) * 1000., s=10)
-    plt.scatter(pareto['params'], np.asarray(pareto['latencies']) * 1000., s=10)
-    plt.ylabel('Latency (ms)')
-    plt.xlabel('Decoder nParams')
-    plt.xlim((4.2e6, 2.6e7))
+    if (args['start_train'] < args['n_iter']) and hybrid:
+        x = np.asarray(all_latencies[idx:]) * 1000.
+        y = np.asarray(all_params[idx:]) * (-1)
+        x_pareto = np.asarray(pareto['latencies']) * 1000.
+        y_pareto = np.asarray(pareto['params']) * (-1)
+        x_label = 'Latency (ms)'
+        y_label = 'Val ppl'
+    else:
+        x = np.asarray(all_params)
+        y = np.asarray(all_latencies) * 1000.
+        x_pareto = np.asarray(pareto['params'])
+        y_pareto = np.asarray(pareto['latencies']) * 1000.
+        x_label = 'Decoder nParams'
+        y_label = 'Latency (ms)'
+    
+    plt.scatter(x, y, s=5)
+    plt.scatter(x_pareto, y_pareto, s=5)
+    plt.ylabel(y_label)
+    plt.xlabel(x_label)
     plt.title('Pareto Curve')
     plt.grid(axis='y')
-    plt.savefig(os.path.join(results_path, 'final_convex_hull.png'), bbox_inches="tight")
+    plt.savefig(os.path.join(results_path, 'final_convex_hull{}.png'.format('' if hybrid else '_params')), bbox_inches="tight")
 
 
 if __name__=='__main__':
@@ -1157,15 +1293,15 @@ if __name__=='__main__':
     random.seed(seed)
     torch.manual_seed(seed)
 
-    args = {'default_path': './evo_search','population_size':50, 'parent_size':10, 'mutation_size':20, 'mutation_prob':0.3, 'crossover_size':20,
+    args = {'default_path': './evo_search','population_size':50, 'parent_size':10, 'mutation_size':20, 'mutation_prob':0.3, 'crossover_size':20, 
             'n_iter':30, 'n_layer_choice':[3,4,5,6,7,8], 'd_model_choice':[128, 256, 512], 'd_inner_choice':list(range(512, 2049, 50))+[2048], 'n_head_choice':[2,4,8],
             'param_constraint':5e6, 'latency_scale':2., 'n_threads':1, 'latency_repeat':5, 'pareto_search':True,
             ################### extracting pareto
             'eps':0.05, 'use_convex_hull':False,
             ################### brute_force
             'nsamples':20000, 'batch':1000, 'do_train':False,
-            ################### evaluation scheme (set start_train to bigger than n_iter to disable training for evaluation)
-            'start_train':15, 'train_local':True, 'n_gpus':4, 'gpu_config':'dgx1_4gpu_fp32', 'config_file':'wt103_base.yaml', 'max_step':500, 'experiment_name':'evolution',
+            ################### evaluation scheme  (set start_train to bigger than n_iter to disable training for evaluation)
+            'start_train':15, 'train_local':True, 'n_gpus':4, 'gpu_config':'dgx1_4gpu_fp32', 'config_file':'wt103_base.yaml', 'max_step':500, 'experiment_name':'evolution', 
             'scheduler':'constant', 'use_valid':True}
     
     dir_name = 'param_threshold_{}'.format(args['param_constraint']/1e6)
@@ -1173,31 +1309,40 @@ if __name__=='__main__':
         dir_name += '_pareto'
     if args['use_convex_hull']:
         dir_name += '_convex_hull'
+    if args['start_train'] < args['n_iter']:
+        dir_name += '_wTrain'
 
-    # dir_name='test'
-    args['results_path'] = os.path.join(args['default_path'], dir_name)
-    # args['results_path'] = os.path.join(args['default_path'], 'param_threshold_5000000_D3_V2')
-    # args['results_path'] = os.path.join(args['default_path'], 'param_threshold_5000000.0_old_pareto')
+    # args['results_path'] = os.path.join(args['default_path'], dir_name)
+    args['results_path'] = os.path.join(args['default_path'], 'param_threshold_5.0_D3_V2')
+    # args['results_path'] = os.path.join(args['default_path'], 'param_threshold_5.0_pareto')
 
     # test_converter()
     # test_convex_hull(args)
     
     #--------------- run evolutionary search
-    test_evo_search(args, brute_force=False)
+    # test_evo_search(args, brute_force=False)
     
     #--------------- submit ground-truth training jobs over the entire population after search
-    # submit_gt_jobs(args, max_step=5000, start_config=48, bundle_count=50, n_gpus=8, gpu_config='dgx1_8gpu_fp32', targets=['NLX-NDv2'])
+    # submit_gt_jobs(args, max_step=40000, start_config=0, bundle_count=20, n_gpus=8, gpu_config='dgx1_8gpu_fp32', targets=['NLX-NDv2'])
+      
+
+    use_convex_hull = True # if True, will use convex hull to extract the final paretos, otherwise, the vanilla pareto formula
+    hybrid = False # if hybrid is true, takes the pareto on mid-search training, otherwise only looks at nparams 
     
-    #--------------- extract proxy pareto from all samples seen during the evolutionary search
-    # get_final_pareto_front(args, eps=0.05)
+    # #--------------- extract proxy pareto from all samples seen during the evolutionary search
+    # ppl_eps = 1 # abosulte ppl difference for extracting the pareto
+    # param_eps = 0.01 # nomarlized parameter diff for extracting the pareto
+    # eps = ppl_eps if (args['start_train'] < args['n_iter'] and hybrid) else param_eps
+    # get_final_pareto_front(args, eps=eps, hybrid=hybrid, use_convex_hull=use_convex_hull)    
 
     #--------------- compare ground-truth pareto with the proxy pareto
-    # gt_exp_name = 'evolution_5000'
-    # path_to_amlt_results = './amlt_logs'
-    # os.makedirs(path_to_amlt_results, exist_ok=True)
+    gt_exp_name = 'evolution_5000'
+    path_to_amlt_results = './amlt_logs'
+    os.makedirs(path_to_amlt_results, exist_ok=True)
     # command = 'amlt results {} -I "*.json"  -o {} --no-md5'.format(gt_exp_name, path_to_amlt_results)
     # os.system(command)
     # command = 'amlt results {} -I "*.yaml"  -o {} --no-md5'.format(gt_exp_name, path_to_amlt_results)
     # os.system(command)
-    # path_to_amlt_results = os.path.join(path_to_amlt_results, gt_exp_name)
-    # get_gt_pareto(args, exp_name=gt_exp_name, path_to_dir=path_to_amlt_results, start_config=25, eps=0.05)
+    path_to_amlt_results = os.path.join(path_to_amlt_results, gt_exp_name)
+    get_gt_pareto(args, exp_name=gt_exp_name, path_to_dir=path_to_amlt_results, start_config=25, 
+                    ppl_eps=0.1, hybrid=hybrid, use_convex_hull=use_convex_hull)

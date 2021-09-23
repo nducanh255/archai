@@ -15,254 +15,104 @@ jobs:
   - pip install --user -e .
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 4,8,8,2,2,2,8 --d_model 256 --d_head 64,32,32,128,128,128,32                   --d_inner
-    935,1735,1685,1585,2035,1835,1535 --d_embed 256 --div_val 4 --max_step 5000 --experiment_name
+    4 --n_head 2,2,8,4 --d_model 512 --d_head 256,256,64,128                   --d_inner
+    1570,1620,1785,1120 --d_embed 512 --div_val 4 --max_step 40000 --experiment_name
     j0
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 4,2,2,2,4,2,8 --d_model 512 --d_head 128,256,256,256,128,256,64                   --d_inner
-    1520,1120,1070,1820,1970,920,920 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
+    4 --n_head 2,2,4,4 --d_model 512 --d_head 256,256,128,128                   --d_inner
+    1570,1920,1785,1885 --d_embed 512 --div_val 4 --max_step 40000 --experiment_name
     j1
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    8 --n_head 4,2,2,8,2,2,2,2 --d_model 512 --d_head 128,256,256,64,256,256,256,256                   --d_inner
-    1720,970,1020,1620,1270,1770,1320,1720 --d_embed 512 --div_val 4 --max_step 5000
-    --experiment_name j2
+    4 --n_head 2,2,4,4 --d_model 512 --d_head 256,256,128,128                   --d_inner
+    1670,1920,1785,1885 --d_embed 512 --div_val 4 --max_step 40000 --experiment_name
+    j2
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 2,4,4,8,8,8,2 --d_model 512 --d_head 256,128,128,64,64,64,256                   --d_inner
-    1770,1220,1370,1170,1120,1970,1720 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
+    6 --n_head 8,8,2,4,4,2 --d_model 512 --d_head 64,64,256,128,128,256                   --d_inner
+    1570,1770,1520,1920,1820,1720 --d_embed 512 --div_val 4 --max_step 40000 --experiment_name
     j3
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    8 --n_head 4,2,4,8,4,4,8,2 --d_model 512 --d_head 128,256,128,64,128,128,64,256                   --d_inner
-    870,1370,970,970,2020,1120,1970,1070 --d_embed 512 --div_val 4 --max_step 5000
-    --experiment_name j4
+    6 --n_head 2,2,4,8,8,4 --d_model 512 --d_head 256,256,128,64,64,128                   --d_inner
+    1920,1920,1820,1285,1720,1970 --d_embed 512 --div_val 4 --max_step 40000 --experiment_name
+    j4
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 2,2,8,4,8,8,2 --d_model 512 --d_head 256,256,64,128,64,64,256                   --d_inner
-    1770,1220,1920,1170,1720,1020,1920 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j5
+    8 --n_head 2,8,4,8,4,2,2,8 --d_model 512 --d_head 256,64,128,64,128,256,256,64                   --d_inner
+    1570,1770,1520,1920,1520,1720,2020,785 --d_embed 512 --div_val 4 --max_step 40000
+    --experiment_name j5
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    6 --n_head 2,4,4,4,8,8 --d_model 512 --d_head 256,128,128,128,64,64                   --d_inner
-    1770,1220,1920,1370,1320,1020 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
+    5 --n_head 2,2,4,4,4 --d_model 256 --d_head 128,128,64,64,64                   --d_inner
+    1920,1920,2035,1685,1135 --d_embed 256 --div_val 4 --max_step 40000 --experiment_name
     j6
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    4 --n_head 4,4,8,4 --d_model 512 --d_head 128,128,64,128                   --d_inner
-    870,1620,1020,1620 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j7
+    8 --n_head 2,4,4,4,2,2,4,4 --d_model 512 --d_head 256,128,128,128,256,256,128,128                   --d_inner
+    1570,1270,1785,1320,1370,1970,1020,1570 --d_embed 512 --div_val 4 --max_step 40000
+    --experiment_name j7
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 8,8,8,8,2,2,8 --d_model 256 --d_head 32,32,32,32,128,128,32                   --d_inner
-    1170,485,2035,1120,1270,1720,1420 --d_embed 256 --div_val 4 --max_step 5000 --experiment_name
+    6 --n_head 2,4,2,4,2,4 --d_model 512 --d_head 256,128,256,128,256,128                   --d_inner
+    1970,1920,1935,1285,1720,1070 --d_embed 512 --div_val 4 --max_step 40000 --experiment_name
     j8
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 2,4,4,4,8,8,2 --d_model 512 --d_head 256,128,128,128,64,64,256                   --d_inner
-    1770,1570,1920,1170,1970,1020,1620 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j9
+    7 --n_head 8,4,4,4,4,2,2 --d_model 512 --d_head 64,128,128,128,128,256,256                   --d_inner
+    1770,1620,1520,1920,1520,1720,1320 --d_embed 512 --div_val 4 --max_step 40000
+    --experiment_name j9
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    8 --n_head 4,2,2,4,2,4,2,2 --d_model 256 --d_head 64,128,128,64,128,64,128,128                   --d_inner
-    1985,1785,1235,835,970,2035,920,1720 --d_embed 256 --div_val 4 --max_step 5000
-    --experiment_name j10
+    6 --n_head 2,2,2,4,2,4 --d_model 512 --d_head 256,256,256,128,256,128                   --d_inner
+    1635,1570,1785,835,1720,1020 --d_embed 512 --div_val 4 --max_step 40000 --experiment_name
+    j10_pareto
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    8 --n_head 2,4,8,4,4,8,2,8 --d_model 512 --d_head 256,128,64,128,128,64,256,64                   --d_inner
-    1720,1620,1020,1820,1520,1020,1320,1570 --d_embed 512 --div_val 4 --max_step 5000
+    8 --n_head 2,4,4,8,4,2,4,2 --d_model 512 --d_head 256,128,128,64,128,256,128,256                   --d_inner
+    1770,1770,1520,1920,1520,1720,1320,785 --d_embed 512 --div_val 4 --max_step 40000
     --experiment_name j11
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 8,2,2,2,2,8,8 --d_model 512 --d_head 64,256,256,256,256,64,64                   --d_inner
-    1520,1220,1635,1970,1970,1635,920 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j12
+    8 --n_head 2,2,4,4,2,8,2,2 --d_model 256 --d_head 128,128,64,64,128,32,128,128                   --d_inner
+    1570,1635,1285,1885,1170,785,1935,1135 --d_embed 256 --div_val 4 --max_step 40000
+    --experiment_name j12
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 2,2,8,4,4,8,2 --d_model 512 --d_head 256,256,64,128,128,64,256                   --d_inner
-    1770,1420,1920,1420,1320,1020,1820 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
+    4 --n_head 4,8,2,2 --d_model 512 --d_head 128,64,256,256                   --d_inner
+    1570,1920,1785,1885 --d_embed 512 --div_val 4 --max_step 40000 --experiment_name
     j13
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 4,4,4,2,2,4,2 --d_model 512 --d_head 128,128,128,256,256,128,256                   --d_inner
-    1770,1570,1920,1520,1970,1020,1920 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
+    6 --n_head 2,2,4,4,2,4 --d_model 256 --d_head 128,128,64,64,128,64                   --d_inner
+    1570,1270,1785,1320,1320,1970 --d_embed 256 --div_val 4 --max_step 40000 --experiment_name
     j14
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    6 --n_head 8,2,4,4,8,8 --d_model 512 --d_head 64,256,128,128,64,64                   --d_inner
-    1770,1220,1920,1420,1320,1020 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
+    5 --n_head 2,2,2,4,2 --d_model 512 --d_head 256,256,256,128,256                   --d_inner
+    1570,1270,1785,1885,1320 --d_embed 512 --div_val 4 --max_step 40000 --experiment_name
     j15
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    8 --n_head 4,4,4,8,8,4,2,2 --d_model 512 --d_head 128,128,128,64,64,128,256,256                   --d_inner
-    1620,1570,1320,970,1970,1120,1970,1370 --d_embed 512 --div_val 4 --max_step 5000
-    --experiment_name j16
+    6 --n_head 2,4,2,8,2,4 --d_model 512 --d_head 256,128,256,64,256,128                   --d_inner
+    1920,1920,1935,1920,1720,1970 --d_embed 512 --div_val 4 --max_step 40000 --experiment_name
+    j16
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    8 --n_head 4,2,4,8,8,4,8,2 --d_model 512 --d_head 128,256,128,64,64,128,64,256                   --d_inner
-    2020,1420,970,970,1370,1870,1970,870 --d_embed 512 --div_val 4 --max_step 5000
-    --experiment_name j17
+    5 --n_head 2,2,4,4,2 --d_model 512 --d_head 256,256,128,128,256                   --d_inner
+    1735,1270,1785,1920,1520 --d_embed 512 --div_val 4 --max_step 40000 --experiment_name
+    j17
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 8,2,8,8,4,2,2 --d_model 512 --d_head 64,256,64,64,128,256,256                   --d_inner
-    1720,1370,1020,1820,1520,1720,1420 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j18
+    8 --n_head 2,4,2,4,2,2,2,2 --d_model 512 --d_head 256,128,256,128,256,256,256,256                   --d_inner
+    1920,1770,1520,1920,1720,1970,1320,1135 --d_embed 512 --div_val 4 --max_step 40000
+    --experiment_name j18_pareto
   - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
     --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    6 --n_head 8,2,8,2,2,8 --d_model 256 --d_head 32,128,32,128,128,32                   --d_inner
-    2020,1735,1120,1420,1370,935 --d_embed 256 --div_val 4 --max_step 5000 --experiment_name
+    5 --n_head 2,4,4,4,4 --d_model 512 --d_head 256,128,128,128,128                   --d_inner
+    1920,1920,2035,1285,1170 --d_embed 512 --div_val 4 --max_step 40000 --experiment_name
     j19
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    8 --n_head 4,2,8,2,4,4,2,2 --d_model 512 --d_head 128,256,64,256,128,128,256,256                   --d_inner
-    1720,1020,1020,920,970,2035,920,1720 --d_embed 512 --div_val 4 --max_step 5000
-    --experiment_name j20
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    6 --n_head 8,4,8,2,4,2 --d_model 512 --d_head 64,128,64,256,128,256                   --d_inner
-    2020,1420,1070,1970,1370,920 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j21
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 4,8,4,2,4,2,2 --d_model 256 --d_head 64,32,64,128,64,128,128                   --d_inner
-    1570,1020,1685,920,970,935,920 --d_embed 256 --div_val 4 --max_step 5000 --experiment_name
-    j22
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 4,2,2,4,2,4,4 --d_model 256 --d_head 64,128,128,64,128,64,64                   --d_inner
-    1570,1785,1635,835,835,2035,2035 --d_embed 256 --div_val 4 --max_step 5000 --experiment_name
-    j23
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 8,4,8,4,4,2,2 --d_model 512 --d_head 64,128,64,128,128,256,256                   --d_inner
-    1720,1620,1070,1970,1970,1720,920 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j24
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 2,4,4,2,8,8,8 --d_model 512 --d_head 256,128,128,256,64,64,64                   --d_inner
-    1520,1220,1920,1970,1320,1020,1920 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j25
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 8,4,4,4,4,2,8 --d_model 512 --d_head 64,128,128,128,128,256,64                   --d_inner
-    1520,1220,1920,1970,1970,1020,1920 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j26
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 4,8,8,2,2,2,2 --d_model 256 --d_head 64,32,32,128,128,128,128                   --d_inner
-    935,1420,1685,1420,2035,1870,1820 --d_embed 256 --div_val 4 --max_step 5000 --experiment_name
-    j27
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 2,4,4,4,8,8,2 --d_model 512 --d_head 256,128,128,128,64,64,256                   --d_inner
-    1770,1570,1320,1520,1970,1020,1620 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j28
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    6 --n_head 4,4,2,2,2,8 --d_model 512 --d_head 128,128,256,256,256,64                   --d_inner
-    1570,1920,1170,1420,970,1320 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j29
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    8 --n_head 4,2,4,2,2,4,8,8 --d_model 512 --d_head 128,256,128,256,256,128,64,64                   --d_inner
-    1020,1270,1220,1020,1320,1420,1670,1570 --d_embed 512 --div_val 4 --max_step 5000
-    --experiment_name j30
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    8 --n_head 4,4,2,4,2,4,2,2 --d_model 512 --d_head 128,128,256,128,256,128,256,256                   --d_inner
-    1985,1785,1235,835,970,2035,870,1720 --d_embed 512 --div_val 4 --max_step 5000
-    --experiment_name j31
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    8 --n_head 4,2,2,4,4,4,2,2 --d_model 256 --d_head 64,128,128,64,64,64,128,128                   --d_inner
-    1135,1785,785,835,970,2035,920,1720 --d_embed 256 --div_val 4 --max_step 5000
-    --experiment_name j32
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    4 --n_head 2,4,4,2 --d_model 512 --d_head 256,128,128,256                   --d_inner
-    1570,1020,1170,920 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j33
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 8,8,8,2,4,2,8 --d_model 512 --d_head 64,64,64,256,128,256,64                   --d_inner
-    1470,1220,870,1970,870,920,920 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j34
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    5 --n_head 2,4,4,2,2 --d_model 512 --d_head 256,128,128,256,256                   --d_inner
-    1170,1370,1470,920,1270 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j35
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    8 --n_head 2,2,2,4,2,8,4,4 --d_model 512 --d_head 256,256,256,128,256,64,128,128                   --d_inner
-    1820,1770,1020,1020,1720,2020,1270,970 --d_embed 512 --div_val 4 --max_step 5000
-    --experiment_name j36
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    8 --n_head 2,8,4,2,2,2,8,2 --d_model 256 --d_head 128,32,64,128,128,128,32,128                   --d_inner
-    1020,1270,1220,1020,1320,1420,1670,1570 --d_embed 256 --div_val 4 --max_step 5000
-    --experiment_name j37
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 2,4,4,2,8,4,2 --d_model 512 --d_head 256,128,128,256,64,128,256                   --d_inner
-    1770,1220,1970,1170,1320,1020,970 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j38
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 2,4,4,4,2,4,8 --d_model 512 --d_head 256,128,128,128,256,128,64                   --d_inner
-    1020,1270,1220,1320,1320,1420,1670 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j39
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    4 --n_head 4,4,2,8 --d_model 512 --d_head 128,128,256,64                   --d_inner
-    1470,1520,1620,1520 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j40
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    6 --n_head 4,2,2,8,4,8 --d_model 256 --d_head 64,128,128,32,64,32                   --d_inner
-    1335,885,1235,1035,1685,2035 --d_embed 256 --div_val 4 --max_step 5000 --experiment_name
-    j41
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 4,4,4,2,2,4,2 --d_model 512 --d_head 128,128,128,256,256,128,256                   --d_inner
-    1170,1370,1220,920,1270,1720,920 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j42
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    5 --n_head 2,2,2,4,2 --d_model 512 --d_head 256,256,256,128,256                   --d_inner
-    1570,870,1020,1770,1220 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j43
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    8 --n_head 2,8,4,8,2,4,4,2 --d_model 512 --d_head 256,64,128,64,256,128,128,256                   --d_inner
-    1020,1270,1220,1020,1320,1420,1920,1820 --d_embed 512 --div_val 4 --max_step 5000
-    --experiment_name j44
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    8 --n_head 4,2,2,4,2,4,2,8 --d_model 512 --d_head 128,256,256,128,256,128,256,64                   --d_inner
-    1985,1920,1720,835,1720,1370,920,1720 --d_embed 512 --div_val 4 --max_step 5000
-    --experiment_name j45
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    6 --n_head 4,2,8,4,2,4 --d_model 256 --d_head 64,128,32,64,128,64                   --d_inner
-    1985,1435,1235,835,970,2035 --d_embed 256 --div_val 4 --max_step 5000 --experiment_name
-    j46
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    6 --n_head 4,4,4,2,8,2 --d_model 512 --d_head 128,128,128,256,64,256                   --d_inner
-    1170,1370,1020,920,1270,1120 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j47
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    7 --n_head 4,2,2,8,2,8,8 --d_model 512 --d_head 128,256,256,64,256,64,64                   --d_inner
-    1835,885,1235,1520,1535,1670,1520 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j48
-  - python -m torch.distributed.launch --nproc_per_node="8" archai/nlp/nvidia_transformer_xl/train.py
-    --config dgx1_8gpu_fp32                   --config_file wt103_base.yaml --n_layer
-    5 --n_head 2,8,4,2,2 --d_model 512 --d_head 256,64,128,256,256                   --d_inner
-    1570,1770,1220,1020,1320 --d_embed 512 --div_val 4 --max_step 5000 --experiment_name
-    j49
   name: config_50
   sku: G8
 storage:
