@@ -155,7 +155,7 @@ class Evolution(object):
     def run_evo_search(self, pareto_search=False, eps=None, use_convex_hull=False, start_train=0, train_local=False, n_gpus=1, gpu_config='dgx1_1gpu_fp32', config_file='wt103_base.yaml', 
                         max_step=500, experiment_name='evolution', scheduler='constant', use_valid=True, **kwargs):
         
-        # if pareto_search is Flase, only searches in the vicinity of the maximum score seen
+        # if pareto_search is False, only searches in the vicinity of the maximum score seen
         print('Performing {} search'.format('full-pareto' if pareto_search else 'best sample'))
         
         population = self.random_sample(self.population_size)
@@ -1157,16 +1157,15 @@ if __name__=='__main__':
     random.seed(seed)
     torch.manual_seed(seed)
 
-
-    args = {'default_path': './evo_search','population_size':10, 'parent_size':2, 'mutation_size':4, 'mutation_prob':0.3, 'crossover_size':4, 
+    args = {'default_path': './evo_search','population_size':50, 'parent_size':10, 'mutation_size':20, 'mutation_prob':0.3, 'crossover_size':20,
             'n_iter':30, 'n_layer_choice':[3,4,5,6,7,8], 'd_model_choice':[128, 256, 512], 'd_inner_choice':list(range(512, 2049, 50))+[2048], 'n_head_choice':[2,4,8],
             'param_constraint':5e6, 'latency_scale':2., 'n_threads':1, 'latency_repeat':5, 'pareto_search':True,
             ################### extracting pareto
             'eps':0.05, 'use_convex_hull':False,
             ################### brute_force
             'nsamples':20000, 'batch':1000, 'do_train':False,
-            ################### evaluation scheme  (set start_train to bigger than n_iter to disable training for evaluation)
-            'start_train':0, 'train_local':True, 'n_gpus':4, 'gpu_config':'dgx1_4gpu_fp32', 'config_file':'wt103_base.yaml', 'max_step':500, 'experiment_name':'evolution', 
+            ################### evaluation scheme (set start_train to bigger than n_iter to disable training for evaluation)
+            'start_train':15, 'train_local':True, 'n_gpus':4, 'gpu_config':'dgx1_4gpu_fp32', 'config_file':'wt103_base.yaml', 'max_step':500, 'experiment_name':'evolution',
             'scheduler':'constant', 'use_valid':True}
     
     dir_name = 'param_threshold_{}'.format(args['param_constraint']/1e6)
