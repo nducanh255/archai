@@ -799,6 +799,72 @@ def test_convex_hull(args):
     plt.savefig(os.path.join(results_path, 'debug_convex_hull.png'), dpi=plt.gcf().dpi, bbox_inches='tight')
 
 
+def test_pareto(args, eps=0.01, decreasing=True):
+    # random points
+    np.random.seed(0)
+    xs = np.random.uniform(size=1000)
+    scale_x = (-1) if decreasing else (1)
+    ys = np.random.uniform(size=1000) + (scale_x * xs) + 1.0
+
+    get_vanilla_pareto(args, xs, ys, eps, decreasing)
+    
+
+def get_vanilla_pareto(args, xs, ys, eps=0.01, decreasing=True):
+    # pareto front using the vanilla definition
+    results_path = args['results_path']
+
+    range_x = np.max(xs) - np.min(xs)
+
+    i = 0
+    pareto_indices = []
+    for i in range(len(xs)):
+        if i in pareto_indices:
+            continue
+        
+        curr_x = xs[i]
+        # find a range where the change on x axis is smaller than eps %
+        indices = []
+        for j in range(len(xs)):
+            diff_x = np.absolute(xs[j] - curr_x)
+            if diff_x <= eps*range_x:
+                indices.append(j)
+        
+        # mark the pareto front point in the found range
+        curr_ys = [ys[k] for k in indices]
+        pareto_idx = indices[np.argmin(curr_ys)]
+        if pareto_idx not in pareto_indices:
+            pareto_indices.append(pareto_idx)
+    
+    print(f'initially found {len(pareto_indices)} pareto points')
+
+    to_remove = []
+    for i in pareto_indices:
+        for j in pareto_indices:  
+            if j==i:
+                continue  
+            if decreasing:
+                if xs[i] >= xs[j] and ys[i] >= ys[j]:
+                    to_remove.append(i)
+                    break
+            else:
+                if xs[i] <= xs[j] and ys[i] >= ys[j]:
+                    to_remove.append(i)
+                    break 
+    print(f'removing {len(to_remove)} non-pareto points')
+    
+    pareto_indices_pruned = [i for i in pareto_indices if i not in to_remove]   
+
+    pareto_xs = [xs[i] for i in pareto_indices_pruned]
+    pareto_ys = [ys[i] for i in pareto_indices_pruned]
+    plt.scatter(xs, ys, s=5)
+    plt.scatter(pareto_xs, pareto_ys, label='pareto', s=5)
+    plt.scatter([xs[i] for i in to_remove], [ys[i] for i in to_remove], c='black', marker='+', label='removed', s=5)
+    plt.legend()
+    plt.savefig(os.path.join(results_path, 'debug_pareto_front.png'), dpi=plt.gcf().dpi, bbox_inches='tight')
+
+    return pareto_indices_pruned
+
+        
 def check_job_status(exp_name, n_configs, start_config=0):
     pass_count = 0
     while pass_count < n_configs:
@@ -1043,7 +1109,7 @@ def get_diff_with_pareto(gt_latencies, gt_val_ppls, is_gt_pareto, is_proxy_paret
     return np.mean(ppl_diff)
 
 
-def get_gt_pareto(args, exp_name, path_to_dir, start_config, ppl_eps=0.1, hybrid=False, use_convex_hull=False):
+def get_gt_pareto(args, exp_name, path_to_dir, start_config, ppl_eps=0.1, latency_eps = 0.01, hybrid=False, use_convex_hull=False):
     gt_results = gather_results(exp_name, path_to_dir, filetypes=['.yaml', '.json'], verbose=False)
     print('found %d model configurations' % len(gt_results.keys()))
 
@@ -1117,6 +1183,7 @@ def get_gt_pareto(args, exp_name, path_to_dir, start_config, ppl_eps=0.1, hybrid
         '''
 
         ################# vanilla pareto extraction ################# 
+        '''
         assert len(gt_val_ppls)==len(is_pareto)
         is_gt_pareto = np.zeros_like(is_pareto)
         for i in range(len(gt_val_ppls)):
@@ -1127,6 +1194,13 @@ def get_gt_pareto(args, exp_name, path_to_dir, start_config, ppl_eps=0.1, hybrid
                 if val_ppl_diff <= ppl_eps and gt_latencies[i] > gt_latencies[j]:
                     is_pareto_ppl = False
             is_gt_pareto[i] = is_pareto_ppl
+        '''
+        pareto_indices = get_vanilla_pareto(args, xs=gt_latencies, ys=gt_val_ppls, eps=latency_eps, decreasing=True)
+        is_gt_pareto = np.zeros_like(is_pareto)
+        for i in range(len(gt_val_ppls)):
+            if i in pareto_indices:
+                is_gt_pareto[i] = 1
+
 
     print('{} points on the groud-truth pareto'.format(len(np.nonzero(is_gt_pareto)[0])))
     TPR = len(np.intersect1d(np.nonzero(is_gt_pareto)[0], np.nonzero(is_pareto)[0]))*100./len(np.nonzero(is_gt_pareto)[0])
@@ -1180,7 +1254,7 @@ def get_final_pareto_front(args, eps=0.05, hybrid=False, use_convex_hull=False):
                 all_latencies.append(logs['latencies'][i][j])
 
                 if hybrid:
-                    all_params.append(logs['params'][i][j])
+                    all_params.append(logs['params'][i][j])   # -val_ppl
                 else:
                     if (args['start_train'] < args['n_iter']) and (i >= args['start_train']):
                         model_config = copy.deepcopy(model_config_defaults)
@@ -1235,6 +1309,7 @@ def get_final_pareto_front(args, eps=0.05, hybrid=False, use_convex_hull=False):
             is_pareto_dict[seen_keys[sorted_indices[i]]] = is_pareto
         '''
         ################# vanilla pareto extraction ################# 
+        '''
         for i in range(len(all_params)):
             if i < idx and hybrid:
                 is_pareto_dict[seen_keys[i]] = False
@@ -1253,6 +1328,13 @@ def get_final_pareto_front(args, eps=0.05, hybrid=False, use_convex_hull=False):
                     pareto['params'].append(all_params[i])
                     pareto['latencies'].append(all_latencies[i])
                 is_pareto_dict[seen_keys[i]] = is_pareto
+        '''
+        pareto_indices = get_vanilla_pareto(args, xs=all_params, ys=all_latencies, eps=eps, decreasing=False)
+        for i in range(len(all_params)):
+            if i in pareto_indices:
+                is_pareto_dict[seen_keys[i]] = True
+            else:
+                is_pareto_dict[seen_keys[i]] = False
 
     fname = 'pareto{}'.format('' if hybrid else '_params')
     fname += '_convexHull' if use_convex_hull else ''
@@ -1284,7 +1366,7 @@ def get_final_pareto_front(args, eps=0.05, hybrid=False, use_convex_hull=False):
     plt.xlabel(x_label)
     plt.title('Pareto Curve')
     plt.grid(axis='y')
-    plt.savefig(os.path.join(results_path, 'final_convex_hull{}.png'.format('' if hybrid else '_params')), bbox_inches="tight")
+    plt.savefig(os.path.join(results_path, 'final_search_pareto{}.png'.format('' if hybrid else '_params')), bbox_inches="tight")
 
 
 if __name__=='__main__':
@@ -1301,7 +1383,7 @@ if __name__=='__main__':
             ################### brute_force
             'nsamples':20000, 'batch':1000, 'do_train':False,
             ################### evaluation scheme  (set start_train to bigger than n_iter to disable training for evaluation)
-            'start_train':15, 'train_local':True, 'n_gpus':4, 'gpu_config':'dgx1_4gpu_fp32', 'config_file':'wt103_base.yaml', 'max_step':500, 'experiment_name':'evolution', 
+            'start_train':40, 'train_local':True, 'n_gpus':4, 'gpu_config':'dgx1_4gpu_fp32', 'config_file':'wt103_base.yaml', 'max_step':500, 'experiment_name':'evolution', 
             'scheduler':'constant', 'use_valid':True}
     
     dir_name = 'param_threshold_{}'.format(args['param_constraint']/1e6)
@@ -1312,12 +1394,14 @@ if __name__=='__main__':
     if args['start_train'] < args['n_iter']:
         dir_name += '_wTrain'
 
+    # dir_name = 'test'
     # args['results_path'] = os.path.join(args['default_path'], dir_name)
     args['results_path'] = os.path.join(args['default_path'], 'param_threshold_5.0_D3_V2')
     # args['results_path'] = os.path.join(args['default_path'], 'param_threshold_5.0_pareto')
 
     # test_converter()
     # test_convex_hull(args)
+    # test_pareto(args, eps=0.01, decreasing=False)
     
     #--------------- run evolutionary search
     # test_evo_search(args, brute_force=False)
@@ -1326,7 +1410,7 @@ if __name__=='__main__':
     # submit_gt_jobs(args, max_step=40000, start_config=0, bundle_count=20, n_gpus=8, gpu_config='dgx1_8gpu_fp32', targets=['NLX-NDv2'])
       
 
-    use_convex_hull = True # if True, will use convex hull to extract the final paretos, otherwise, the vanilla pareto formula
+    use_convex_hull = False # if True, will use convex hull to extract the final paretos, otherwise, the vanilla pareto formula
     hybrid = False # if hybrid is true, takes the pareto on mid-search training, otherwise only looks at nparams 
     
     # #--------------- extract proxy pareto from all samples seen during the evolutionary search
@@ -1345,4 +1429,4 @@ if __name__=='__main__':
     # os.system(command)
     path_to_amlt_results = os.path.join(path_to_amlt_results, gt_exp_name)
     get_gt_pareto(args, exp_name=gt_exp_name, path_to_dir=path_to_amlt_results, start_config=25, 
-                    ppl_eps=0.1, hybrid=hybrid, use_convex_hull=use_convex_hull)
+                    ppl_eps=0.1, latency_eps=0.01, hybrid=hybrid, use_convex_hull=use_convex_hull)
