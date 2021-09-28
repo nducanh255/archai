@@ -85,7 +85,7 @@ trainer:
     _copy: '/common/wandb'
   apex:
     _copy: '/common/apex'
-  epochs: 300
+  epochs: 100
   logger_freq: 10
   drop_path_prob: 0.0
   grad_clip: 0.0
