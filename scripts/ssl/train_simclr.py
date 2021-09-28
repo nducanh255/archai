@@ -37,7 +37,7 @@ def train_test(conf_main:Config):
     elif "efficientnet" in conf_trainer['model']:
         with open('confs/algos/simclr_efficientnets.yaml', 'r') as f:
             conf_models = yaml.load(f, Loader=yaml.Loader)
-    else:
+    elif "proxylessnas" not in conf_trainer['model']:
         raise Exception(f"Not implemented SimCLR for model {conf_trainer['model']}")
         
     conf_model = conf_models[conf_trainer['model']]

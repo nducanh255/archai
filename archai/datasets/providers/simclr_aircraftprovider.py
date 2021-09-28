@@ -9,7 +9,7 @@ from torch.utils.data.dataset import Dataset
 
 import torchvision
 from torchvision.transforms import transforms
-from archai.datasets.transforms.simclr_transforms import SimCLRTrainDataTransform,SimCLREvalDataTransform
+from archai.datasets.transforms.simclr_transforms import SimCLREvalLinearTransform,SimCLRTrainDataTransform,SimCLREvalDataTransform
 from archai.datasets.dataset_provider import DatasetProvider, register_dataset_provider, TrainTestDatasets
 from archai.common.config import Config
 from archai.common import utils
