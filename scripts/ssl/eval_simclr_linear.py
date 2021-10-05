@@ -144,7 +144,7 @@ def train_test(conf:Config):
         input_dim = model_desc.logits_op.params['conv'].ch_out
 
     model.fc = nn.Linear(input_dim, conf_dataset['n_classes'])
-    model = model.to(torch.device('cuda', 0))
+    # model = model.to(torch.device('cuda', 0))
 
     # get data
     data_loaders = data.get_data_ssl(conf_loader)

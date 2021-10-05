@@ -10,6 +10,7 @@ else
     pushd ~/GitHubSrc
     rm -rf ./apex # for some reason this exist in amlk8s
     git clone https://github.com/NVIDIA/apex
+    mv optimized_sync_batchnorm_kernel.py apex/apex/parallel/
     cd apex
     # git checkout 0c2c6ee
     # pip install --user -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./

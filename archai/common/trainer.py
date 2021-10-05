@@ -368,6 +368,68 @@ class TrainerLinear(Trainer):
             wandb.define_metric("epoch_timings", step_metric="epoch")
 
     @overrides
+    def fit(self, data_loaders:data.DataLoaders)->Metrics:
+        logger.pushd(self._title)
+
+        assert data_loaders.train_dl is not None
+
+        self._metrics = Metrics(self._title, self._apex, logger_freq=self._logger_freq)
+
+        # create optimizers and schedulers
+        self._multi_optim = self.create_multi_optim(len(data_loaders.train_dl))
+        # before checkpoint restore, convert to amp
+        self.model = self._apex.to_amp_dist(self.model, self._multi_optim,
+                                       batch_size=data_loaders.train_dl.batch_size)
+
+        self._lossfn = self._lossfn.to(self.get_device())
+
+        self.pre_fit(data_loaders)
+
+        # we need to restore checkpoint after all objects are created because
+        # restoring checkpoint requires load_state_dict calls on these objects
+        self._start_epoch = 0
+        # do we have a checkpoint
+        checkpoint_avail = self._checkpoint is not None
+        checkpoint_val = checkpoint_avail and 'trainer' in self._checkpoint
+        resumed = False
+        if checkpoint_val:
+            # restore checkpoint
+            resumed = True
+            self.restore_checkpoint()
+        elif checkpoint_avail: # TODO: bad checkpoint?
+            self._checkpoint.clear()
+        logger.warn({'resumed': resumed, 'checkpoint_avail': checkpoint_avail,
+                     'checkpoint_val': checkpoint_val,
+                     'start_epoch': self._start_epoch,
+                     'total_epochs': self._epochs})
+        logger.info({'aux_weight': self._aux_weight,
+                     'grad_clip': self._grad_clip,
+                     'drop_path_prob': self._drop_path_prob,
+                     'validation_freq': self._validation_freq,
+                     'batch_chunks': self.batch_chunks})
+
+        if self._start_epoch >= self._epochs:
+            logger.warn(f'fit done because start_epoch {self._start_epoch}>={self._epochs}')
+            return self.get_metrics() # we already finished the run, we might be checkpointed
+
+        logger.pushd('epochs')
+        for epoch in range(self._start_epoch, self._epochs):
+            logger.pushd(epoch)
+            self._set_epoch(epoch, data_loaders)
+            self.pre_epoch(data_loaders)
+            self._train_epoch(data_loaders.train_dl)
+            self.post_epoch(data_loaders)
+            logger.popd()
+        logger.popd()
+        self.post_fit(data_loaders)
+
+        # make sure we don't keep references to the graph
+        del self._multi_optim
+
+        logger.popd()
+        return self.get_metrics()
+
+    @overrides
     def _train_epoch(self, train_dl: DataLoader)->None:
         steps = len(train_dl)
         if self._apex._enabled and self._apex._distributed_enabled:

@@ -265,6 +265,43 @@ class ApexUtils:
 
         return model
 
+    def to_amp_dist(self, model:nn.Module, multi_optim:MultiOptim, batch_size:int)\
+                ->nn.Module:
+        # conver BNs to sync BNs in distributed mode
+        if self.is_dist() and self._sync_bn:
+            model = self._ddp.convert_syncbn_model(model)
+            self._log_info({'BNs_converted': True})
+
+        model = model.to(self.device)
+
+        if self.is_mixed():
+            optim = self._get_optim(multi_optim)
+
+            # scale LR
+            if self.is_dist() and self._scale_lr:
+                lr = ml_utils.get_optim_lr(optim)
+                scaled_lr = lr * self.world_size / float(batch_size)
+                ml_utils.set_optim_lr(optim, scaled_lr)
+                self._log_info({'lr_scaled': True, 'old_lr': lr, 'new_lr': scaled_lr})
+
+            model, optim = self._amp.initialize(
+                model, optim, opt_level=self._opt_level,
+                keep_batchnorm_fp32=self._bn_fp32, loss_scale=self._loss_scale
+            )
+
+            # put back amp'd optim
+            multi_optim[0].optim = optim
+
+        if self.is_dist():
+            # By default, apex.parallel.DistributedDataParallel overlaps communication with
+            # computation in the backward pass.
+            # delay_allreduce delays all communication to the end of the backward pass.
+            model = torch.nn.parallel.DistributedDataParallel(model,
+                                                              device_ids=[self.local_rank],
+                                                              output_device=self.local_rank)
+
+        return model
+
     def clip_grad(self, clip:float, model:nn.Module, multi_optim:MultiOptim)->None:
         if clip > 0.0:
             if self.is_mixed():
