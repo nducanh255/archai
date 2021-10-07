@@ -85,7 +85,7 @@ class TrainerSimClr(EnforceOverrides):
         # create optimizers and schedulers
         self._multi_optim = self.create_multi_optim(len(data_loaders.train_dl))
         # before checkpoint restore, convert to amp
-        self.model = self._apex.to_amp(self.model, self._multi_optim,
+        self.model = self._apex.to_amp_dist(self.model, self._multi_optim,
                                        batch_size=data_loaders.train_dl.batch_size)
 
         self._lossfn = self._lossfn.to(self.get_device())
