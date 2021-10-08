@@ -14,7 +14,7 @@ from archai.common.config import Config
 from archai.common.common import common_init, create_conf, get_state, init_from, update_envvars
 from archai.datasets import data
 from archai.common.checkpoint import CheckPoint
-from archai.common.apex_utils import ApexUtils
+from archai.common.dist_utils import ApexUtils
 
 def train_test(conf_main:Config):
     conf_loader = conf_main['loader']

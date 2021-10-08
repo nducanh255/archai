@@ -25,7 +25,7 @@ from archai.common import ml_utils, utils
 from archai.common.metrics import EpochMetrics, Metrics
 from archai.nas.model import Model
 from archai.common.checkpoint import CheckPoint
-from common.apex_utils import ApexUtils
+from common.dist_utils import ApexUtils
 
 
 class EvalResult:

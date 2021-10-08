@@ -15,7 +15,7 @@ import yaml
 
 from . import utils, ml_utils
 from .common import logger, get_tb_writer
-from .apex_utils import ApexUtils
+from .dist_utils import ApexUtils
 
 
 class Metrics:

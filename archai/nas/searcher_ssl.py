@@ -16,7 +16,7 @@ from archai.common.common import logger
 from archai.common import common
 from archai.common.config import Config
 from archai.nas.model_desc_builder import ModelDescBuilder
-from archai.common.apex_utils import ApexUtils
+from archai.common.dist_utils import ApexUtils
 from archai.nas.arch_trainer import TArchTrainer
 from archai.common.trainer_ssl import TrainerSimClr
 from archai.nas.model_desc import CellType, ModelDesc

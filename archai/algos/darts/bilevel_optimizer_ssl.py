@@ -12,7 +12,7 @@ from torch.optim.optimizer import Optimizer
 from archai.common.config import Config
 from archai.common import utils, ml_utils
 from archai.common.common import logger
-from archai.common.apex_utils import ApexUtils
+from archai.common.dist_utils import ApexUtils
 from archai.common.utils import zip_eq
 from archai.nas.model_ssl import ModelSimClr
 

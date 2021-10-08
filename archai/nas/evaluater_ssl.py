@@ -19,7 +19,7 @@ from archai.common.config import Config
 from archai.common.common import logger
 from archai.datasets import data
 from archai.nas.model_desc import ModelDesc
-from archai.common.apex_utils import ApexUtils
+from archai.common.dist_utils import ApexUtils
 from archai.nas.model_desc_builder import ModelDescBuilder
 from archai.nas import nas_utils
 from archai.common import ml_utils, utils

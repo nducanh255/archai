@@ -14,7 +14,7 @@ from .metrics_ssl import MetricsSimClr
 from .config import Config
 from . import utils, ml_utils
 from .common import logger
-from archai.common.apex_utils import ApexUtils
+from archai.common.dist_utils import ApexUtils
 
 class TesterSimClr(EnforceOverrides):
     def __init__(self, conf_train:Config, model:nn.Module, apex:ApexUtils)->None:

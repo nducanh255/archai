@@ -14,7 +14,7 @@ from archai.common.config import Config
 from archai.common.common import _create_sysinfo, common_init, create_conf, expdir_abspath, get_expdir, get_state, init_from, update_envvars
 from archai.datasets import data
 from archai.nas.model_desc import ModelDesc
-from archai.common.apex_utils import ApexUtils
+from archai.common.dist_utils import ApexUtils
 from archai.nas.model_ssl import ModelSimCLRDarts
 from archai.common.checkpoint import CheckPoint
 from archai.nas.model_desc_builder import ModelDescBuilder
@@ -111,7 +111,8 @@ def train_test(conf:Config):
         if ckpt['trainer']['last_epoch'] +1 != config_train['nas']['eval']['trainer']['epochs']:
             raise Exception("Model training not finished, exiting evaluation...")
     elif ckpt['trainer']['last_epoch'] +1 != config_train['trainer']['epochs']:
-        raise Exception(f"Model training not finished, still at epoch {ckpt['trainer']['last_epoch'] +1}, exiting evaluation...")
+        pass
+        # raise Exception(f"Model training not finished, still at epoch {ckpt['trainer']['last_epoch'] +1}, exiting evaluation...")
     print("Loading model from epoch {}".format(ckpt['trainer']['last_epoch']+1))
     model_state_dict = ckpt['trainer']['model']
     keys = list(model_state_dict.keys())

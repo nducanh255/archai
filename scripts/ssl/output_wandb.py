@@ -15,7 +15,8 @@ api = wandb.Api()
 # Project is specified by <entity/project-name>
 resnets = []
 outputs = {f"resnet_v{i}":{} for i in range(1,95)}
-datasets = ['cifar10', 'cifar100', 'flower102', 'mit67', 'sport8']
+datasets = ['cifar10', 'cifar100', 'flower102', 'mit67', 'sport8', 'aircraft', 'svhn', 'food101']
+# datasets = ['aircraft', 'svhn', 'food101']
 outputs['resnet18'] = {}
 outputs['resnet34'] = {}
 outputs['resnet50'] = {}
@@ -67,8 +68,7 @@ for resnet in outputs.keys():
             final_accs_array = np.concatenate((final_accs_array,np.array([params[resnet]]+accs)[np.newaxis,:]))
 print_array = final_accs_array
 for i,p in enumerate(print_array):
-    print(final_resnets[i],p[0],p[1],p[2],p[3],p[4],p[5])
-exit()
+    print(final_resnets[i],p[0],p[1],p[2],p[3],p[4],p[5], p[6], p[7], p[8])
 
 final_accs_array = final_accs_array[:,1:]
 pears = np.zeros((len(datasets),len(datasets)))

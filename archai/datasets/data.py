@@ -20,10 +20,12 @@ from torch.utils.data.distributed import DistributedSampler
 
 from filelock import FileLock
 
+from ..common import dist_utils
+
 from .augmentation import add_named_augs
 from archai.common import common
 from ..common.common import logger
-from ..common import utils, apex_utils
+from ..common import utils, dist_utils
 from archai.datasets.dataset_provider import DatasetProvider, get_provider_type
 # from archai.datasets.providers.simclr_provider import create_simclr_provider
 from ..common.config import Config
@@ -62,7 +64,7 @@ def get_data(conf_loader:Config)->DataLoaders:
 
     ds_provider = create_dataset_provider(conf_dataset)
 
-    apex = apex_utils.ApexUtils(conf_apex, logger)
+    apex = dist_utils.ApexUtils(conf_apex, logger)
 
     train_dl, val_dl, test_dl = get_dataloaders(ds_provider,
         load_train=load_train, train_batch_size=train_batch,
@@ -110,7 +112,7 @@ def get_data_ssl(conf_loader:Config)->DataLoaders:
 
     ds_provider = create_dataset_provider_ssl(conf_dataset)
 
-    apex = apex_utils.ApexUtils(conf_apex, logger)
+    apex = dist_utils.ApexUtils(conf_apex, logger)
 
     train_dl, val_dl, test_dl = get_dataloaders(ds_provider,
         load_train=load_train, train_batch_size=train_batch,
@@ -138,7 +140,7 @@ def create_dataset_provider_ssl(conf_dataset:Config)->DatasetProvider:
 def get_dataloaders(ds_provider:DatasetProvider,
     load_train:bool, train_batch_size:int,
     load_test:bool, test_batch_size:int,
-    aug, cutout:int, val_ratio:float, apex:apex_utils.ApexUtils,
+    aug, cutout:int, val_ratio:float, apex:dist_utils.ApexUtils,
     val_fold=0, train_workers:Optional[int]=None, test_workers:Optional[int]=None,
     target_lb=-1, max_batches:int=-1) \
         -> Tuple[Optional[DataLoader], Optional[DataLoader], Optional[DataLoader]]:
@@ -262,7 +264,7 @@ def _get_datasets(ds_provider:DatasetProvider, load_train:bool, load_test:bool,
 
 # target_lb allows to filter dataset for a specific class, not used
 def _get_sampler(dataset:Dataset, val_ratio:Optional[float], shuffle:bool,
-                 max_items:Optional[int], apex:apex_utils.ApexUtils)\
+                 max_items:Optional[int], apex:dist_utils.ApexUtils)\
         ->Tuple[DistributedStratifiedSampler, Optional[DistributedStratifiedSampler]]:
 
     world_size, global_rank = apex.world_size, apex.global_rank

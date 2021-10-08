@@ -21,7 +21,7 @@ import psutil
 from .config import Config
 from . import utils
 from .ordereddict_logger import OrderedDictLogger
-from .apex_utils import ApexUtils
+from .dist_utils import ApexUtils
 from send2trash import send2trash
 
 class SummaryWriterDummy:

@@ -10,7 +10,7 @@ import yaml
 import torch
 from archai.common import utils, common
 from archai.common.config import Config
-from archai.common.apex_utils import ApexUtils
+from archai.common.dist_utils import ApexUtils
 from archai.nas.arch_trainer import TArchTrainer
 from archai.nas.exp_runner import ExperimentRunner
 from archai.algos.darts.darts_model_desc_builder_ssl import DartsModelDescBuilderSimClr
