@@ -280,10 +280,16 @@ class TrainerSimClr(EnforceOverrides):
                 logdir = utils.full_path(os.environ['logdir'])
                 for folder in os.listdir(logdir):
                     srcdir = os.path.join(logdir,folder)
+                    destdir = os.path.join(intermediatedir,folder)
+                    if os.path.exists(destdir):
+                        if os.path.isdir(destdir):
+                            shutil.rmtree(destdir)
+                        else:
+                            os.remove(destdir)
                     if os.path.isdir(srcdir):
-                        shutil.copytree(srcdir,os.path.join(intermediatedir,folder), dirs_exist_ok=True)
+                        shutil.copytree(srcdir,destdir)
                     else:
-                        shutil.copy(srcdir,os.path.join(intermediatedir,folder), dirs_exist_ok=True)
+                        shutil.copy(srcdir,destdir)
                 print(f'Copied files from logdir {logdir} to intermediate dir {intermediatedir}')
 
     def pre_step(self, xi:Tensor, xj:Tensor)->None:

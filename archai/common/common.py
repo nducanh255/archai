@@ -458,10 +458,16 @@ def copy_resume_dirs(conf:Config)->bool:
         if found:
             for folder in os.listdir(conf_common['resumedir']):
                 srcdir = os.path.join(conf_common['resumedir'],folder)
+                destdir = os.path.join(logdir,folder)
+                if os.path.exists(destdir):
+                    if os.path.isdir(destdir):
+                        shutil.rmtree(destdir)
+                    else:
+                        os.remove(destdir)
                 if os.path.isdir(srcdir):
-                    shutil.copytree(srcdir,os.path.join(logdir,folder), dirs_exist_ok=True)
+                    shutil.copytree(srcdir,destdir)
                 else:
-                    shutil.copy(srcdir,os.path.join(logdir,folder), dirs_exist_ok=True)
+                    shutil.copy(srcdir,os.path.join(logdir,folder))
             return True
         else:
             print(check_message)
