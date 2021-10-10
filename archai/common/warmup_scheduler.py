@@ -1,5 +1,6 @@
 # Credits: https://github.com/ildoonet/pytorch-gradual-warmup-lr
 
+from posixpath import basename
 from torch.optim.lr_scheduler import _LRScheduler
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
@@ -23,6 +24,23 @@ class GradualWarmupScheduler(_LRScheduler):
         self.after_scheduler = after_scheduler
         self.finished = False
         super(GradualWarmupScheduler, self).__init__(optimizer)
+
+    def state_dict(self):
+        """Returns the state of the scheduler as a :class:`dict`.
+
+        It contains an entry for every variable in self.__dict__ which
+        is not the optimizer.
+        """
+        base_dict = {key: value for key, value in self.__dict__.items() if key != 'optimizer' and key != 'after_scheduler'}
+        base_dict['after_scheduler'] = self.after_scheduler.state_dict()
+        return base_dict
+
+    def load_state_dict(self, state_dict: dict) -> None:
+        after_scheduler = self.after_scheduler
+        out = super().load_state_dict(state_dict)
+        after_scheduler.load_state_dict(state_dict['after_scheduler'])
+        self.after_scheduler = after_scheduler
+        return out
 
     def get_lr(self):
         if self.last_epoch > self.total_epoch:

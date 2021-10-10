@@ -420,37 +420,35 @@ def create_epoch_desc_dir(conf:Config)->None:
     
 def create_intermediate_dirs(conf:Config)->None:
     conf_common = get_conf_common(conf)
-    conf_checkpoint = conf_common['checkpoint']
-    intermediatedir = os.path.join(conf_common['intermediatedir'],get_experiment_name(conf))
-    logdir = os.path.join(conf_common['logdir'],get_experiment_name(conf))
     if conf_common['save_intermediate']:
-        print(f'Copying logs and ckpts from working directory {logdir} to intermediate directory {intermediatedir}')
         os.makedirs(conf_common['intermediatedir'], exist_ok=True)
-        os.makedirs(intermediatedir, exist_ok=True)
-        log_suffix = ''
-        log_prefix = conf_common['log_prefix']
-        intermediate_ckpt_path = os.path.join(intermediatedir,os.path.basename(utils.full_path(conf_checkpoint['filename'])))
-        intermediate_sys_log_filepath = utils.full_path(os.path.join(intermediatedir, f'{log_prefix}{log_suffix}.log'))
-        intermediate_logs_yaml_filepath = utils.full_path(os.path.join(intermediatedir, f'{log_prefix}{log_suffix}.yaml'))
-        sys_log_filepath = utils.full_path(os.path.join(logdir, f'{log_prefix}{log_suffix}.log'))
-        logs_yaml_filepath = utils.full_path(os.path.join(logdir, f'{log_prefix}{log_suffix}.yaml'))
-        ckpt_path = os.path.join(logdir,os.path.basename(utils.full_path(conf_checkpoint['filename'])))
-        if os.path.exists(ckpt_path):
-            shutil.copy(ckpt_path, intermediate_ckpt_path)
-        if os.path.exists(logs_yaml_filepath):
-            shutil.copy(logs_yaml_filepath, intermediate_logs_yaml_filepath)
-        if os.path.exists(sys_log_filepath):
-            shutil.copy(sys_log_filepath, intermediate_sys_log_filepath)
-        # if os.path.exists(os.path.join(logdir,'dist')):
-        #     os.makedirs(os.path.join(intermediatedir,'dist'),exist_ok=True)
-        #     copy_tree(os.path.join(logdir,'dist'),os.path.join(intermediatedir,'dist'))
+
+        # conf_checkpoint = conf_common['checkpoint']
+        # intermediatedir = os.path.join(conf_common['intermediatedir'],get_experiment_name(conf))
+        # logdir = os.path.join(conf_common['logdir'],get_experiment_name(conf))
+        # print(f'Copying logs and ckpts from working directory {logdir} to intermediate directory {intermediatedir}')
+        # os.makedirs(intermediatedir, exist_ok=True)
+        # log_suffix = ''
+        # log_prefix = conf_common['log_prefix']
+        # intermediate_ckpt_path = os.path.join(intermediatedir,os.path.basename(utils.full_path(conf_checkpoint['filename'])))
+        # intermediate_sys_log_filepath = utils.full_path(os.path.join(intermediatedir, f'{log_prefix}{log_suffix}.log'))
+        # intermediate_logs_yaml_filepath = utils.full_path(os.path.join(intermediatedir, f'{log_prefix}{log_suffix}.yaml'))
+        # sys_log_filepath = utils.full_path(os.path.join(logdir, f'{log_prefix}{log_suffix}.log'))
+        # logs_yaml_filepath = utils.full_path(os.path.join(logdir, f'{log_prefix}{log_suffix}.yaml'))
+        # ckpt_path = os.path.join(logdir,os.path.basename(utils.full_path(conf_checkpoint['filename'])))
+        # if os.path.exists(ckpt_path):
+        #     shutil.copy(ckpt_path, intermediate_ckpt_path)
+        # if os.path.exists(logs_yaml_filepath):
+        #     shutil.copy(logs_yaml_filepath, intermediate_logs_yaml_filepath)
+        # if os.path.exists(sys_log_filepath):
+        #     shutil.copy(sys_log_filepath, intermediate_sys_log_filepath)
 
 def copy_resume_dirs(conf:Config)->bool:
     conf_common = get_conf_common(conf)
-    conf_checkpoint = conf_common['checkpoint']
-    resumedir = os.path.join(conf_common['resumedir'],get_experiment_name(conf))
-    logdir = os.path.join(conf_common['logdir'],get_experiment_name(conf))
     if conf_common['resume']:
+        conf_checkpoint = conf_common['checkpoint']
+        logdir = utils.full_path(os.environ['logdir'])
+        resumedir = os.path.join(conf_common['resumedir'],get_experiment_name(conf))
         resume_ckpt_path = os.path.join(resumedir,os.path.basename(utils.full_path(conf_checkpoint['filename'])))
         log_suffix = ''
         log_prefix = conf_common['log_prefix']
@@ -458,26 +456,48 @@ def copy_resume_dirs(conf:Config)->bool:
         resume_logs_yaml_filepath = utils.full_path(os.path.join(resumedir, f'{log_prefix}{log_suffix}.yaml'))
         found, check_message = check_resume_files(resume_ckpt_path, resume_sys_log_filepath, resume_logs_yaml_filepath)
         if found:
-            print(f'Copying logs and ckpts from resume directory {resumedir} to working directory {logdir}')
-            sys_log_filepath = utils.full_path(os.path.join(logdir, f'{log_prefix}{log_suffix}.log'))
-            logs_yaml_filepath = utils.full_path(os.path.join(logdir, f'{log_prefix}{log_suffix}.yaml'))
-            ckpt_path = os.path.join(logdir,os.path.basename(utils.full_path(conf_checkpoint['filename'])))
-            shutil.copy(resume_sys_log_filepath, sys_log_filepath)
-            shutil.copy(resume_logs_yaml_filepath, logs_yaml_filepath)
-            shutil.copy(resume_ckpt_path, ckpt_path)
-            # if os.path.exists(os.path.join(logdir,'dist')):
-            #     os.makedirs(os.path.join(logdir,'dist'),exist_ok=True)
-            #     copy_tree(os.path.join(resumedir,'dist'),os.path.join(logdir,'dist'))
+            for folder in os.listdir(conf_common['resumedir']):
+                srcdir = os.path.join(conf_common['resumedir'],folder)
+                if os.path.isdir(srcdir):
+                    shutil.copytree(srcdir,os.path.join(logdir,folder), dirs_exist_ok=True)
+                else:
+                    shutil.copy(srcdir,os.path.join(logdir,folder), dirs_exist_ok=True)
             return True
         else:
             print(check_message)
-            # if os.path.exists(conf_common['resumedir']):
-            #     shutil.rmtree(conf_common['resumedir'])
-            # conf_common['resume'] = conf_checkpoint['resume'] = conf_common['apex']['resume'] = \
-            # conf_common['apex']['resume'] = conf_common['apex']['resume'] = False
-            # conf_common['resumedir'] = conf_checkpoint['resumedir'] = ''
             return False
-    return True
+
+    # conf_checkpoint = conf_common['checkpoint']
+    # resumedir = os.path.join(conf_common['resumedir'],get_experiment_name(conf))
+    # logdir = os.path.join(conf_common['logdir'],get_experiment_name(conf))
+    # if conf_common['resume']:
+    #     resume_ckpt_path = os.path.join(resumedir,os.path.basename(utils.full_path(conf_checkpoint['filename'])))
+    #     log_suffix = ''
+    #     log_prefix = conf_common['log_prefix']
+    #     resume_sys_log_filepath = utils.full_path(os.path.join(resumedir, f'{log_prefix}{log_suffix}.log'))
+    #     resume_logs_yaml_filepath = utils.full_path(os.path.join(resumedir, f'{log_prefix}{log_suffix}.yaml'))
+    #     found, check_message = check_resume_files(resume_ckpt_path, resume_sys_log_filepath, resume_logs_yaml_filepath)
+    #     if found:
+    #         print(f'Copying logs and ckpts from resume directory {resumedir} to working directory {logdir}')
+    #         sys_log_filepath = utils.full_path(os.path.join(logdir, f'{log_prefix}{log_suffix}.log'))
+    #         logs_yaml_filepath = utils.full_path(os.path.join(logdir, f'{log_prefix}{log_suffix}.yaml'))
+    #         ckpt_path = os.path.join(logdir,os.path.basename(utils.full_path(conf_checkpoint['filename'])))
+    #         shutil.copy(resume_sys_log_filepath, sys_log_filepath)
+    #         shutil.copy(resume_logs_yaml_filepath, logs_yaml_filepath)
+    #         shutil.copy(resume_ckpt_path, ckpt_path)
+    #         # if os.path.exists(os.path.join(logdir,'dist')):
+    #         #     os.makedirs(os.path.join(logdir,'dist'),exist_ok=True)
+    #         #     copy_tree(os.path.join(resumedir,'dist'),os.path.join(logdir,'dist'))
+    #         return True
+    #     else:
+    #         print(check_message)
+    #         # if os.path.exists(conf_common['resumedir']):
+    #         #     shutil.rmtree(conf_common['resumedir'])
+    #         # conf_common['resume'] = conf_checkpoint['resume'] = conf_common['apex']['resume'] = \
+    #         # conf_common['apex']['resume'] = conf_common['apex']['resume'] = False
+    #         # conf_common['resumedir'] = conf_checkpoint['resumedir'] = ''
+    #         return False
+    # return True
 
 def check_resume_files(ckpt_path:str, log_path:str, yaml_path:str)->Tuple[bool,str]:
     if os.path.exists(ckpt_path) and os.path.exists(log_path) and os.path.exists(yaml_path):
@@ -500,7 +520,6 @@ def create_logger(conf:Config):
     conf_common = get_conf_common(conf)
 
     global logger
-    logger.init_conf_vars(conf_common)
     logger.close()  # close any previous instances
 
     expdir = conf_common['expdir']

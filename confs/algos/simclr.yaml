@@ -81,6 +81,8 @@ loader:
 trainer:
   title: 'eval_train'
   resume: '_copy: /common/checkpoint/resume'
+  save_intermediate: '_copy: /common/save_intermediate'
+  intermediatedir: '_copy: /common/intermediatedir'
   wandb:
     _copy: '/common/wandb'
   apex:

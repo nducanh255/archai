@@ -1,8 +1,10 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+import shutil
 from typing import Callable, Tuple, Optional
 
+import os
 import wandb
 import torch
 from torch import nn, Tensor
@@ -271,6 +273,18 @@ class TrainerSimClr(EnforceOverrides):
             self.update_checkpoint(self._checkpoint)
             print('Saving best checkpoint')
             self._checkpoint.commit()
+            
+            save_intermediate = self._conf_train['save_intermediate']
+            intermediatedir = self._conf_train['intermediatedir']
+            if save_intermediate:
+                logdir = utils.full_path(os.environ['logdir'])
+                for folder in os.listdir(logdir):
+                    srcdir = os.path.join(logdir,folder)
+                    if os.path.isdir(srcdir):
+                        shutil.copytree(srcdir,os.path.join(intermediatedir,folder), dirs_exist_ok=True)
+                    else:
+                        shutil.copy(srcdir,os.path.join(intermediatedir,folder), dirs_exist_ok=True)
+                print(f'Copied files from logdir {logdir} to intermediate dir {intermediatedir}')
 
     def pre_step(self, xi:Tensor, xj:Tensor)->None:
         self._metrics.pre_step(xi,xj)

@@ -26,11 +26,6 @@ class CheckPoint(UserDict):
 
         # region config vars
         self.filepath = utils.full_path(conf_checkpoint['filename'])
-        self._save_intermediate = conf_checkpoint['save_intermediate']
-        self.intermediate_filepath = os.path.join(conf_checkpoint['intermediatedir'], 
-                                                  conf_checkpoint['experiment_name'],
-                                                  os.path.basename(utils.full_path(conf_checkpoint['filename']))
-                                                  )
 
         self.freq = conf_checkpoint['freq']
         # endregion
@@ -73,8 +68,6 @@ class CheckPoint(UserDict):
     def commit(self)->None:
         assert self.filepath and not self.is_empty()
         torch.save(self.data, self.filepath)
-        if self._save_intermediate and os.path.exists(os.path.dirname(self.intermediate_filepath)):
-            torch.save(self.data, self.intermediate_filepath)
         # clean up after commit so we don't hold up references
 
     def is_empty(self)->bool:

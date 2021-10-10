@@ -30,28 +30,6 @@ class OrderedDictLogger:
         super().__init__()
         self.reset(filepath, logger, save_delay, yaml_log=yaml_log)
 
-    def init_conf_vars(self, conf_common:Config):
-        
-        self._save_intermediate = conf_common['save_intermediate']
-        self._intermediatedir = conf_common['intermediatedir']
-        if utils.is_main_process() and self._save_intermediate:
-            intermediatedir = self._intermediatedir
-            experiment_name = conf_common['experiment_name']
-            logdir = conf_common['logdir']
-            logdir = os.path.join(utils.full_path(logdir), experiment_name)
-            if intermediatedir:
-                intermediatedir = utils.full_path(intermediatedir)
-                expdir = os.path.join(intermediatedir, experiment_name)
-            else:
-                expdir = intermediatedir
-
-            log_prefix = conf_common['log_prefix']
-            intermediatedir, log_suffix = expdir, ''
-
-            self._sys_log_filepath = utils.full_path(os.path.join(logdir, f'{log_prefix}{log_suffix}.log'))
-            self._intermediate_sys_log_filepath = utils.full_path(os.path.join(intermediatedir, f'{log_prefix}{log_suffix}.log'))
-            self._intermediate_logs_yaml_filepath = utils.full_path(os.path.join(intermediatedir, f'{log_prefix}{log_suffix}.yaml'))
-
 
     def reset(self, filepath:Optional[str], logger:Optional[logging.Logger],
                  save_delay:Optional[float]=30.0,
@@ -101,14 +79,10 @@ class OrderedDictLogger:
 
         if level is not None and self._logger:
             self._logger.log(msg=self.path() + ' ' + msg, level=level)
-            if utils.is_main_process() and self._save_intermediate and os.path.exists(self._intermediatedir):
-                shutil.copy(self._sys_log_filepath, self._intermediate_sys_log_filepath)
 
         if self._save_delay is not None and \
                 time.time() - self._last_save > self._save_delay:
             self.save()
-            # if utils.is_main_process() and self._save_intermediate and os.path.exists(self._intermediatedir):
-            #     shutil.copy(self._filepath, self._intermediate_logs_yaml_filepath)
             self._last_save = time.time()
 
     def _root(self)->OrderedDict:
