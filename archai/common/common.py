@@ -14,6 +14,7 @@ import yaml
 import sys
 
 import torch
+import torch.distributed
 from torch.utils.tensorboard import SummaryWriter
 import torch.backends.cudnn as cudnn
 import psutil
@@ -154,6 +155,72 @@ def create_conf(config_filepath: Optional[str]=None,
 
     return conf
 
+
+def common_init_dist(config_filepath: Optional[str]=None,
+                param_args: list = [], use_args=True,
+                clean_expdir=False)->Config:
+
+        # is_clean = None
+        # conf = create_conf(config_filepath='confs/algos/simclr.yaml')
+        # Config.set_inst(conf)
+        # update_envvars(conf)
+        # commonstate = get_state()
+        # init_from(commonstate,recreate_logger=False)
+        # conf['common']['is_clean'] = True
+        # print('Running child process')
+    conf = create_conf(config_filepath, param_args, use_args)
+
+    # setup global instance
+    Config.set_inst(conf)
+
+    # setup env vars which might be used in paths
+    update_envvars(conf)
+
+    # create apex to know distributed processing paramters
+    conf_apex = get_conf_common(conf)['apex']
+    apex = ApexUtils(conf_apex, logger=logger)
+
+    if apex.is_master():
+        # create experiment dir
+        create_dirs(conf, clean_expdir)
+        # copy from resume dir if exists
+        is_clean = copy_resume_dirs(conf)
+    else:
+        is_clean = False
+
+    if apex.is_dist():
+        is_clean = torch.Tensor([is_clean]).to(torch.device(f'cuda:{apex.global_rank}'))
+        torch.distributed.broadcast(is_clean, src=0)
+        is_clean = is_clean.item()
+    # if resume set to False, regenerate conf
+    if not is_clean:
+        print('Resume directory not clean, disabling resume')
+        update_resume_args(param_args)
+        conf = create_conf(config_filepath, param_args, use_args)
+        Config.set_inst(conf)
+        update_envvars(conf)
+
+    if apex.is_master():
+        # create intermediate exp dir
+        create_intermediate_dirs(conf)
+
+    # create global logger
+    create_logger(conf)
+
+    _create_sysinfo(conf)
+
+
+    # setup tensorboard
+    global _tb_writer
+    _tb_writer = create_tb_writer(conf, apex.is_master())
+
+    # create hooks to execute code when script exits
+    global _atexit_reg
+    if not _atexit_reg:
+        atexit.register(on_app_exit)
+        _atexit_reg = True
+
+    return conf
 
 # TODO: rename this simply as init
 # initializes random number gen, debugging etc
@@ -404,7 +471,6 @@ def copy_resume_dirs(conf:Config)->bool:
             return True
         else:
             print(check_message)
-            print('Resume directory not clean, disabling resume')
             # if os.path.exists(conf_common['resumedir']):
             #     shutil.rmtree(conf_common['resumedir'])
             # conf_common['resume'] = conf_checkpoint['resume'] = conf_common['apex']['resume'] = \

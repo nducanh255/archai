@@ -277,7 +277,9 @@ class TrainerSimClr(EnforceOverrides):
 
     def post_step(self, loss:Tensor, batch_size:int)->None:
         self._metrics.post_step(loss, batch_size)
-        if self.is_wandb_enabled and self._apex.is_master():
+        if self.is_wandb_enabled and self._apex.is_master() \
+           and self._logger_freq > 0 and \
+                ((self._metrics.global_step+1) % self._logger_freq == 0):
             wandb.log({"lr":self._multi_optim.get_lr(0, 0),
                        "loss_train":self.reduce_mean(loss),
                        "global_step":self._metrics.global_step})

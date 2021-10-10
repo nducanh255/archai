@@ -1,0 +1,174 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    cli_version: 0.12.1
+    framework: torch
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    m:
+    - 1: global_step
+      6:
+      - 3
+    - 1: epoch
+      6:
+      - 3
+    - 1: loss_train
+      5: 1
+      6:
+      - 1
+      - 3
+    - 1: lr
+      5: 1
+      6:
+      - 1
+      - 3
+    - 1: epoch_loss_train
+      5: 2
+      6:
+      - 1
+      - 3
+    - 1: epoch_timings_train
+      5: 2
+      6:
+      - 1
+      - 3
+    - 1: avg_step_timings_train
+      5: 2
+      6:
+      - 1
+      - 3
+    - 1: epoch_loss_val
+      5: 2
+      6:
+      - 1
+      - 3
+    - 1: epoch_timings_val
+      5: 2
+      6:
+      - 1
+      - 3
+    - 1: avg_step_timings_val
+      5: 2
+      6:
+      - 1
+      - 3
+    python_version: 3.8.2
+    start_time: 1633724159
+    t:
+      1:
+      - 1
+      - 5
+      4: 3.8.2
+      5: 0.12.1
+      8:
+      - 5
+args:
+  desc: null
+  value: Namespace(config=None)
+config_filepath:
+  desc: null
+  value: confs/algos/simclr.yaml;confs/datasets/cifar10.yaml
+data:
+  desc: null
+  value:
+    __include__: ./dataroot.yaml
+    common: '{''experiment_name'': ''SimClr_Cifar10'', ''experiment_desc'': ''SimClr_Cifar10'',
+      ''logdir'': ''/vulcanscratch/sgirish/archai'', ''log_prefix'': ''log'', ''log_level'':
+      20, ''backup_existing_log_file'': False, ''yaml_log'': True, ''seed'': 2.0,
+      ''tb_enable'': False, ''tb_dir'': ''$expdir/tb'', ''save_delay'': 30, ''resume'':
+      False, ''resumedir'': '''', ''save_intermediate'': True, ''intermediatedir'':
+      ''/vulcanscratch/sgirish/dummy/'', ''checkpoint'': {''filename'': ''$expdir/checkpoint.pth'',
+      ''freq'': 1, ''experiment_name'': ''SimClr_Cifar10'', ''resume'': False, ''resumedir'':
+      '''', ''save_intermediate'': True, ''intermediatedir'': ''/vulcanscratch/sgirish/dummy/''},
+      ''redis'': None, ''apex'': {''enabled'': True, ''distributed_enabled'': True,
+      ''mixed_prec_enabled'': False, ''gpus'': '''', ''opt_level'': ''O2'', ''bn_fp32'':
+      False, ''loss_scale'': ''dynamic'', ''sync_bn'': True, ''scale_lr'': False,
+      ''min_world_size'': 0, ''detect_anomaly'': False, ''seed'': 2.0, ''ray'': {''enabled'':
+      False, ''local_mode'': False}, ''resume'': False}, ''wandb'': {''enabled'':
+      True, ''project_name'': ''dummy'', ''run_name'': ''archai_train'', ''entity'':
+      ''sgirish''}, ''smoke_test'': False, ''only_eval'': False, ''expdir'': ''/vulcanscratch/sgirish/archai/SimClr_Cifar10'',
+      ''distdir'': ''/vulcanscratch/sgirish/archai/SimClr_Cifar10/dist''}'
+    dataset: '{''dataroot'': ''/cfarhomes/sgirish/dataroot'', ''name'': ''cifar10'',
+      ''n_classes'': 10, ''channels'': 3, ''max_batches'': 20, ''storage_name'': ''cifar-10-batches-py''}'
+    dataset_eval: '{''dataroot'': ''$default_dataroot''}'
+    loader: '{''apex'': {''enabled'': True, ''distributed_enabled'': True, ''mixed_prec_enabled'':
+      False, ''gpus'': '''', ''opt_level'': ''O2'', ''bn_fp32'': False, ''loss_scale'':
+      ''dynamic'', ''sync_bn'': True, ''scale_lr'': False, ''min_world_size'': 0,
+      ''detect_anomaly'': False, ''seed'': 2.0, ''ray'': {''enabled'': False, ''local_mode'':
+      False}, ''resume'': False}, ''aug'': '''', ''cutout'': 0, ''load_train'': True,
+      ''train_batch'': 64, ''train_workers'': 4, ''test_workers'': 4, ''load_test'':
+      True, ''test_batch'': 512, ''val_ratio'': 0.0, ''val_fold'': 0, ''cv_num'':
+      5, ''dataset'': {''jitter_strength'': 1.0, ''input_height'': 224, ''gaussian_blur'':
+      True, ''normalize'': True, ''dataroot'': ''$default_dataroot'', ''name'': ''cifar10'',
+      ''n_classes'': 10, ''channels'': 3, ''max_batches'': 20, ''storage_name'': ''cifar-10-batches-py''}}'
+    trainer: '{''title'': ''eval_train'', ''resume'': False, ''wandb'': {''enabled'':
+      True, ''project_name'': ''dummy'', ''run_name'': ''archai_train'', ''entity'':
+      ''sgirish''}, ''apex'': {''enabled'': True, ''distributed_enabled'': True, ''mixed_prec_enabled'':
+      False, ''gpus'': '''', ''opt_level'': ''O2'', ''bn_fp32'': False, ''loss_scale'':
+      ''dynamic'', ''sync_bn'': True, ''scale_lr'': False, ''min_world_size'': 0,
+      ''detect_anomaly'': False, ''seed'': 2.0, ''ray'': {''enabled'': False, ''local_mode'':
+      False}, ''resume'': False}, ''epochs'': 10, ''logger_freq'': 10, ''drop_path_prob'':
+      0.0, ''grad_clip'': 0.0, ''aux_weight'': 0.0, ''batch_chunks'': 1, ''model'':
+      ''resnet18'', ''lossfn'': {''type'': ''NTXentLoss'', ''temperature'': 0.1, ''eps'':
+      1e-06}, ''optimizer'': {''type'': ''lars'', ''lr'': 5.0, ''decay'': 1e-06, ''momentum'':
+      0.9, ''trust_coeff'': 0.001, ''decay_bn'': nan}, ''lr_schedule'': {''type'':
+      ''cosine'', ''min_lr'': 0.0001, ''warmup'': {''multiplier'': 1, ''epochs'':
+      10}}, ''validation'': {''title'': ''eval_test'', ''batch_chunks'': 1, ''logger_freq'':
+      0, ''freq'': 10, ''lossfn'': {''type'': ''NTXentLoss'', ''temperature'': 0.5,
+      ''eps'': 1e-06}}}'
+extra_args:
+  desc: null
+  value:
+  - --local_rank=0
+  - --trainer.optimizer.lr
+  - '5.0'
+  - --common.apex.enabled
+  - 'True'
+  - --dataset_yaml
+  - confs/datasets/cifar10.yaml
+  - --trainer.epochs
+  - '2'
+  - --loader.train_batch
+  - '64'
+  - --trainer.batch_chunks
+  - '1'
+  - --trainer.model
+  - resnet18
+  - --common.apex.sync_bn
+  - 'True'
+  - --loader.dataset.jitter_strength
+  - '1.0'
+  - --trainer.lossfn.temperature
+  - '0.1'
+  - --loader.dataset.input_height
+  - '224'
+  - --loader.dataset.gaussian_blur
+  - 'True'
+  - --dataset.max_batches
+  - '20'
+  - -loader.train_workers
+  - '2'
+  - --common.checkpoint.freq
+  - '1'
+  - --common.logdir
+  - ./
+  - --trainer.epochs
+  - '10'
+  - --common.save_intermediate
+  - 'True'
+  - --common.intermediatedir
+  - /vulcanscratch/sgirish/dummy/
+  - --common.resume
+  - 'True'
+  - --common.resumedir
+  - /vulcanscratch/sgirish/dummy/
+  - --common.wandb.enabled
+  - 'True'
+  - --common.wandb.project_name
+  - dummy
+  - --common.wandb.run_name
+  - archai_train
+  - --common.wandb.entity
+  - sgirish

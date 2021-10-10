@@ -11,7 +11,7 @@ from archai.networks_ssl.simclr import ModelSimCLRResNet, ModelSimCLRVGGNet, Mod
 from archai.common import utils
 from archai.common.trainer_ssl import TrainerSimClr
 from archai.common.config import Config
-from archai.common.common import common_init, create_conf, get_state, init_from, update_envvars
+from archai.common.common import common_init, common_init_dist, create_conf, get_state, init_from, update_envvars
 from archai.datasets import data
 from archai.common.checkpoint import CheckPoint
 from archai.common.dist_utils import ApexUtils
@@ -117,16 +117,7 @@ def train_test(conf_main:Config):
 
 
 if __name__ == '__main__':
-    if utils.is_main_process():
-        conf = common_init(config_filepath='confs/algos/simclr.yaml')
-        print('Running main process')
-    else:
-        conf = create_conf(config_filepath='confs/algos/simclr.yaml')
-        Config.set_inst(conf)
-        update_envvars(conf)
-        commonstate = get_state()
-        init_from(commonstate,recreate_logger=False)
-        print('Running child process')
+    conf = common_init_dist(config_filepath='confs/algos/simclr.yaml')
     train_test(conf)
 
 

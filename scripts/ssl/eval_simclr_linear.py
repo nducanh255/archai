@@ -111,6 +111,7 @@ def train_test(conf:Config):
         if ckpt['trainer']['last_epoch'] +1 != config_train['nas']['eval']['trainer']['epochs']:
             raise Exception("Model training not finished, exiting evaluation...")
     elif ckpt['trainer']['last_epoch'] +1 != config_train['trainer']['epochs']:
+        # pass
         raise Exception(f"Model training not finished, still at epoch {ckpt['trainer']['last_epoch'] +1}, exiting evaluation...")
     print("Loading model from epoch {}".format(ckpt['trainer']['last_epoch']+1))
     model_state_dict = ckpt['trainer']['model']

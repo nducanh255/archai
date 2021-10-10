@@ -1,0 +1,159 @@
+__include__: ./dataroot.yaml
+common:
+  apex:
+    bn_fp32: false
+    detect_anomaly: false
+    distributed_enabled: true
+    enabled: true
+    gpus: ''
+    loss_scale: dynamic
+    min_world_size: 0
+    mixed_prec_enabled: false
+    opt_level: O2
+    ray:
+      enabled: false
+      local_mode: false
+    resume: false
+    scale_lr: false
+    seed: 2.0
+    sync_bn: true
+  backup_existing_log_file: false
+  checkpoint:
+    experiment_name: SimClr_Cifar10
+    filename: $expdir/checkpoint.pth
+    freq: 1
+    intermediatedir: /vulcanscratch/sgirish/dummy/
+    resume: false
+    resumedir: ''
+    save_intermediate: true
+  distdir: /vulcanscratch/sgirish/archai/SimClr_Cifar10/dist
+  expdir: /vulcanscratch/sgirish/archai/SimClr_Cifar10
+  experiment_desc: SimClr_Cifar10
+  experiment_name: SimClr_Cifar10
+  intermediatedir: /vulcanscratch/sgirish/dummy/
+  log_level: 20
+  log_prefix: log
+  logdir: /vulcanscratch/sgirish/archai
+  only_eval: false
+  redis: null
+  resume: false
+  resumedir: ''
+  save_delay: 30
+  save_intermediate: true
+  seed: 2.0
+  smoke_test: false
+  tb_dir: $expdir/tb
+  tb_enable: false
+  wandb:
+    enabled: true
+    entity: sgirish
+    project_name: dummy
+    run_name: archai_train
+  yaml_log: true
+dataset:
+  channels: 3
+  dataroot: /cfarhomes/sgirish/dataroot
+  max_batches: 20
+  n_classes: 10
+  name: cifar10
+  storage_name: cifar-10-batches-py
+dataset_eval:
+  dataroot: $default_dataroot
+loader:
+  apex:
+    bn_fp32: false
+    detect_anomaly: false
+    distributed_enabled: true
+    enabled: true
+    gpus: ''
+    loss_scale: dynamic
+    min_world_size: 0
+    mixed_prec_enabled: false
+    opt_level: O2
+    ray:
+      enabled: false
+      local_mode: false
+    resume: false
+    scale_lr: false
+    seed: 2.0
+    sync_bn: true
+  aug: ''
+  cutout: 0
+  cv_num: 5
+  dataset:
+    channels: 3
+    dataroot: $default_dataroot
+    gaussian_blur: true
+    input_height: 224
+    jitter_strength: 1.0
+    max_batches: 20
+    n_classes: 10
+    name: cifar10
+    normalize: true
+    storage_name: cifar-10-batches-py
+  load_test: true
+  load_train: true
+  test_batch: 512
+  test_workers: 4
+  train_batch: 64
+  train_workers: 4
+  val_fold: 0
+  val_ratio: 0.0
+trainer:
+  apex:
+    bn_fp32: false
+    detect_anomaly: false
+    distributed_enabled: true
+    enabled: true
+    gpus: ''
+    loss_scale: dynamic
+    min_world_size: 0
+    mixed_prec_enabled: false
+    opt_level: O2
+    ray:
+      enabled: false
+      local_mode: false
+    resume: false
+    scale_lr: false
+    seed: 2.0
+    sync_bn: true
+  aux_weight: 0.0
+  batch_chunks: 1
+  drop_path_prob: 0.0
+  epochs: 10
+  grad_clip: 0.0
+  logger_freq: 10
+  lossfn:
+    eps: 1.0e-06
+    temperature: 0.1
+    type: NTXentLoss
+  lr_schedule:
+    min_lr: 0.0001
+    type: cosine
+    warmup:
+      epochs: 10
+      multiplier: 1
+  model: resnet18
+  optimizer:
+    decay: 1.0e-06
+    decay_bn: .nan
+    lr: 5.0
+    momentum: 0.9
+    trust_coeff: 0.001
+    type: lars
+  resume: false
+  title: eval_train
+  validation:
+    batch_chunks: 1
+    freq: 10
+    logger_freq: 0
+    lossfn:
+      eps: 1.0e-06
+      temperature: 0.5
+      type: NTXentLoss
+    title: eval_test
+  wandb:
+    enabled: true
+    entity: sgirish
+    project_name: dummy
+    run_name: archai_train
