@@ -1,4 +1,5 @@
 import yaml
+import numpy as np
 
 # resnets = {}
 # count = 92
@@ -148,32 +149,93 @@ import yaml
 #         f.write(f"    hidden_dim: 2048\n")
 #         f.write(f"    out_features: 128\n")
 
-densenets = {}
-count = 1
-for l1 in [2,4,6]:
-    for l2 in [8,10,12]:
-        for l3 in [24, 32, 36, 48]:
-            for l4 in [16, 24, 32]:
-                for growth_rate in [16, 32, 48]:
-                    for num_init_features in [32, 64, 96]:
-                        block_config = [l1,l2,l3,l4]
-                        cur_densenet = {
-                                    "layers": block_config,
-                                    "growth_rate": growth_rate,
-                                    "num_init_features": num_init_features,
-                                    "hidden_dim": 2048,
-                                    "out_features": 128,
-                        }
-                        densenets["densenet_v{}".format(count)] = cur_densenet
-                        count += 1
+# densenets = {}
+# count = 1
+# for l1 in [2,4,6]:
+#     for l2 in [8,10,12]:
+#         for l3 in [24, 32, 36, 48]:
+#             for l4 in [16, 24, 32]:
+#                 for growth_rate in [16, 32, 48]:
+#                     for num_init_features in [32, 64, 96]:
+#                         block_config = [l1,l2,l3,l4]
+#                         cur_densenet = {
+#                                     "layers": block_config,
+#                                     "growth_rate": growth_rate,
+#                                     "num_init_features": num_init_features,
+#                                     "hidden_dim": 2048,
+#                                     "out_features": 128,
+#                         }
+#                         densenets["densenet_v{}".format(count)] = cur_densenet
+#                         count += 1
 
-with open('confs/algos/simclr_densenets.yaml','a') as f:
+# with open('confs/algos/simclr_densenets.yaml','a') as f:
+#     f.write("\n")
+#     for name, cur_densenet in densenets.items():
+#         block_config, growth_rate, num_init_features, hidden_dim, out_features = cur_densenet.values()
+#         f.write(f"\n{name}:\n")
+#         f.write(f"    block_config: [{block_config[0]}, {block_config[1]}, {block_config[2]}, {block_config[3]}]\n")
+#         f.write(f"    growth_rate: {growth_rate}\n")
+#         f.write(f"    num_init_features: {num_init_features}\n")
+#         f.write(f"    hidden_dim: {hidden_dim}\n")
+#         f.write(f"    out_features: {out_features}\n")
+
+
+
+mobilenets = {}
+count = 1
+for t in [[1,6,6,6,6,6,6]]:
+    for c in [[16,24,32,64,96,160,320]]:
+        for n in [[1,2,3,4,3,3,1]]:
+            for s in [[1,2,2,2,1,2,1]]:
+                for width_mult in np.linspace(1,3,11):
+                    width_mult = round(width_mult,1)
+                    cur_mobilenet = {
+                                "t": t,
+                                "c": c,
+                                "n": n,
+                                "s": s,
+                                "width_mult": width_mult,
+                                "hidden_dim": 2048,
+                                "out_features": 128,
+                    }
+                    mobilenets["mobilenet_v{}".format(count)] = cur_mobilenet
+                    count += 1
+
+for t in [[1,6,6,6,6,6,6]]:
+    for c in [[16,24,32,64,96,160,320]]:
+        for n1 in [2,3]:
+            for n2 in [3,4]:
+                for n3 in [4,5]:
+                    for n4 in [3,4]:
+                        for n5 in [3,4]:
+                            for s in [[1,2,2,2,1,2,1]]:
+                                for width_mult in [1.0]:
+                                    n = [1,n1,n2,n3,n4,n5,1]
+                                    if n==[1,2,3,4,3,3,1]:
+                                        continue
+                                    width_mult = round(width_mult,1)
+                                    cur_mobilenet = {
+                                                "t": t,
+                                                "c": c,
+                                                "n": n,
+                                                "s": s,
+                                                "width_mult": width_mult,
+                                                "hidden_dim": 2048,
+                                                "out_features": 128,
+                                    }
+                                    mobilenets["mobilenet_v{}".format(count)] = cur_mobilenet
+                                    count += 1
+
+
+with open('confs/algos/simclr_mobilenets.yaml','a') as f:
     f.write("\n")
-    for name, cur_densenet in densenets.items():
-        block_config, growth_rate, num_init_features, hidden_dim, out_features = cur_densenet.values()
+    for name, cur_mobilenet in mobilenets.items():
+        t, c, n, s, width_mult, hidden_dim, out_features = cur_mobilenet.values()
         f.write(f"\n{name}:\n")
-        f.write(f"    block_config: [{block_config[0]}, {block_config[1]}, {block_config[2]}, {block_config[3]}]\n")
-        f.write(f"    growth_rate: {growth_rate}\n")
-        f.write(f"    num_init_features: {num_init_features}\n")
+        f.write(f"    t: [{','.join([str(i) for i in t])}]\n")
+        f.write(f"    c: [{','.join([str(i) for i in c])}]\n")
+        f.write(f"    n: [{','.join([str(i) for i in n])}]\n")
+        f.write(f"    s: [{','.join([str(i) for i in s])}]\n")
+        f.write(f"    width_mult: {width_mult}\n")
         f.write(f"    hidden_dim: {hidden_dim}\n")
         f.write(f"    out_features: {out_features}\n")

@@ -4,6 +4,7 @@ from archai.networks_ssl.resnet import _resnet
 from archai.networks_ssl.densenet import _densenet
 from archai.networks_ssl.vggnet import _vggnet
 from archai.networks_ssl.vit import _vit
+from archai.networks_ssl.mobilenet_v2 import mobilenet_v2
 from archai.networks_ssl.efficientnet import EfficientNet
 from typing import Type, Any, Callable, Union, List, Optional
 
@@ -89,10 +90,10 @@ class ModelSimCLRDenseNet(nn.Module):
 
 class ModelSimCLRMobileNet(nn.Module):
     
-    def __init__(self, dataset: str, hidden_dim: int, out_features:int, **kwargs: Any):
+    def __init__(self, hidden_dim: int, out_features:int, **kwargs: Any):
         super(ModelSimCLRMobileNet, self).__init__()
-        self.backbone = _densenet(dataset, **kwargs)
-        input_dim = self.backbone.output_features
+        self.backbone = mobilenet_v2(**kwargs)
+        input_dim = self.backbone.last_channel
         self.projection = Projection(input_dim, hidden_dim, out_features)
 
     def forward(self, x):

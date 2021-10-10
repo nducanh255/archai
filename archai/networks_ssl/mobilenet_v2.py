@@ -105,6 +105,7 @@ class InvertedResidual(nn.Module):
 class MobileNetV2(nn.Module):
     def __init__(
         self,
+        compress: bool = False,
         width_mult: float = 1.0,
         inverted_residual_setting: Optional[List[List[int]]] = None,
         round_nearest: int = 8,
@@ -156,7 +157,8 @@ class MobileNetV2(nn.Module):
         input_channel = _make_divisible(input_channel * width_mult, round_nearest)
         self.last_channel = _make_divisible(last_channel * max(1.0, width_mult), round_nearest)
         self.lastconv_output_channels = self.last_channel
-        features: List[nn.Module] = [ConvBNReLU(3, input_channel, stride=2, norm_layer=norm_layer)]
+        stride = 1 if compress else 2
+        features: List[nn.Module] = [ConvBNReLU(3, input_channel, stride=stride, norm_layer=norm_layer)]
         # building inverted residual blocks
         for t, c, n, s in inverted_residual_setting:
             output_channel = _make_divisible(c * width_mult, round_nearest)
@@ -195,7 +197,7 @@ class MobileNetV2(nn.Module):
         x = nn.functional.adaptive_avg_pool2d(x, (1, 1))
         x = torch.flatten(x, 1)
         out = self.classifier(x)
-        return [out,x]
+        return [out]
 
     def forward(self, x: Tensor) -> Tensor:
         return self._forward_impl(x)

@@ -7,7 +7,7 @@ import yaml
 import time
 import torch
 import shutil
-from archai.networks_ssl.simclr import ModelSimCLRResNet, ModelSimCLRVGGNet, ModelSimCLRViT, ModelSimCLRDenseNet, ModelSimCLREfficientNet
+from archai.networks_ssl.simclr import ModelSimCLRResNet, ModelSimCLRVGGNet, ModelSimCLRViT, ModelSimCLRDenseNet, ModelSimCLREfficientNet, ModelSimCLRMobileNet
 from archai.common import utils
 from archai.common.trainer_ssl import TrainerSimClr
 from archai.common.config import Config
@@ -37,7 +37,10 @@ def train_test(conf_main:Config):
     elif "efficientnet" in conf_trainer['model']:
         with open('confs/algos/simclr_efficientnets.yaml', 'r') as f:
             conf_models = yaml.load(f, Loader=yaml.Loader)
-    elif "proxylessnas" not in conf_trainer['model']:
+    elif "mobilenet" in conf_trainer['model']:
+        with open('confs/algos/simclr_mobilenets.yaml', 'r') as f:
+            conf_models = yaml.load(f, Loader=yaml.Loader)
+    else:
         raise Exception(f"Not implemented SimCLR for model {conf_trainer['model']}")
         
     conf_model = conf_models[conf_trainer['model']]
@@ -69,6 +72,12 @@ def train_test(conf_main:Config):
         model = ModelSimCLREfficientNet(conf_trainer['model'], hidden_dim = conf_model["hidden_dim"], out_features = conf_model["out_features"],
                 load_pretrained = False, width_coefficient = conf_model['width'], depth_coefficient = conf_model['depth'],
                 image_size = conf_model['res'], dropout_rate = conf_model['dropout']
+                )
+    elif "mobilenet" in conf_trainer['model']:
+        inverted_residual_setting = [[conf_model['t'][i],conf_model['c'][i],conf_model['n'][i],conf_model['s'][i]] \
+                                        for i in range(len(conf_model['t']))]
+        model = ModelSimCLRMobileNet(hidden_dim = conf_model["hidden_dim"], out_features = conf_model["out_features"],
+                inverted_residual_setting = inverted_residual_setting, width_mult = conf_model['width_mult'], compress = conf_model['compress']
                 )
     model = model.to(torch.device('cuda', 0))
     print('Number of trainable params: {:.2f}M'

@@ -467,6 +467,8 @@ def copy_resume_dirs(conf:Config)->bool:
             print(check_message)
             return False
 
+    return True
+
     # conf_checkpoint = conf_common['checkpoint']
     # resumedir = os.path.join(conf_common['resumedir'],get_experiment_name(conf))
     # logdir = os.path.join(conf_common['logdir'],get_experiment_name(conf))
