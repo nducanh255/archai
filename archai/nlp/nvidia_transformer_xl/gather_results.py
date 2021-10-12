@@ -178,8 +178,11 @@ def get_info_from_json(json_file, step=[], type=None):
       return None
     job_desc = '{'+job_desc.group(1)+'}}'
     work_dir = json.loads(job_desc)['data']['work_dir']
-    idx_start = re.search('amlt-results', work_dir).span()[-1] + 1
-    amlt_job = work_dir[idx_start:].split('/')[0]
+    try:
+      idx_start = re.search('amlt-results', work_dir).span()[-1] + 1
+      amlt_job = work_dir[idx_start:].split('/')[0]
+    except:
+      amlt_job = None
   
     for line in lines:
       str = re.search('DLLL \{(.+?)\}', line)
@@ -227,16 +230,19 @@ def get_info_from_json(json_file, step=[], type=None):
 def get_config_name(job):
   # idx = list(re.search('config_', job).span())[0]
   # return job[idx:]
-  if 'baseline' in job:
-    dir_name = os.path.basename(os.path.dirname(job))
-    return re.search('(config_[0-9]+_[0-9]+)', dir_name).group(1)
-  elif 'similar_params_sweep' in job or 'simp' in job or 'evolution' in job:
+  if 'similar_params_sweep' in job or 'simp' in job or 'evolution' in job:
     idx =  re.search('(config_[0-9]+)', job).span()[0]
     job = job[idx:]
     config_name = job.split('/')[0]
     return config_name + '_' + job.split('/')[1]
+  
+  elif 'baseline' in job:
+    dir_name = os.path.basename(os.path.dirname(job))
+    return re.search('(config_[0-9]+_[0-9]+)', dir_name).group(1)
+  
   elif 'evo_search' in job or 'midevolution' in job:
     return job
+  
   else:
     return re.search('(config_[0-9]+)', job).group(1)
     
@@ -983,13 +989,16 @@ def main(args):
     
     legend_keys = []
     for exp_name in args.exp_name:
-      try:
-        idx = re.search('(fear_stage_1)', exp_name).span()[-1]
-      except:
-        idx = re.search('(fear_stage1)', exp_name).span()[-1]
-      legend_key = exp_name[idx+1:].split('_')[-1]
-      if len(legend_key)==0:
-        legend_key = 'homogeneous'
+      if 'fear' in exp_name:
+        try:
+          idx = re.search('(fear_stage_1)', exp_name).span()[-1]
+        except:
+          idx = re.search('(fear_stage1)', exp_name).span()[-1]
+        legend_key = exp_name[idx+1:].split('_')[-1]
+        if len(legend_key)==0:
+          legend_key = 'homogeneous'
+      else:
+        legend_key = 'heterogeneous'
       legend_keys.append(legend_key)
       
       path_to_results = os.path.join(args.results_dir, exp_name)
@@ -1071,7 +1080,7 @@ def main(args):
     for k in legend_keys:
       plt.scatter(-np.asarray(n_params[k])[sorted_ground_truth[k]], np.asarray(val_ppl_list_gt[k])[sorted_ground_truth[k]], label=k)
     plt.ylabel('Validation PPL')
-    plt.xlabel('Total nParams')
+    plt.xlabel('Decoder nParams')
     plt.title('Pareto Curve')
     plt.grid(axis='y')
     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))

@@ -564,8 +564,9 @@ class MemTransformerLM(nn.Module):
         d_embed = d_model if d_embed is None else d_embed
         self.d_embed = d_embed
         self.d_model = d_model
-        self.n_head = n_head
+        self.n_head = n_head[0] if isinstance(n_head, list) else n_head
         self.d_head = d_model//n_head if d_head is None else d_head
+        d_inner = d_inner[0] if isinstance(d_inner, list) else d_inner
 
         self.word_emb = AdaptiveEmbedding(n_token, d_embed, d_model, cutoffs,
                                           div_val=div_val)

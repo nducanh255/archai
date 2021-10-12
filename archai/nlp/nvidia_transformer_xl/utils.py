@@ -100,7 +100,7 @@ def get_model_and_params(model_config, verbose=False):
 
 
 def get_model(model_config, train=False):
-    if isinstance(model_config['n_head'], list) and len(model_config['n_head'])>1:
+    if isinstance(model_config['n_head'], list):# and len(model_config['n_head'])>1:
         model = MemTransformerLM_flex(**model_config)
     else:
         model = MemTransformerLM(**model_config)

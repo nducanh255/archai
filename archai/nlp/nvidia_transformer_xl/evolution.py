@@ -4,6 +4,7 @@ import re
 import pickle
 import copy
 import imageio
+from numpy.lib.arraysetops import isin
 import yaml
 import time
 import types
@@ -39,17 +40,23 @@ class Converter(object):
         gene.append(config['d_model'])
         gene.append(sample_n_layer)
 
-        for i in range(self.max_n_layer):
-            if i < sample_n_layer:
-                gene.append(config['d_inner'][i])
+        for i in range(max(self.max_n_layer, sample_n_layer)):
+            if isinstance(config['d_inner'], list):
+                if i < sample_n_layer:
+                    gene.append(config['d_inner'][i])
+                else:
+                    gene.append(config['d_inner'][0])
             else:
-                gene.append(config['d_inner'][0])
+                gene.append(config['d_inner'])
 
-        for i in range(self.max_n_layer):
-            if i < sample_n_layer:
-                gene.append(config['n_head'][i])
+        for i in range(max(self.max_n_layer, sample_n_layer)):
+            if isinstance(config['n_head'], list):
+                if i < sample_n_layer:
+                    gene.append(config['n_head'][i])
+                else:
+                    gene.append(config['n_head'][0])
             else:
-                gene.append(config['n_head'][0])
+                gene.append(config['n_head'])
 
         return gene
 
@@ -64,14 +71,13 @@ class Converter(object):
         current_index += 1
 
         config['d_inner'] = gene[current_index: current_index + config['n_layer']]
-        current_index += self.max_n_layer
+        current_index += max(self.max_n_layer, config['n_layer'])
 
         config['n_head'] = gene[current_index: current_index + config['n_layer']]
-        current_index += self.max_n_layer
+        current_index += max(self.max_n_layer, config['n_layer'])
 
         return config
 
-    
     def gene2key(self, gene):
         key_list = []
 
@@ -1072,17 +1078,18 @@ def submit_gt_jobs(args, max_step=500, start_config=0, bundle_count=50, n_gpus=8
     create_jobs(all_population, start_config, bundle_count, max_step, n_gpus, gpu_config, targets[0], exp_name='evolution_', is_pareto=is_pareto)
 
 
-def get_diff_with_pareto(gt_latencies, gt_val_ppls, is_gt_pareto, is_proxy_pareto):
+def get_diff_with_pareto(gt_latencies, gt_val_ppls, is_gt_pareto, is_proxy_pareto, min_acceptable_latency_diff=0):
     sorted_idx = np.argsort(gt_latencies)
     
     ppl_diff = []
+    on_pareto = 0
     for i, idx in enumerate(sorted_idx):
         latency, val_ppl = gt_latencies[idx], gt_val_ppls[idx]
         if not is_proxy_pareto[idx]:
             continue
         if is_gt_pareto[idx]:
-            pass
             ppl_diff.append(0.)
+            on_pareto += 1
         else:
             idx_fwd, idx_bkwd = None, None
             for j in sorted_idx[i+1:]:
@@ -1102,15 +1109,24 @@ def get_diff_with_pareto(gt_latencies, gt_val_ppls, is_gt_pareto, is_proxy_paret
                 closest_idx = idx_fwd
             else:
                 closest_idx = idx_bkwd
-            print('latency difference with closest pareto point: {:1f} ms'.format(np.absolute(latency-gt_latencies[closest_idx])*1000))
-            ppl_diff.append(np.absolute(val_ppl-gt_val_ppls[closest_idx])*100./gt_val_ppls[closest_idx])        
+
+            latency_diff = np.absolute(latency-gt_latencies[closest_idx])*1000
+            print('latency difference with closest pareto point: {:1f} ms'.format(latency_diff))
+            
+            if latency_diff <= min_acceptable_latency_diff:
+                ppl_diff.append(np.absolute(val_ppl-gt_val_ppls[closest_idx])*100./gt_val_ppls[closest_idx])        
     
-    assert len(ppl_diff)==np.sum(is_proxy_pareto)
+    if min_acceptable_latency_diff==0:
+        assert len(ppl_diff)==np.sum(is_proxy_pareto)
+    
+    print(f'{on_pareto} points out of {np.sum(is_proxy_pareto)} were on the ground-truth pareto')
+
     return np.mean(ppl_diff)
 
 
-def get_gt_pareto(args, exp_name, path_to_dir, start_config, ppl_eps=0.1, latency_eps = 0.01, hybrid=False, use_convex_hull=False):
-    gt_results = gather_results(exp_name, path_to_dir, filetypes=['.yaml', '.json'], verbose=False)
+def get_gt_pareto(args, exp_name, path_to_dir, start_config, ppl_eps=0.1, latency_eps = 0.01, hybrid=False, use_convex_hull=False, 
+                    min_acceptable_latency_diff=0, baseline_exp=None):
+    gt_results = gather_results(exp_name, os.path.join(path_to_dir, exp_name), filetypes=['config.yaml', '.json'], verbose=False)
     print('found %d model configurations' % len(gt_results.keys()))
 
     print('Loading the latencies from log file')
@@ -1118,7 +1134,12 @@ def get_gt_pareto(args, exp_name, path_to_dir, start_config, ppl_eps=0.1, latenc
     path_to_pkl = os.path.join(results_path, 'latencies.pkl')
     with open(path_to_pkl, 'rb') as f:
         latencies = pickle.load(f)
-    
+    print(len(latencies.keys()))
+
+    if baseline_exp is not None:
+        print('Loading the baseline')
+        latencies_baseline, val_ppls_baseline = analyze_baseline(args, exp_name=baseline_exp, path_to_dir=path_to_dir)
+
     # load previous pareto
     loaded_pareto = None
     fname = 'pareto{}'.format('' if hybrid else '_params')
@@ -1206,18 +1227,22 @@ def get_gt_pareto(args, exp_name, path_to_dir, start_config, ppl_eps=0.1, latenc
     TPR = len(np.intersect1d(np.nonzero(is_gt_pareto)[0], np.nonzero(is_pareto)[0]))*100./len(np.nonzero(is_gt_pareto)[0])
     TNR = len(np.intersect1d(np.nonzero(~is_gt_pareto)[0], np.nonzero(~is_pareto)[0]))*100./len(np.nonzero(~is_gt_pareto)[0])
     print(f'TPR={TPR}% and TNR={TNR}%')
-    mean_ppl_difference = get_diff_with_pareto(gt_latencies, gt_val_ppls, is_gt_pareto, is_pareto)
+    mean_ppl_difference = get_diff_with_pareto(gt_latencies, gt_val_ppls, is_gt_pareto, is_pareto, min_acceptable_latency_diff=min_acceptable_latency_diff)
     print('mean ppl difference between proxy and gt pareto: {:.1f}%'.format(mean_ppl_difference))
     
     plt.figure()
     plt.scatter(np.asarray(gt_latencies)[~is_pareto] * 1000., np.asarray(gt_val_ppls)[~is_pareto], s=5)
     plt.scatter(np.asarray(gt_latencies)[is_pareto] * 1000., np.asarray(gt_val_ppls)[is_pareto], s=5)
-    plt.scatter(np.asarray(gt_latencies)[is_gt_pareto] * 1000., np.asarray(gt_val_ppls)[is_gt_pareto], s=5)
+    # plt.scatter(np.asarray(gt_latencies)[is_gt_pareto] * 1000., np.asarray(gt_val_ppls)[is_gt_pareto], s=5)
     # plt.scatter(np.asarray(gt_val_ppls)[~is_pareto], np.asarray(gt_latencies)[~is_pareto] * 1000., s=10)
     # plt.scatter(np.asarray(gt_val_ppls)[is_pareto], np.asarray(gt_latencies)[is_pareto] * 1000., s=10)
+    if baseline_exp:
+        plt.scatter(np.asarray(latencies_baseline) * 1000., np.asarray(val_ppls_baseline), s=10, marker='*', c='red')
+        plt.xlim((min(np.min(gt_latencies), np.min(latencies_baseline))*1000-10, np.max(gt_latencies)*1000+10))
+    else:
+        plt.xlim(np.min(gt_latencies)*1000-10, np.max(gt_latencies)*1000+10)
     plt.xlabel('Latency (ms)')
-    plt.ylabel('Val PPL')
-    plt.xlim((np.min(gt_latencies)*1000-10, np.max(gt_latencies)*1000+10))
+    plt.ylabel('Val PPL')  
     plt.title('Pareto Curve')
     plt.grid(axis='y')
     fname = 'gt_pareto_latency{}.png'.format('' if hybrid else '_params')
@@ -1369,6 +1394,64 @@ def get_final_pareto_front(args, eps=0.05, hybrid=False, use_convex_hull=False):
     plt.savefig(os.path.join(results_path, 'final_search_pareto{}.png'.format('' if hybrid else '_params')), bbox_inches="tight")
 
 
+def analyze_baseline(args, exp_name, path_to_dir):
+    alg = Evolution(**args)
+    
+    baseline_results = gather_results(exp_name, os.path.join(path_to_dir, exp_name), filetypes=['config.yaml', '.json'], verbose=False)
+    with open(os.path.join(path_to_dir, exp_name, 'latency_summary.yaml'), 'r') as f:
+        latencies = yaml.load(f)
+
+    latencies_list = []
+    val_ppls = []
+    for config_name, latency in latencies.items():
+        latencies_list.append(latency)
+        val_ppls.append(baseline_results[config_name]['valid_perplexity'])
+    
+    ''' Uncomment to masure latency locally
+    params = {}
+    latencies = {}
+    latencies_list = []
+    val_ppls = []
+    for _, result in baseline_results.items():
+        gene = alg.converter.config2gene(result)
+        config = alg.converter.gene2config(gene)
+        print(config)
+        key = alg.converter.gene2key(gene)
+
+        if key in params.keys():
+            continue
+
+        model_config = copy.deepcopy(model_config_defaults)
+        model_config.update(config)
+        model = get_model(model_config, train=False)
+        
+        curr_n_all_param, _, _, params_attention, params_ff = process_parameters(model, verbose=False)
+        params[key] = params_attention + params_ff
+        
+        latency = get_latency(model, model_config, n_threads=alg.n_threads, repeat=alg.latency_repeat)
+        latencies[key] = latency
+        latencies_list.append(latency)
+        val_ppls.append(result['valid_perplexity'])
+    path_to_save = os.path.join(path_to_dir, exp_name)
+    with open(os.path.join(path_to_save, 'params.pkl'), 'wb') as f:
+        pickle.dump(params, f)
+    with open(os.path.join(path_to_save, 'latencies.pkl'), 'wb') as f:
+        pickle.dump(latencies, f)
+    '''
+
+    print(f'summarized {len(latencies.keys())} baseline jobs')
+
+    plt.figure()
+    plt.scatter(np.asarray(latencies_list) * 1000., val_ppls, s=5)
+    plt.xlabel('Latency (ms)')
+    plt.ylabel('Val PPL')
+    plt.grid(axis='y')
+    fname = 'baseline_pareto_latency.png'
+    plt.savefig(os.path.join(args['results_path'], fname), bbox_inches="tight")
+
+    return latencies_list, val_ppls
+
+
 if __name__=='__main__':
     seed = 1111
     np.random.seed(seed)
@@ -1420,13 +1503,43 @@ if __name__=='__main__':
     # get_final_pareto_front(args, eps=eps, hybrid=hybrid, use_convex_hull=use_convex_hull)    
 
     #--------------- compare ground-truth pareto with the proxy pareto
-    gt_exp_name = 'evolution_5000'
+    gt_exp_name = 'evolution_40000'
     path_to_amlt_results = './amlt_logs'
     os.makedirs(path_to_amlt_results, exist_ok=True)
     # command = 'amlt results {} -I "*.json"  -o {} --no-md5'.format(gt_exp_name, path_to_amlt_results)
     # os.system(command)
     # command = 'amlt results {} -I "*.yaml"  -o {} --no-md5'.format(gt_exp_name, path_to_amlt_results)
     # os.system(command)
-    path_to_amlt_results = os.path.join(path_to_amlt_results, gt_exp_name)
-    get_gt_pareto(args, exp_name=gt_exp_name, path_to_dir=path_to_amlt_results, start_config=25, 
-                    ppl_eps=0.1, latency_eps=0.01, hybrid=hybrid, use_convex_hull=use_convex_hull)
+    get_gt_pareto(args, exp_name=gt_exp_name, path_to_dir=path_to_amlt_results, start_config=0, 
+                    ppl_eps=0.1, latency_eps=0.01, hybrid=hybrid, use_convex_hull=use_convex_hull, min_acceptable_latency_diff=2, baseline_exp='evolution_baselines')
+
+    #---------------- print ppl versus nparams pareto
+    # with open('amlt_logs/evolution_40000/params_summary.yaml') as f:
+    #     n_all_params = yaml.load(f)
+    # gt_results = gather_results('evolution_40000', 'amlt_logs/evolution_40000', filetypes=['.json'], verbose=False)
+
+    # params_list = []
+    # val_ppl_list = []
+    # for job_name, result in gt_results.items():
+    #     if job_name in n_all_params.keys():
+    #         params_list.append(n_all_params[job_name]['FFN'] + n_all_params[job_name]['Attn'])
+    #         val_ppl_list.append(result['valid_perplexity'])
+    
+    # max_ppl_diff = 0.
+    # for idx, p in enumerate(params_list):
+    #     for idx2, p2 in enumerate(params_list):
+    #         if abs(p-p2)*100./p < 0.1:
+    #             if abs(val_ppl_list[idx] - val_ppl_list[idx2]) > max_ppl_diff:
+    #                 max_ppl_diff = abs(val_ppl_list[idx] - val_ppl_list[idx2])
+    #                 max_idx = idx
+
+    # print(f'maximum vertical difference in val ppl={max_ppl_diff}, happend in p={params_list[idx]}')
+
+    # plt.figure()
+    # plt.scatter(params_list, val_ppl_list, s=5)
+    # plt.xlabel('# Decoder Params')
+    # plt.ylabel('Val PPL')
+    # plt.title('Pareto Curve')
+    # plt.grid(axis='y')
+    # fname = 'pareto_params.png'
+    # plt.savefig(os.path.join(args['results_path'], fname), bbox_inches="tight")

@@ -31,7 +31,7 @@ generation_seed = 4568
 np.random.seed(generation_seed)
 random.seed(generation_seed)
 
-phase = 1   # 1: submit jobs (optionally with fear stage 1 activated), 2: fear stage 2, 3: baseline, 4: similar parameter exploration
+phase = 5   # 1: submit jobs (optionally with fear stage 1 activated), 2: fear stage 2, 3: baseline, 4: similar parameter exploration, 5: trasnformer-XL baseline
 activate_fear = False
 n_unfreeze = 3  # used in phase 2
 different_seeds = None #[1111,1009,1200,1234,1302,1562,2222,3334,3425,4567]
@@ -109,11 +109,11 @@ def gather_results(exp_name, path_to_dir, filetypes='.json', verbose=True):
       else:
         for ft in filetypes:
           if ft in j:
-            if ft=='.log':
+            if '.log' in ft:
               logs = get_info_from_logs(j_path, stage_1='stage_1' in exp_name)
-            elif ft=='.json':
+            elif '.json' in ft:
               logs = get_info_from_json(j_path)
-            elif ft=='.yaml':
+            elif '.yaml' in ft:
               with open(os.path.join(j_path), 'r') as f:
                 config = yaml.load(f)
               if config is None:
@@ -305,7 +305,7 @@ def multiply(value, factor):
 
 
 if __name__ == '__main__':
-  path_to_configs = os.path.join('/home/t-mojanj/Projects/archai/archai/nlp/nvidia_transformer_xl', 'configs')
+  path_to_configs = os.path.join('archai/nlp/nvidia_transformer_xl', 'configs')
   if not os.path.exists(path_to_configs):
       os.mkdir(path_to_configs)
   
@@ -487,7 +487,7 @@ if __name__ == '__main__':
 
     generate_bash_files(path_to_configs, f_name='amlt_run_fear_baseline', exp_name=exp_name)
 
-  else:
+  elif phase==4:
     n_layers = [5]
     div_vals = [4]
     # d_inners = [512, 700]
@@ -688,3 +688,56 @@ if __name__ == '__main__':
       print('######', n_configs)
       bash_start = generate_bash_files(path_to_configs, f_name='amlt_run_fear_stage1_similar_params', bash_start=bash_start, exp_name='simp')
       bash_start_config += n_configs
+
+  else:
+    n_configs = 16
+    n_gpus = 8
+    gpu_config = 'dgx1_8gpu_fp32'
+    bundle_count = 6
+    target = 'itpscusv100cl'
+
+    c = 0
+    config_idx = 0
+    while c < n_configs: 
+        with open('../archaiphilly/nv_train.yaml') as file:
+            amlt_config = yaml.safe_load(file)
+            # if c==0:
+            #   pprint.pprint(amlt_config)
+
+        amlt_config['environment']['setup'] = ['set -e -o xtrace', 'pip install --user tensorboard']
+        amlt_config['environment']['image'] = 'debadeepta/pytorch:1.7.0-cuda11.0-cudnn8-devel'
+        
+        del amlt_config['search']
+        amlt_config['jobs'] = [{}]
+        amlt_config['jobs'][0]['name'] = 'config_{}'.format(str(config_idx))
+        amlt_config['jobs'][0]['sku'] = f'G{n_gpus}'
+        amlt_config['jobs'][0]['command'] = ['set -e -o xtrace', 'pip install --user -e .']
+        
+        for i in range(1, bundle_count+1):
+          n_layer = i + c
+          exp_name = 'j' + str(i)
+
+          if n_layer > n_configs:
+            break
+          
+          amlt_config['jobs'][0]['command'].append('python -m torch.distributed.launch --nproc_per_node="%s" archai/nlp/nvidia_transformer_xl/train.py --config %s \
+                        --config_file wt103_base.yaml --n_layer %s --n_head 8 --d_model 512 --d_head 64 --d_inner 2048 --div_val 4 --experiment_name %s' \
+                        % (str(n_gpus), gpu_config, n_layer, exp_name))
+        
+        config_file = 'nv_train_'+str(config_idx)+'.yaml'
+        path_to_configs = os.path.join('archai/nlp/nvidia_transformer_xl', 'configs')
+        f_name = os.path.join(path_to_configs, config_file)
+        with open(f_name, 'w') as file:
+            yaml.dump(amlt_config, file)
+
+        c += bundle_count
+        config_idx += 1
+
+    exp_name = 'memformer_baselines'
+    bash_f_name = 'amlt_run_memformerBase.sh'
+    bash_file = os.path.join(path_to_configs, bash_f_name)
+    if os.path.exists(bash_file):
+        os.remove(bash_file)  
+    for i in range(config_idx):
+        with open(bash_file, 'a') as f:
+            f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_{}.yaml {} -t {}\n'.format(i, exp_name, target))
