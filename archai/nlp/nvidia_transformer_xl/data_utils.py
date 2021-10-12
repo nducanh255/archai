@@ -21,9 +21,9 @@ import numpy as np
 import sacremoses
 import torch
 
-from . import nvidia_utils as utils
-from .nvidia_utils.vocabulary import OpenAIVocab
-from .nvidia_utils.vocabulary import Vocab
+import nvidia_utils as utils
+from nvidia_utils.vocabulary import OpenAIVocab
+from nvidia_utils.vocabulary import Vocab
 
 
 class LMOrderedIterator(object):
@@ -225,9 +225,10 @@ class LMMultiFileIterator(LMShuffledIterator):
         rank = utils.distributed.get_rank()
         chunk_len = len(paths) // world_size + 1 # NOTE: this causes a slight imbalance!
         paths_chunks = [paths[i:i+chunk_len] for i in range(0, len(paths), chunk_len)]
-        self.paths = paths_chunks[rank]        
+        self.paths = paths_chunks[rank]
 
     def get_sent_stream(self, path):
+        print(f'Encoding file {path}')
         sents = self.vocab.encode_file(path, add_double_eos=True)
         if self.shuffle:
             np.random.shuffle(sents)
@@ -380,3 +381,16 @@ if __name__ == '__main__':
 
     corpus = get_lm_corpus(args.datadir, args.dataset, vocab='word')
     logging.info('Vocab size : {}'.format(len(corpus.vocab.idx2sym)))
+
+    # DEBUG: iterate through the data for lm1b
+    batch_size = 224
+    tgt_len = 32
+    ext_len = 0
+    device = 'cuda'
+
+    tr_iter = corpus.get_iterator('train', batch_size, tgt_len,
+                                  device=device, ext_len=ext_len)
+
+    for idx, _ in enumerate(tr_iter):
+        print(f'idx: {idx}')
+
