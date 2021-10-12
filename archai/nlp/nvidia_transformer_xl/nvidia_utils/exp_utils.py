@@ -232,7 +232,7 @@ def dataset_dir_name(dataset:str)->str:
     if dataset=='wt2':
         return 'wikitext-2'
     if dataset=='lm1b':
-        raise RuntimeError(f'dataset "{dataset}" is not supported yet')
+        return 'one-billion-words'
     if dataset=='enwik8':
         raise RuntimeError(f'dataset "{dataset}" is not supported yet')
     if dataset=='text8':
