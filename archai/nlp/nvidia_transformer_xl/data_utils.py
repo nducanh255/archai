@@ -218,14 +218,14 @@ class LMMultiFileIterator(LMShuffledIterator):
         self.n_batch = -1
         self.last_iter = None
 
-        self.paths = paths
-        # # DDP prep: partition self.paths into world size chunks 
-        # # and pick chunk for this rank
-        # world_size = utils.distributed.get_world_size()
-        # rank = utils.distributed.get_rank()
-        # chunk_len = len(paths) // world_size + 1 # NOTE: this causes a slight imbalance!
-        # paths_chunks = [paths[i:i+chunk_len] for i in range(0, len(paths), chunk_len)]
-        # self.paths = paths_chunks[rank]        
+        # self.paths = paths
+        # DDP prep: partition self.paths into world size chunks 
+        # and pick chunk for this rank
+        world_size = utils.distributed.get_world_size()
+        rank = utils.distributed.get_rank()
+        chunk_len = len(paths) // world_size + 1 # NOTE: this causes a slight imbalance!
+        paths_chunks = [paths[i:i+chunk_len] for i in range(0, len(paths), chunk_len)]
+        self.paths = paths_chunks[rank]        
 
     def get_sent_stream(self, path):
         sents = self.vocab.encode_file(path, add_double_eos=True)
