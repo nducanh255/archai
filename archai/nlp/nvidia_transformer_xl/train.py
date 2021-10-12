@@ -54,7 +54,7 @@ def parse_args():
     cfg_parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
 
     cfg_parser.add_argument('--config', default='toy') # use 'dgx1_8gpu_fp16' for V100 16GB, dgx1_1gpu_fp16, default
-    cfg_parser.add_argument('--config_file', default='wt103_base.yaml')
+    cfg_parser.add_argument('--config_file', default=None)
 
     config_args, _ = cfg_parser.parse_known_args()
 
@@ -552,11 +552,15 @@ def train(tr_iter, va_iter, model, para_model, model_config, optimizer,
     log_start_time = time.time()
 
     mems = [None for _ in range(args.batch_chunk)]
-    if args.varlen:
-        train_iter = tr_iter.get_varlen_iter(start=last_iter)
+    # Changes to make train_iter for lm1b to be properly caught
+    if args.dataset != 'lm1b':
+        if args.varlen:
+            train_iter = tr_iter.get_varlen_iter(start=last_iter)
+        else:
+            train_iter = tr_iter.get_fixlen_iter(start=last_iter)
     else:
-        train_iter = tr_iter.get_fixlen_iter(start=last_iter)
-
+        train_iter = tr_iter
+    
     for batch, (data, target, seq_len, _) in enumerate(train_iter, start=last_batch+1):
         log_step += 1
         target_tokens += target.numel()

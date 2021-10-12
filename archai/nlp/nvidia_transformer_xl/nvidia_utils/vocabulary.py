@@ -121,7 +121,7 @@ class Vocab(object):
             print('final vocab size {} from {} unique tokens'.format(
                 len(self), len(self.counter)))
 
-    def encode_file(self, path, ordered=False, verbose=True, add_eos=True,
+    def encode_file(self, path, ordered=False, verbose=False, add_eos=True,
                     add_double_eos=False):
         if verbose:
             print('encoding file {} ...'.format(path))
@@ -173,7 +173,7 @@ class Vocab(object):
         if sym in self.sym2idx:
             return self.sym2idx[sym]
         else:
-            print('encounter unk {}'.format(sym))
+            # print('encounter unk {}'.format(sym))
             assert '<eos>' not in sym
             assert hasattr(self, 'unk_idx')
             return self.sym2idx.get(sym, self.unk_idx)

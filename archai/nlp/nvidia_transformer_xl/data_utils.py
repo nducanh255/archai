@@ -181,7 +181,12 @@ class LMShuffledIterator(object):
             data = data.to(self.device)
             target = target.to(self.device)
 
-            yield data, target, self.bptt
+            # making it compatible with LMOrdered iterator
+            # by passing a dummy variable (for 'warm')
+            # NOTE: We need to understand 'warm' in detail.
+            dummy = True
+
+            yield data, target, self.bptt, dummy
 
             n_retain = min(data.size(0), self.ext_len)
             if n_retain > 0:
@@ -200,7 +205,6 @@ class LMMultiFileIterator(LMShuffledIterator):
     def __init__(self, paths, vocab, bsz, bptt, device='cpu', ext_len=None,
                  shuffle=False):
 
-        self.paths = paths
         self.vocab = vocab
 
         self.bsz = bsz
@@ -209,6 +213,19 @@ class LMMultiFileIterator(LMShuffledIterator):
 
         self.device = device
         self.shuffle = shuffle
+
+        # For compatibility with LMOrderedIterator
+        self.n_batch = -1
+        self.last_iter = None
+
+        # self.paths = paths
+        # DDP prep: partition self.paths into world size chunks 
+        # and pick chunk for this rank
+        world_size = utils.distributed.get_world_size()
+        rank = utils.distributed.get_rank()
+        chunk_len = len(paths) // world_size + 1 # NOTE: this causes a slight imbalance!
+        paths_chunks = [paths[i:i+chunk_len] for i in range(0, len(paths), chunk_len)]
+        self.paths = paths_chunks[rank]        
 
     def get_sent_stream(self, path):
         sents = self.vocab.encode_file(path, add_double_eos=True)
@@ -225,8 +242,9 @@ class LMMultiFileIterator(LMShuffledIterator):
         for path in self.paths:
             # sent_stream is an iterator
             sent_stream = self.get_sent_stream(path)
-            for batch in self.stream_iterator(sent_stream):
+            for idx, batch in enumerate(self.stream_iterator(sent_stream)):
                 yield batch
+                self.last_iter = idx
 
 
 class Corpus(object):
@@ -293,6 +311,7 @@ class Corpus(object):
             if self.dataset in ['ptb', 'wt2', 'wt103', 'enwik8', 'text8']:
                 data_iter = LMOrderedIterator(data, *args, **kwargs)
             elif self.dataset == 'lm1b':
+                kwargs.pop('mem_len') #WARNING: there is no mem_len kw arg in LMShuffledIterator
                 data_iter = LMShuffledIterator(data, *args, **kwargs)
 
         return data_iter
