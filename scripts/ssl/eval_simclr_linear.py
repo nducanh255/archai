@@ -8,7 +8,7 @@ import shutil
 import torch.nn as nn
 from archai.common import utils
 from archai.algos.darts.darts_model_desc_builder_ssl import DartsModelDescBuilderSimClr
-from archai.networks_ssl.simclr import ModelSimCLRResNet, ModelSimCLRVGGNet, ModelSimCLRViT, ModelSimCLRDenseNet, ModelSimCLREfficientNet
+from archai.networks_ssl.simclr import ModelSimCLRResNet, ModelSimCLRVGGNet, ModelSimCLRViT, ModelSimCLRDenseNet, ModelSimCLREfficientNet, ModelSimCLRMobileNet
 from archai.common.trainer import TrainerLinear
 from archai.common.config import Config
 from archai.common.common import _create_sysinfo, common_init, create_conf, expdir_abspath, get_expdir, get_state, init_from, update_envvars
@@ -68,6 +68,9 @@ def train_test(conf:Config):
     elif "efficientnet" in conf_trainer['model']:
         with open('confs/algos/simclr_efficientnets.yaml', 'r') as f:
             conf_models = yaml.load(f, Loader=yaml.Loader)
+    elif "mobilenet" in conf_trainer['model']:
+        with open('confs/algos/simclr_mobilenets.yaml', 'r') as f:
+            conf_models = yaml.load(f, Loader=yaml.Loader)
     elif "darts" in conf_trainer['model']:
         model_desc_builder = DartsModelDescBuilderSimClr()
         model, model_desc = create_model(config_train['nas']['eval'], conf, model_desc_builder, config_train['nas']['eval']['full_desc_filename'])
@@ -105,6 +108,12 @@ def train_test(conf:Config):
                 load_pretrained = False, width_coefficient = conf_model['width'], depth_coefficient = conf_model['depth'],
                 image_size = conf_model['res'], dropout_rate = conf_model['dropout']
                 )
+    elif "mobilenet" in conf_trainer['model']:
+        inverted_residual_setting = [[conf_model['t'][i],conf_model['c'][i],conf_model['n'][i],conf_model['s'][i]] \
+                                        for i in range(len(conf_model['t']))]
+        model = ModelSimCLRMobileNet(hidden_dim = conf_model["hidden_dim"], out_features = conf_model["out_features"],
+                inverted_residual_setting = inverted_residual_setting, width_mult = conf_model['width_mult'], compress = conf_model['compress']
+                )
     model = model.to(torch.device('cuda', 0))
     ckpt = torch.load(conf['common']['load_checkpoint'])
     if "darts" in conf['common']['load_checkpoint']:
@@ -141,6 +150,8 @@ def train_test(conf:Config):
         input_dim = model.backbone.output_features
     elif "efficientnet" in conf_trainer['model']:
         input_dim = model.backbone.output_features
+    elif "mobilenet" in conf_trainer['model']:
+        input_dim = model.backbone.last_channel
     elif 'darts' in conf_trainer['model']:
         input_dim = model_desc.logits_op.params['conv'].ch_out
 
