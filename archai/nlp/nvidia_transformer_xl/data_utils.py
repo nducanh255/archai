@@ -329,7 +329,7 @@ def get_lm_corpus(datadir, dataset, vocab, max_size=None):
     else:
         raise RuntimeError('Unsupported vocab')
 
-    if os.path.exists(fn):
+    if os.path.exists(fn) and dataset != 'lm1b':
         logging.info('Loading cached dataset...')
         corpus = torch.load(fn)
     else:
@@ -350,7 +350,7 @@ def get_lm_corpus(datadir, dataset, vocab, max_size=None):
 
         corpus = Corpus(datadir, dataset, vocab, max_size=max_size, **kwargs)
         with utils.distributed.sync_workers() as rank:
-            if rank == 0:
+            if rank == 0 and dataset != 'lm1b':
                 torch.save(corpus, fn)
 
     return corpus

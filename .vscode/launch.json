@@ -449,7 +449,7 @@
             "module": "torch.distributed.launch",
             "console": "integratedTerminal",
             "args": [
-                "--nproc_per_node=4",
+                "--nproc_per_node=1",
                 "archai/nlp/nvidia_transformer_xl/train.py",
                 "--cuda",
                 "--dataset", "lm1b",
