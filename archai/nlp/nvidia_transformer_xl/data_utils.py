@@ -226,9 +226,9 @@ class LMMultiFileIterator(LMShuffledIterator):
         chunk_len = len(paths) // world_size + 1 # NOTE: this causes a slight imbalance!
         paths_chunks = [paths[i:i+chunk_len] for i in range(0, len(paths), chunk_len)]
         self.paths = paths_chunks[rank]
+        print(self.paths)
 
     def get_sent_stream(self, path):
-        print(f'Encoding file {path}')
         sents = self.vocab.encode_file(path, add_double_eos=True)
         if self.shuffle:
             np.random.shuffle(sents)
