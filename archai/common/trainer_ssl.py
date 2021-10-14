@@ -118,6 +118,7 @@ class TrainerSimClr(EnforceOverrides):
 
         if self._start_epoch >= self._epochs:
             logger.warn(f'fit done because start_epoch {self._start_epoch}>={self._epochs}')
+            self.post_fit(data_loaders)
             return self.get_metrics() # we already finished the run, we might be checkpointed
 
         logger.pushd('epochs')
@@ -226,6 +227,24 @@ class TrainerSimClr(EnforceOverrides):
             if best_test:
                 wandb.run.summary['best_test_epoch'] = self.reduce_mean(best_test.index)
                 wandb.run.summary['best_test_loss'] = self.reduce_mean(best_test.loss.avg)
+
+            save_intermediate = self._conf_train['save_intermediate']
+            intermediatedir = self._conf_train['intermediatedir']
+            if save_intermediate:
+                logdir = utils.full_path(os.environ['logdir'])
+                for folder in os.listdir(logdir):
+                    srcdir = os.path.join(logdir,folder)
+                    destdir = os.path.join(intermediatedir,folder)
+                    if os.path.exists(destdir):
+                        if os.path.isdir(destdir):
+                            shutil.rmtree(destdir)
+                        else:
+                            os.remove(destdir)
+                    if os.path.isdir(srcdir):
+                        shutil.copytree(srcdir,destdir)
+                    else:
+                        shutil.copy(srcdir,destdir)
+                print(f'Copied files from logdir {logdir} to intermediate dir {intermediatedir}')
 
     def pre_epoch(self, data_loaders:data.DataLoaders)->None:
         self._metrics.pre_epoch(lr=self._multi_optim.get_lr(0, 0))
