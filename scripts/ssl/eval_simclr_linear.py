@@ -3,6 +3,7 @@
 
 import os
 import yaml
+import time
 import torch
 import shutil
 import torch.nn as nn
@@ -11,7 +12,7 @@ from archai.algos.darts.darts_model_desc_builder_ssl import DartsModelDescBuilde
 from archai.networks_ssl.simclr import ModelSimCLRResNet, ModelSimCLRVGGNet, ModelSimCLRViT, ModelSimCLRDenseNet, ModelSimCLREfficientNet, ModelSimCLRMobileNet
 from archai.common.trainer import TrainerLinear
 from archai.common.config import Config
-from archai.common.common import _create_sysinfo, common_init, create_conf, expdir_abspath, get_expdir, get_state, init_from, update_envvars
+from archai.common.common import _create_sysinfo, common_init_dist, create_conf, expdir_abspath, get_expdir, get_state, init_from, update_envvars
 from archai.datasets import data
 from archai.nas.model_desc import ModelDesc
 from archai.common.dist_utils import ApexUtils
@@ -136,8 +137,8 @@ def train_test(conf:Config):
             if 'projection' not in key:
                 del model_state_dict[key]
     model.load_state_dict(model_state_dict)
-    # print('Number of trainable params: {:.2f}M'
-    #       .format(sum(p.numel() for p in model.backbone.parameters() if p.requires_grad)/1e6))
+    print('Number of trainable params: {:.2f}M'
+          .format(sum(p.numel() for p in model.backbone.parameters() if p.requires_grad)/1e6))
     # exit()
    
     if "resnet" in conf_trainer['model']:
@@ -165,6 +166,20 @@ def train_test(conf:Config):
     apex = ApexUtils(conf['common']['apex'], logger=None)
     apex.sync_devices()
     apex.barrier()
+    if conf_checkpoint['resume']:
+        resumedir = conf_checkpoint['resumedir']
+        experiment_name = conf_checkpoint['experiment_name']
+        resumedir = utils.full_path(resumedir)
+        resumedir = os.path.join(resumedir, experiment_name)
+        filename = os.path.basename(utils.full_path(conf_checkpoint['filename']))
+        filepath = os.path.join(resumedir, filename)
+        if os.path.exists(filepath):
+            print("Resuming")
+            found = ckpt.resume(filepath)
+        else:
+            print('Resume ckpt not found')
+            conf_checkpoint['resume'] = False
+            conf_checkpoint['resumedir'] = ''
 
     if apex.is_master():
         conf_wandb = conf['common']['wandb']
@@ -182,21 +197,24 @@ def train_test(conf:Config):
 
     if apex.is_master():
         shutil.copyfile(train_config_path,expdir_abspath('config_used_train.yaml'))
-    trainer = TrainerLinear(conf_trainer, model)
+    trainer = TrainerLinear(conf_trainer, model, ckpt)
+    st = time.time()
     trainer.fit(data_loaders)
+    print('Time taken:', time.time()-st)
 
 
 if __name__ == '__main__':
-    if utils.is_main_process():
-        conf = common_init(config_filepath='confs/algos/simclr_eval.yaml')
-        print('Running main process')
-    else:
-        conf = create_conf(config_filepath='confs/algos/simclr_eval.yaml')
-        Config.set_inst(conf)
-        update_envvars(conf)
-        commonstate = get_state()
-        init_from(commonstate)
-        print('Running child process')
+    conf = common_init_dist(config_filepath='confs/algos/simclr_eval.yaml')
+    # if utils.is_main_process():
+    #     conf = common_init(config_filepath='confs/algos/simclr_eval.yaml')
+    #     print('Running main process')
+    # else:
+    #     conf = create_conf(config_filepath='confs/algos/simclr_eval.yaml')
+    #     Config.set_inst(conf)
+    #     update_envvars(conf)
+    #     commonstate = get_state()
+    #     init_from(commonstate)
+    #     print('Running child process')
     train_test(conf)
 
 

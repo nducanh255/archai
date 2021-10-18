@@ -4,8 +4,10 @@
 from typing import Callable, Tuple, Optional
 from overrides.overrides import overrides
 
+import os
 import wandb
 import torch
+import shutil
 from torch import nn, Tensor
 from torch.optim.optimizer import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
@@ -28,7 +30,7 @@ class Trainer(EnforceOverrides):
     def __init__(self, conf_train:Config, model:nn.Module,
                  checkpoint:Optional[CheckPoint]=None)->None:
         # region config vars
-        self.conf_train = conf_train
+        self._conf_train = conf_train
         conf_lossfn = conf_train['lossfn']
         self._aux_weight = conf_train['aux_weight']
         self._grad_clip = conf_train['grad_clip']
@@ -584,6 +586,24 @@ class TrainerLinear(Trainer):
             self._checkpoint.new()
             self.update_checkpoint(self._checkpoint)
             self._checkpoint.commit()
+            
+            save_intermediate = self._conf_train['save_intermediate']
+            intermediatedir = self._conf_train['intermediatedir']
+            if save_intermediate:
+                logdir = utils.full_path(os.environ['logdir'])
+                for folder in os.listdir(logdir):
+                    srcdir = os.path.join(logdir,folder)
+                    destdir = os.path.join(intermediatedir,folder)
+                    if os.path.exists(destdir):
+                        if os.path.isdir(destdir):
+                            shutil.rmtree(destdir)
+                        else:
+                            os.remove(destdir)
+                    if os.path.isdir(srcdir):
+                        shutil.copytree(srcdir,destdir)
+                    else:
+                        shutil.copy(srcdir,destdir)
+                print(f'Copied files from logdir {logdir} to intermediate dir {intermediatedir}')
 
     @overrides
     def post_fit(self, data_loaders:data.DataLoaders)->None:
@@ -610,6 +630,24 @@ class TrainerLinear(Trainer):
             if best_test:
                 wandb.run.summary['best_test_loss'] = best_test.loss.avg
                 wandb.run.summary['best_test_top1'] = best_test.top1.avg
+
+            save_intermediate = self._conf_train['save_intermediate']
+            intermediatedir = self._conf_train['intermediatedir']
+            if save_intermediate:
+                logdir = utils.full_path(os.environ['logdir'])
+                for folder in os.listdir(logdir):
+                    srcdir = os.path.join(logdir,folder)
+                    destdir = os.path.join(intermediatedir,folder)
+                    if os.path.exists(destdir):
+                        if os.path.isdir(destdir):
+                            shutil.rmtree(destdir)
+                        else:
+                            os.remove(destdir)
+                    if os.path.isdir(srcdir):
+                        shutil.copytree(srcdir,destdir)
+                    else:
+                        shutil.copy(srcdir,destdir)
+                print(f'Copied files from logdir {logdir} to intermediate dir {intermediatedir}')
 
 
 class TrainerFinetune(Trainer):

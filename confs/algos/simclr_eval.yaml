@@ -19,7 +19,7 @@ common:
   intermediatedir: ''
   checkpoint:
     filename: '$expdir/checkpoint_linear.pth'
-    freq: 10
+    freq: 1
     experiment_name: '_copy: /common/experiment_name'
     resume: '_copy: /common/resume'
     resumedir: '_copy: /common/resumedir'
@@ -84,6 +84,8 @@ loader:
 trainer:
   title: 'eval_train'
   resume: '_copy: /common/checkpoint/resume'
+  save_intermediate: '_copy: /common/save_intermediate'
+  intermediatedir: '_copy: /common/intermediatedir'
   wandb:
     _copy: '/common/wandb'
   apex:
