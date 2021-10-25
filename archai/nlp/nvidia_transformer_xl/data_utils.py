@@ -382,15 +382,15 @@ if __name__ == '__main__':
     corpus = get_lm_corpus(args.datadir, args.dataset, vocab='word')
     logging.info('Vocab size : {}'.format(len(corpus.vocab.idx2sym)))
 
-    # DEBUG: iterate through the data for lm1b
-    batch_size = 224
-    tgt_len = 32
-    ext_len = 0
-    device = 'cuda'
+    # # DEBUG: iterate through the data for lm1b
+    # batch_size = 224
+    # tgt_len = 32
+    # ext_len = 0
+    # device = 'cuda'
 
-    tr_iter = corpus.get_iterator('train', batch_size, tgt_len,
-                                  device=device, ext_len=ext_len)
+    # tr_iter = corpus.get_iterator('train', batch_size, tgt_len,
+    #                               device=device, ext_len=ext_len)
 
-    for idx, _ in enumerate(tr_iter):
-        print(f'idx: {idx}')
+    # for idx, _ in enumerate(tr_iter):
+    #     print(f'idx: {idx}')
 
