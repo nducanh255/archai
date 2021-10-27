@@ -649,6 +649,62 @@ class TrainerLinear(Trainer):
                         shutil.copy(srcdir,destdir)
                 print(f'Copied files from logdir {logdir} to intermediate dir {intermediatedir}')
 
+    def extract_features(self, dataloaders: data.DataLoaders)->None:
+        train_dl = dataloaders.train_dl
+        test_dl = dataloaders.test_dl
+        steps_train = len(train_dl)
+        steps_test = len(test_dl)
+        if self._apex._enabled and self._apex._distributed_enabled:
+            self.model.module.backbone.eval()
+        else:
+            self.model.backbone.eval()
+
+        Xtrain = None
+        ytrain = None
+        Xtest = None
+        ytest = None
+        logger.pushd('train_steps')
+        for step, (xc, yc) in enumerate(train_dl):
+            logger.pushd(step)
+            xc, yc = xc.to(self.get_device(), non_blocking=True), yc.to(self.get_device(), non_blocking=True)
+            with torch.no_grad():
+                if self._apex._enabled and self._apex._distributed_enabled:
+                    feats = self.model.module.backbone(xc)[-1]
+                else:
+                    feats = self.model.backbone(xc)[-1]
+
+                if Xtrain is None:
+                    Xtrain = feats.detach().cpu()
+                    ytrain = yc.detach().cpu()
+                else:
+                    Xtrain = torch.cat((Xtrain,feats.detach().cpu()),dim=0)
+                    ytrain = torch.cat((ytrain,yc.detach().cpu()),dim=0)
+            logger.popd()
+        logger.popd()
+        logger.pushd('test_steps')
+        for step, (xc, yc) in enumerate(test_dl):
+            logger.pushd(step)
+
+            xc, yc = xc.to(self.get_device(), non_blocking=True), yc.to(self.get_device(), non_blocking=True)
+
+            with torch.no_grad():
+                if self._apex._enabled and self._apex._distributed_enabled:
+                    feats = self.model.module.backbone(xc)[-1]
+                else:
+                    feats = self.model.backbone(xc)[-1]
+
+                if Xtest is None:
+                    Xtest = feats.detach().cpu()
+                    ytest = yc.detach().cpu()
+                else:
+                    Xtest = torch.cat((Xtest,feats.detach().cpu()),dim=0)
+                    ytest = torch.cat((ytest,yc.detach().cpu()),dim=0)
+            logger.popd()
+        logger.popd()
+
+        return Xtrain, ytrain, Xtest, ytest
+
+
 
 class TrainerFinetune(Trainer):
     
