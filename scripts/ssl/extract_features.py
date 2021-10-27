@@ -206,6 +206,11 @@ def train_test(conf:Config):
     if apex.is_master():
         torch.save(features,os.path.join(conf['common']['logdir'], conf['common']['experiment_name'],\
                                          'features.pt'))
+        save_intermediate = conf['common']['save_intermediate']
+        intermediatedir = conf['common']['intermediatedir']
+        if save_intermediate:
+            torch.save(features,os.path.join(intermediatedir, conf['common']['experiment_name'],\
+                                            'features.pt'))
 
     print('Time taken:', time.time()-st)
 
