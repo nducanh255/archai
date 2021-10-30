@@ -209,8 +209,9 @@ def train_test(conf:Config):
         save_intermediate = conf['common']['save_intermediate']
         intermediatedir = conf['common']['intermediatedir']
         if save_intermediate:
-            torch.save(features,os.path.join(intermediatedir, conf['common']['experiment_name'],\
-                                            'features.pt'))
+            if os.path.exists(intermediatedir):
+                shutil.rmtree(intermediatedir)
+            shutil.copytree(utils.full_path(conf['common']['logdir']),intermediatedir)
 
     print('Time taken:', time.time()-st)
 
