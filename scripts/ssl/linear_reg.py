@@ -201,6 +201,25 @@ if __name__ == '__main__':
     len_dataset_test = features['Xtest'].size(0)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+
+    if args.use_wandb:
+        id = hashlib.md5(args.run_name.encode('utf-8')).hexdigest()
+        wandb.init(project=args.project_name,
+                    name=args.run_name,
+                    config=args.__dict__,
+                    id=id,
+                    resume=args.resume,
+                    dir=args.path,
+                    entity=args.entity)
+        wandb.define_metric("epoch")
+        wandb.define_metric("lr", step_metric="epoch")
+        wandb.define_metric("epoch_loss_train", step_metric="epoch")
+        wandb.define_metric("epoch_top1_train", step_metric="epoch")
+        wandb.define_metric("epoch_top5_train", step_metric="epoch")
+        wandb.define_metric("epoch_timings", step_metric="epoch")
+        wandb.define_metric("epoch_top1_val", step_metric="epoch")
+        wandb.define_metric("epoch_top5_val", step_metric="epoch")
+        
     if args.use_svm:
         from thundersvm import SVC
         best_acc = 0
@@ -287,24 +306,6 @@ if __name__ == '__main__':
                     best_acc = avg_acc
                     best_params = cur_params
                     print('Current best params: ',best_params)
-
-    if args.use_wandb:
-        id = hashlib.md5(args.run_name.encode('utf-8')).hexdigest()
-        wandb.init(project=args.project_name,
-                    name=args.run_name,
-                    config=args.__dict__,
-                    id=id,
-                    resume=args.resume,
-                    dir=args.path,
-                    entity=args.entity)
-        wandb.define_metric("epoch")
-        wandb.define_metric("lr", stesp_metric="epoch")
-        wandb.define_metric("epoch_loss_train", step_metric="epoch")
-        wandb.define_metric("epoch_top1_train", step_metric="epoch")
-        wandb.define_metric("epoch_top5_train", step_metric="epoch")
-        wandb.define_metric("epoch_timings", step_metric="epoch")
-        wandb.define_metric("epoch_top1_val", step_metric="epoch")
-        wandb.define_metric("epoch_top5_val", step_metric="epoch")
 
     args.weight_decay = best_params['weight_decay']
     args.train_batch_size = best_params['batch_size']
