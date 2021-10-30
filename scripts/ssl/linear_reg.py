@@ -4,10 +4,12 @@ import math
 import torch
 import wandb
 import hashlib
+import random
 import argparse
 import numpy as np
 import torch.nn as nn
-from utils.utils import setup_cuda
+from typing import Union
+import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
 from torch.optim import Adam, LBFGS, SGD
 from sklearn.svm import SVC,LinearSVC
@@ -15,6 +17,23 @@ from sklearn.model_selection import KFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import Dataset, DataLoader
+
+def setup_cuda(seed:Union[float, int], rank:int=0):
+    seed = int(seed) + rank
+    # setup cuda
+    cudnn.enabled = True
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+
+    #torch.cuda.manual_seed_all(seed)
+    cudnn.benchmark = True # set to false if deterministic
+    torch.set_printoptions(precision=10)
+    #cudnn.deterministic = False
+    # torch.cuda.empty_cache()
+    # torch.cuda.synchronize()
+
 
 def accuracy(output, target, topk=(1,)):
     """ Computes the precision@k for the specified values of k """
