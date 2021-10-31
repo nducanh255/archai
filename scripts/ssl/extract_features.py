@@ -47,6 +47,12 @@ def train_test(conf:Config):
     conf_dataset = conf_loader['dataset']
     conf_checkpoint = conf['common']['checkpoint']
     train_config_path = os.path.join(os.path.dirname(conf['common']['load_checkpoint']),"config_used.yaml")
+    config_resnet_v1 = False
+    if not os.path.exists(train_config_path):
+        config_resnet_v1 = True
+        train_config_path = os.path.join(os.path.dirname(conf['common']['load_checkpoint']),"config_used_resnet_v1.yaml")
+        if not os.path.exists(train_config_path):
+            train_config_path = os.path.join(os.path.dirname(conf['common']['load_checkpoint']),"config_used_mobilenet_v1.yaml")
     with open(train_config_path) as f:
         config_train = yaml.load(f, Loader=yaml.Loader)
     # conf_trainer['batch_chunks'] = config_train['trainer']['batch_chunks']
@@ -54,6 +60,9 @@ def train_test(conf:Config):
         conf_trainer['model'] = 'darts'
     else:
         conf_trainer['model'] = config_train['trainer']['model']
+        if config_resnet_v1:
+            conf_trainer['model'] = os.path.dirname(conf['common']['load_checkpoint']).split("/")[-2]
+
 
     if "resnet" in conf_trainer['model']:
         with open('confs/algos/simclr_resnets.yaml', 'r') as f:
