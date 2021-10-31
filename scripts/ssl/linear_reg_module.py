@@ -236,7 +236,7 @@ def linear_reg(features):
     kf = KFold(n_splits=args.kfolds)
     best_params = {'weight_decay':0.0, 'batch_size':128, 'init_lr':5.0}
     best_acc = 0.0
-    for weight_decay in [1e-6, 1e-5, 1e-4, 1e-3, 1e-2]:
+    for weight_decay in [1e-5, 1e-4, 1e-3]:
         for batch_size in [128]:
             for init_lr in [5.0]:
                 args.weight_decay = weight_decay
