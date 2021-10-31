@@ -199,8 +199,8 @@ def train(args, Xtrain, Ytrain, Xeval, Yeval, model, print_logs=False):
                             "lr": cur_lr,
                             "epoch":epoch})
             
-            torch.save({"epoch":epoch+1, "model":model.state_dict(), "optimizer":optimizer.state_dict()},\
-                        os.path.join(args.path,"checkpoint_linear.pth"))
+            # torch.save({"epoch":epoch+1, "model":model.state_dict(), "optimizer":optimizer.state_dict()},\
+            #             os.path.join(args.path,"checkpoint_linear.pth"))
     if args.use_wandb and print_logs:
         wandb.run.summary["best_weight_decay"] = args.weight_decay
         wandb.run.summary["best_batch_size"] = args.train_batch_size
@@ -208,18 +208,13 @@ def train(args, Xtrain, Ytrain, Xeval, Yeval, model, print_logs=False):
     return running_acc1_train/len_dataset_train, running_acc5_train/len_dataset_train, \
             running_acc1_test/len_dataset_test, running_acc5_test/len_dataset_test
 
-
-if __name__ == '__main__':
-    args = parser.parse_args()
+def linear_reg(features):
+    args, _ = parser.parse_known_args()
     if args.manual_seed is not None:
         setup_cuda(args.manual_seed)
-    features = torch.load(os.path.join(args.path,'features.pt'))
     dim = features['Xtrain'].size(1)
     num_classes = torch.unique(features['Ytrain']).size(0)
-    len_dataset_train = features['Xtrain'].size(0)
-    len_dataset_test = features['Xtest'].size(0)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
 
     if args.use_wandb:
         id = hashlib.md5(args.run_name.encode('utf-8')).hexdigest()
@@ -228,7 +223,6 @@ if __name__ == '__main__':
                     config=args.__dict__,
                     id=id,
                     resume=args.resume,
-                    dir=args.path,
                     entity=args.entity)
         wandb.define_metric("epoch")
         wandb.define_metric("lr", step_metric="epoch")
@@ -238,39 +232,6 @@ if __name__ == '__main__':
         wandb.define_metric("epoch_timings", step_metric="epoch")
         wandb.define_metric("epoch_top1_val", step_metric="epoch")
         wandb.define_metric("epoch_top5_val", step_metric="epoch")
-        
-    # if args.use_svm:
-    #     from thundersvm import SVC
-    #     best_acc = 0
-    #     best_alpha = 1.0
-    #     for alpha in  [0.01, 0.1, 1, 10]:
-    #         print(f'Alpha {alpha}')
-    #         kf = KFold(n_splits=3)
-    #         accs = 0.0
-    #         for train_index, val_index in kf.split(features['Xtrain']):
-    #             # clf = LinearSVC(C=alpha,tol=1e-5, max_iter=3000, verbose=True, dual=False)
-    #             clf = SVC(kernel='linear',C=alpha,tol=1e-5, max_iter=3000, verbose=False,\
-    #                       n_jobs=args.n_worker)
-    #             # clf = SVC(kernel='linear',C=alpha,tol=1.0, verbose=0)
-    #             X_train, X_val = features['Xtrain'][train_index], features['Xtrain'][val_index]
-    #             y_train, y_val = features['Ytrain'][train_index], features['Ytrain'][val_index]
-    #             # clf = make_pipeline(StandardScaler(), clf)
-    #             clf.fit(X_train, y_train)
-    #             accs += clf.score(X_val, y_val)
-    #             print(f'Acc {clf.score(X_val, y_val)}')
-    #         accs = accs/3
-    #         print(f'Accuracy: {accs}')
-    #         if accs>best_acc:
-    #             best_acc = accs
-    #             best_alpha = alpha
-    #     clf = SVC(kernel='linear',C=best_alpha,tol=1e-5, max_iter=3000, verbose=False)
-    #     clf.fit(features['Xtrain'], features['Ytrain'])
-    #     acc = clf.score(features['Xtest'],features['Ytest'])
-    #     print(f'Final Acc {acc}')
-    #     exit()
-    # Training parameters
-    criterion = nn.CrossEntropyLoss()
-    epochs = args.n_epochs
 
     kf = KFold(n_splits=args.kfolds)
     best_params = {'weight_decay':0.0, 'batch_size':128, 'init_lr':5.0}
@@ -335,3 +296,4 @@ if __name__ == '__main__':
     model.to(device)
     X_train, y_train, X_test, y_test = features['Xtrain'], features['Ytrain'], features['Xtest'], features['Ytest']
     top1_train, top5_train, top1_val, top5_val = train(args, X_train, y_train, X_test, y_test, model, print_logs=True)
+    return top1_train, top5_train, top1_val, top5_val

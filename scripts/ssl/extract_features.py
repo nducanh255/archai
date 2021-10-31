@@ -19,6 +19,7 @@ from archai.common.dist_utils import ApexUtils
 from archai.nas.model_ssl import ModelSimCLRDarts
 from archai.common.checkpoint import CheckPoint
 from archai.nas.model_desc_builder import ModelDescBuilder
+from linear_reg_module import linear_reg
 
 def create_model(conf_train:Config, conf_eval:Config, model_desc_builder:ModelDescBuilder, desc_filename:str)->nn.Module:
 
@@ -201,21 +202,28 @@ def train_test(conf:Config):
         shutil.copyfile(train_config_path,expdir_abspath('config_used_train.yaml'))
     trainer = TrainerLinear(conf_trainer, model, ckpt)
     st = time.time()
-    if not (save_intermediate and os.path.exists(os.path.join(intermediatedir,\
-                                                 conf['common']['experiment_name'],'features.pt'))):
-        Xtrain, ytrain, Xtest, ytest = trainer.extract_features(data_loaders)
+    Xtrain, ytrain, Xtest, ytest = trainer.extract_features(data_loaders)
 
-        features = {'Xtrain': Xtrain, 'Ytrain': ytrain, 'Xtest': Xtest, 'Ytest': ytest}
+    features = {'Xtrain': Xtrain, 'Ytrain': ytrain, 'Xtest': Xtest, 'Ytest': ytest}
 
-        if apex.is_master():
-            torch.save(features,os.path.join(conf['common']['logdir'], conf['common']['experiment_name'],\
-                                            'features.pt'))
-            if save_intermediate:
-                if os.path.exists(intermediatedir):
-                    shutil.rmtree(intermediatedir)
-                shutil.copytree(utils.full_path(conf['common']['logdir']),intermediatedir)
+    linear_reg(features)
+    # if not (save_intermediate and os.path.exists(os.path.join(intermediatedir,\
+    #                                              conf['common']['experiment_name'],'features.pt'))):
+    #     Xtrain, ytrain, Xtest, ytest = trainer.extract_features(data_loaders)
 
-        print('Time taken:', time.time()-st)
+    #     features = {'Xtrain': Xtrain, 'Ytrain': ytrain, 'Xtest': Xtest, 'Ytest': ytest}
+
+    #     linear_reg(features)
+
+    #     # if apex.is_master():
+    #     #     torch.save(features,os.path.join(conf['common']['logdir'], conf['common']['experiment_name'],\
+    #     #                                     'features.pt'))
+    #     #     if save_intermediate:
+    #     #         if os.path.exists(intermediatedir):
+    #     #             shutil.rmtree(intermediatedir)
+    #     #         shutil.copytree(utils.full_path(conf['common']['logdir']),intermediatedir)
+
+    print('Time taken:', time.time()-st)
 
 
 if __name__ == '__main__':
