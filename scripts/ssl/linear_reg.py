@@ -275,7 +275,7 @@ if __name__ == '__main__':
     kf = KFold(n_splits=args.kfolds)
     best_params = {'weight_decay':0.0, 'batch_size':128, 'init_lr':5.0}
     best_acc = 0.0
-    for weight_decay in [0.0, 1e-7, 1e-6, 1e-5, 1e-4]:
+    for weight_decay in [1e-6, 1e-5, 1e-4, 1e-3, 1e-2]:
         for batch_size in [128]:
             for init_lr in [5.0]:
                 args.weight_decay = weight_decay
@@ -299,32 +299,32 @@ if __name__ == '__main__':
                     best_params = cur_params
                     print('Current best params: ',best_params)
                     
-    args.weight_decay = best_params['weight_decay']
-    best_params = {'weight_decay':0.0, 'batch_size':128, 'init_lr':5.0}
-    best_acc = 0.0
-    for weight_decay in [args.weight_decay]:
-        for batch_size in [128, 256]:
-            for init_lr in [1.0, 5.0, 10.0, 20.0]:
-                args.weight_decay = weight_decay
-                args.train_batch_size = batch_size
-                args.init_lr = init_lr
-                avg_acc = 0.0
-                for train_index, val_index in kf.split(features['Xtrain']):
-                    X_train, X_val = features['Xtrain'][train_index], features['Xtrain'][val_index]
-                    y_train, y_val = features['Ytrain'][train_index], features['Ytrain'][val_index]
-                    if args.manual_seed is not None:
-                        setup_cuda(args.manual_seed)
-                    model = LinearModel(dim, num_classes)
-                    model.to(device)
-                    top1_train, top5_train, top1_val, top5_val = train(args, X_train, y_train, X_val, y_val, model, print_logs=False)
-                    avg_acc += top1_val
-                avg_acc = avg_acc/args.kfolds
-                cur_params = {'weight_decay':weight_decay, 'batch_size':batch_size, 'init_lr':init_lr}
-                print('Weight decay ', weight_decay, 'Batch Size ', batch_size, 'Init LR', init_lr, 'Accuracy: ',avg_acc)
-                if avg_acc > best_acc:
-                    best_acc = avg_acc
-                    best_params = cur_params
-                    print('Current best params: ',best_params)
+    # args.weight_decay = best_params['weight_decay']
+    # best_params = {'weight_decay':0.0, 'batch_size':128, 'init_lr':5.0}
+    # best_acc = 0.0
+    # for weight_decay in [args.weight_decay]:
+    #     for batch_size in [128]:
+    #         for init_lr in [5.0]:
+    #             args.weight_decay = weight_decay
+    #             args.train_batch_size = batch_size
+    #             args.init_lr = init_lr
+    #             avg_acc = 0.0
+    #             for train_index, val_index in kf.split(features['Xtrain']):
+    #                 X_train, X_val = features['Xtrain'][train_index], features['Xtrain'][val_index]
+    #                 y_train, y_val = features['Ytrain'][train_index], features['Ytrain'][val_index]
+    #                 if args.manual_seed is not None:
+    #                     setup_cuda(args.manual_seed)
+    #                 model = LinearModel(dim, num_classes)
+    #                 model.to(device)
+    #                 top1_train, top5_train, top1_val, top5_val = train(args, X_train, y_train, X_val, y_val, model, print_logs=False)
+    #                 avg_acc += top1_val
+    #             avg_acc = avg_acc/args.kfolds
+    #             cur_params = {'weight_decay':weight_decay, 'batch_size':batch_size, 'init_lr':init_lr}
+    #             print('Weight decay ', weight_decay, 'Batch Size ', batch_size, 'Init LR', init_lr, 'Accuracy: ',avg_acc)
+    #             if avg_acc > best_acc:
+    #                 best_acc = avg_acc
+    #                 best_params = cur_params
+    #                 print('Current best params: ',best_params)
 
     args.weight_decay = best_params['weight_decay']
     args.train_batch_size = best_params['batch_size']

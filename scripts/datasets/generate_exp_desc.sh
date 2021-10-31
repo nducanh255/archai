@@ -1,17 +1,4 @@
-print_usage() {
-  printf "Usage: d-> dataset\n"
-}
-export OPTIND=1
-while getopts d:h flag
-do
-    case "${flag}" in
-        d) dataset=${OPTARG};;
-        h) print_usage;
-           exit 1 ;;
-    esac
-done
-
-case "$dataset" in
+case "$1" in
     "imagenet") export EXP_DESC='SimClr_ImageNet'
     ;;
     "inat21") export EXP_DESC='SimClr_INat21'

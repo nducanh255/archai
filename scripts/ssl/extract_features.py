@@ -195,25 +195,27 @@ def train_test(conf:Config):
                         dir=os.path.join(conf['common']['logdir']),
                         entity=conf_wandb['entity'])
 
+    save_intermediate = conf['common']['save_intermediate']
+    intermediatedir = conf['common']['intermediatedir']
     if apex.is_master():
         shutil.copyfile(train_config_path,expdir_abspath('config_used_train.yaml'))
     trainer = TrainerLinear(conf_trainer, model, ckpt)
     st = time.time()
-    Xtrain, ytrain, Xtest, ytest = trainer.extract_features(data_loaders)
+    if not (save_intermediate and os.path.exists(os.path.join(intermediatedir,\
+                                                 conf['common']['experiment_name'],'features.pt'))):
+        Xtrain, ytrain, Xtest, ytest = trainer.extract_features(data_loaders)
 
-    features = {'Xtrain': Xtrain, 'Ytrain': ytrain, 'Xtest': Xtest, 'Ytest': ytest}
+        features = {'Xtrain': Xtrain, 'Ytrain': ytrain, 'Xtest': Xtest, 'Ytest': ytest}
 
-    if apex.is_master():
-        torch.save(features,os.path.join(conf['common']['logdir'], conf['common']['experiment_name'],\
-                                         'features.pt'))
-        save_intermediate = conf['common']['save_intermediate']
-        intermediatedir = conf['common']['intermediatedir']
-        if save_intermediate:
-            if os.path.exists(intermediatedir):
-                shutil.rmtree(intermediatedir)
-            shutil.copytree(utils.full_path(conf['common']['logdir']),intermediatedir)
+        if apex.is_master():
+            torch.save(features,os.path.join(conf['common']['logdir'], conf['common']['experiment_name'],\
+                                            'features.pt'))
+            if save_intermediate:
+                if os.path.exists(intermediatedir):
+                    shutil.rmtree(intermediatedir)
+                shutil.copytree(utils.full_path(conf['common']['logdir']),intermediatedir)
 
-    print('Time taken:', time.time()-st)
+        print('Time taken:', time.time()-st)
 
 
 if __name__ == '__main__':
