@@ -32,10 +32,10 @@ class SimClrNABirds555Provider(DatasetProvider):
         trainset, testset = None, None
 
         if load_train:
-            trainpath = os.path.join(self._dataroot, 'nabirds555_simclr', 'train')
+            trainpath = os.path.join(self._dataroot, 'nabirds555', 'train')
             trainset = torchvision.datasets.ImageFolder(trainpath, transform=transform_train)
         if load_test:
-            testpath = os.path.join(self._dataroot, 'nabirds555_simclr', 'test')
+            testpath = os.path.join(self._dataroot, 'nabirds555', 'test')
             testset = torchvision.datasets.ImageFolder(testpath, transform=transform_test)
 
         return trainset, testset
