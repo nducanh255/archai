@@ -5,20 +5,72 @@ import yaml
 import json
 import wandb
 import argparse
+import scipy.stats
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from scipy.stats import pearsonr, spearmanr
 from archai.networks_ssl.simclr import ModelSimCLRResNet, ModelSimCLRVGGNet, ModelSimCLRViT, ModelSimCLRMobileNet
 
 
+def param_plots(params, models, dataset_name, dataset):
+    del_nets =  list(set(list(models.keys()))-set(list(params.keys())))
+    for del_net in del_nets:
+        del models[del_net]
 
+    l1 = [params[net]['l1'] for net in models]
+    l2 = [params[net]['l2'] for net in models]
+    l3 = [params[net]['l3'] for net in models]
+    l4 = [params[net]['l4'] for net in models]
+    bottom_params = [params[net]['bottom_params'] for net in models]
+    top_params = [params[net]['top_params'] for net in models]
+    vals, count = np.unique(np.array(bottom_params),return_counts=True)
+    bottom_dict = {k:v for k,v in zip(vals,count) if v>1}
+    ratio_params = [params[net]['bottom_params']/params[net]['top_params'] for net in models]
+    net_params = [params[net]['params'] for net in models]
+    new_accs = [models[net] for net in models]
+
+    df = pd.DataFrame(list(zip(bottom_params, top_params, ratio_params, net_params, new_accs)), \
+                            columns=['Bottom Params', 'Top Params', 'Bottom Params / Top Params', 'Net Params', f'{dataset_name} Accuracy'])
+    plt.clf()
+    g = sns.lmplot('Net Params', f'{dataset_name} Accuracy', df, order=2, truncate=False)
+    plt.show()
+    plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/params_{dataset}_{key}.png')
+    plt.clf()
+    g = sns.lmplot('Bottom Params / Top Params', f'{dataset_name} Accuracy', df, order=2, truncate=False)
+    plt.show()
+    plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/top_bottom_params_{dataset}_{key}.png')
+    plt.clf()
+    if dataset == 'imagenet':
+        cur_top_params = [params[net]['top_params'] for net in models if params[net]['bottom_params'] in bottom_dict]
+        cur_bottom_params = [round(params[net]['bottom_params'],2) for net in models if params[net]['bottom_params'] in bottom_dict]
+        cur_accs = [models[net] for net in models if params[net]['bottom_params'] in bottom_dict]
+        cur_df = pd.DataFrame(list(zip(cur_top_params, cur_bottom_params, cur_accs)), \
+                                columns=['Top Params', 'Bottom Params', f'{dataset_name} Accuracy'])
+        g = sns.lmplot('Top Params', f'{dataset_name} Accuracy', cur_df, order=2, truncate=False, hue="Bottom Params")
+        # plt.legend(labels=legend)
+        # handles = g._legend_data.values()
+        # labels = g._legend_data.keys()
+        # g.fig.legend(handles=handles, labels=labels, loc='upper left')
+        # plt.legend(bbox_to_anchor=(1.05, 1), loc='lower center', borderaxespad=0)
+        plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/top_params_legend_{dataset}_{key}.png')
+
+    plt.clf()
+    g = sns.lmplot('Bottom Params', f'{dataset_name} Accuracy', df, order=2, truncate=False)
+    plt.show()
+    plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/bottom_params_{dataset}_{key}.png')
+    plt.clf()
+    g = sns.lmplot('Top Params', f'{dataset_name} Accuracy', df, order=2, truncate=False)
+    plt.show()
+    plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/top_params_{dataset}_{key}.png')
 # key = 'resnet'
-key = 'mobilenet'
+key = 'resnet'
 with open(f'/vulcanscratch/sgirish/dummy/resnet_params.json','r') as f:
     resnet_params = json.load(f)
 with open(f'/vulcanscratch/sgirish/dummy/mobilenet_params.json','r') as f:
     mobilenet_params = json.load(f)
+params = resnet_params if key == 'resnet' else mobilenet_params
 with open('/vulcanscratch/sgirish/eval_models.csv') as csv_file:
     csv_reader = csv.DictReader(csv_file, delimiter=',')
     acc, dataset, model = [[] for _ in range(3)]
@@ -32,19 +84,22 @@ with open('/vulcanscratch/sgirish/eval_models.csv') as csv_file:
         if name.strip().split('-')[0].split('_')[-1] == 'imagenet':
             if 'resnet' in name.strip().split('-')[-1] and float(row['epoch_top1_test'])>54.0 and float(resnet_params[name.strip().split('-')[-1]]['params']<30):
                 imagenet_resnet_models[name.strip().split('-')[-1]] = float(row['epoch_top1_test'])
-            elif 'mobilenet' in name.strip().split('-')[-1]and float(mobilenet_params[name.strip().split('-')[-1]]['params']<3):
+            elif 'mobilenet' in name.strip().split('-')[-1] and float(mobilenet_params[name.strip().split('-')[-1]]['params']<3):
                 imagenet_mobilenet_models[name.strip().split('-')[-1]] = float(row['epoch_top1_test'])
 
 imagenet_models = imagenet_resnet_models if key == 'resnet' else imagenet_mobilenet_models
-params = resnet_params if key == 'resnet' else mobilenet_params
+
 # params = {}
 # if key == 'resnet':
 #     with open('confs/algos/simclr_resnets.yaml', 'r') as f:
 #         conf_models = yaml.load(f, Loader=yaml.Loader)
+#     all_models = ['resnet18','resnet34','resnet50']+[f'resnet_v{i}' for i in range(1,92)]
 # elif key == 'mobilenet':
 #     with open('confs/algos/simclr_mobilenets.yaml', 'r') as f:
 #         conf_models = yaml.load(f, Loader=yaml.Loader)
-# for net in imagenet_models:
+#     all_models = [f'mobilenet_v{i}' for i in range(1,43)]
+
+# for net in all_models:
 #     conf_model = conf_models[net]
 #     if key == 'resnet':
 #         model = ModelSimCLRResNet('cifar10', conf_model['depth'], conf_model['layers'], conf_model['bottleneck'],
@@ -52,9 +107,9 @@ params = resnet_params if key == 'resnet' else mobilenet_params
 #                 width_per_group=conf_model['width_per_group'])
 #         l1, l2, l3, l4 = conf_model['layers']
 #         net_dict = {'params':sum(p.numel() for p in model.backbone.parameters() if p.requires_grad)/1e6,
-#                     'bottom_params':sum(p.numel() for n,p in model.backbone.named_parameters() \
-#                                         if p.requires_grad and ('layer1' in n or 'layer2' in n))/1e6,
 #                     'top_params':sum(p.numel() for n,p in model.backbone.named_parameters() \
+#                                         if p.requires_grad and ('layer1' in n or 'layer2' in n))/1e6,
+#                     'bottom_params':sum(p.numel() for n,p in model.backbone.named_parameters() \
 #                                         if p.requires_grad and ('layer3' in n or 'layer4' in n))/1e6,
 #                     'l1':l1, 'l2': l2, 'l3': l3, 'l4': l4}
 #         params[net] = net_dict
@@ -66,7 +121,10 @@ params = resnet_params if key == 'resnet' else mobilenet_params
 #                 )
 #         params[net] = {'params':sum(p.numel() for p in model.backbone.parameters() if p.requires_grad)/1e6}
 
-    
+# if key == 'resnet':
+#     params['resnet18_blur'] = params['resnet18']
+#     params['resnet34_blur'] = params['resnet34']
+#     params['resnet50_blur'] = params['resnet50']
 # with open(f'/vulcanscratch/sgirish/dummy/{key}_params.json','w') as f:
 #     json.dump(params,f)
 
@@ -81,16 +139,16 @@ for i in range(len(acc)):
     model_name, dataset_name = model[i], dataset[i]
     if model[i] in nets:
         accs[nets.index(model_name),dataset_names.index(dataset_name)] = acc[i]
-
 keep_model_idx = np.arange(accs.shape[0])[np.all(accs!=0.0,axis=1)]
 imagenet_models_subset = {k:v for k,v in imagenet_models.items() if model_names.index(k) in keep_model_idx}
+accs = accs[keep_model_idx]
 
 model_plot = [model[i] for i in range(len(acc)) if dataset[i]!='imagenet' and model[i] in imagenet_models_subset]
 dataset_plot = [dataset[i] for i in range(len(acc)) if dataset[i]!='imagenet' and model[i] in imagenet_models_subset]
 acc_plot_y = [acc[i] for i in range(len(acc)) if dataset[i]!='imagenet' and model[i] in imagenet_models_subset]
 acc_plot_x = [imagenet_models[model[i]] for i in range(len(acc)) if dataset[i]!='imagenet' and model[i] in imagenet_models_subset]
 
-
+sns.set(font_scale=1.6)
 df = pd.DataFrame(list(zip(acc_plot_x, acc_plot_y, dataset_plot)), \
                     columns=['ImageNet Accuracy', 'Accuracy','Dataset'])
 plt.clf()
@@ -101,7 +159,7 @@ sns.set_style("darkgrid")
 # grid.map(sns.lmplot, "ImageNet Accuracy", "Accuracy")
 # grid.add_legend()
 g = sns.lmplot(x="ImageNet Accuracy", y="Accuracy", col="Dataset", col_order=[n for n in dataset_names if n!='imagenet'],
-               data=df, col_wrap=5, sharey=False, sharex=True)
+               data=df, col_wrap=5, sharey=False, sharex=True, truncate=False)
 
 in_min = min(list(imagenet_models_subset.values()))
 in_max = max(list(imagenet_models_subset.values()))
@@ -111,35 +169,77 @@ for i in range(10):
     cur_accs = [a for i,a in enumerate(acc) if dataset[i]==dataset_name and model[i] in imagenet_models_subset]
     g.axes[i].set_ylim((min(cur_accs)*0.998,max(cur_accs)*1.002))
     g.axes[i].set_xlim((in_min,in_max))
-    plt.show()
-    plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/downstream_accs_{key}.png')
+plt.show()
+plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/downstream_accs_{key}.png')
     
 if key == 'resnet':
-    l1 = [params[net]['l1'] for net in imagenet_models]
-    l2 = [params[net]['l2'] for net in imagenet_models]
-    l3 = [params[net]['l3'] for net in imagenet_models]
-    l4 = [params[net]['l4'] for net in imagenet_models]
-    bottom_params = [params[net]['bottom_params'] for net in imagenet_models]
-    top_params = [params[net]['top_params'] for net in imagenet_models]
-    ratio_params = [params[net]['top_params']/params[net]['bottom_params'] for net in imagenet_models]
-    net_params = [params[net]['params'] for net in imagenet_models]
-    accs = [imagenet_models[net] for net in imagenet_models]
-
-    df = pd.DataFrame(list(zip(bottom_params, top_params, ratio_params, net_params, accs)), \
-                            columns=['Bottom Params', 'Top Params', 'Top Params / Bottom Params', 'Net Params', f'ImageNet Accuracy'])
+    cur_dataset = ['aircraft', 'flower102', 'cars196', 'imagenet']
+    cur_dataset_names = ['Aircraft','Flowers102','Stanford Cars', 'ImageNet']
+    min_vals = {'aircraft':38.0, 'flower102':91.5, 'cars196':32.0, 'imagenet':54.0}
+    acc_y = [acc[i] for i in range(len(acc)) if dataset[i] in cur_dataset and key in model[i] and \
+             params[model[i]]['params']<30 and acc[i]>min_vals[dataset[i]]]
+    params_x = [params[model[i]]['params'] for i in range(len(acc)) if dataset[i] in cur_dataset and key in model[i] and \
+                params[model[i]]['params']<30 and acc[i]>min_vals[dataset[i]]]
+    dataset_plot = [dataset[i] for i in range(len(acc)) if dataset[i] in cur_dataset and key in model[i] and \
+                    params[model[i]]['params']<30 and acc[i]>min_vals[dataset[i]]]
+    df = pd.DataFrame(list(zip(params_x, acc_y, dataset_plot)), columns=['Params (in Million)', 'Accuracy','Dataset'])
     plt.clf()
-    g = sns.lmplot('Net Params', 'ImageNet Accuracy', df)
+    plt.grid()
+    g = sns.lmplot(x="Params (in Million)", y="Accuracy", col="Dataset", col_order=cur_dataset[::-1],
+                data=df, col_wrap=2, sharey=False, sharex=True, truncate=False, order=2)
+    for j in range(len(cur_dataset)):
+        cur_accs = [acc[i] for i in range(len(acc)) if dataset[i] == cur_dataset[::-1][j] and key in model[i] and \
+                    params[model[i]]['params']<30 and acc[i]>min_vals[dataset[i]]]
+        g.axes[j].set_xlim((min(params_x)*0.998,max(params_x)*1.002))
+        g.axes[j].set_ylim((min(cur_accs)*0.998,max(cur_accs)*1.002))
     plt.show()
-    plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/params_imagenet_{key}.png')
+    plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/downstream_params_{key}.png')
+
+    param_plots(params, imagenet_models, 'ImageNet', 'imagenet')
+    for plot_dataset, plot_dataset_name, min_acc in zip(['aircraft', 'flower102', 'cars196', 'imagenet'],\
+        ['Aircraft','Flowers102','Stanford Cars', 'ImageNet'],[38.0, 91.5, 32.0, 54.0]):
+        cur_accs = {}
+        cur_accs = {model[i]:acc[i] for i in range(len(acc)) if dataset[i]==plot_dataset and key in model[i] \
+                                                                and params[model[i]]['params']<30 and acc[i]>min_acc}
+        param_plots(params, cur_accs, plot_dataset_name, plot_dataset)
+
 elif key == 'mobilenet':
     net_params = [params[net]['params'] for net in imagenet_models]
-    accs = [imagenet_models[net] for net in imagenet_models]
-    df = pd.DataFrame(list(zip(net_params, accs)), \
+    new_accs = [imagenet_models[net] for net in imagenet_models]
+    df = pd.DataFrame(list(zip(net_params, new_accs)), \
                             columns=['Net Params', f'ImageNet Accuracy'])
     plt.clf()
-    g = sns.lmplot('Net Params', 'ImageNet Accuracy', df)
+    g = sns.lmplot('Net Params', 'ImageNet Accuracy', df, order=2, truncate=False)
     plt.show()
     plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/params_imagenet_{key}.png')
+
+
+# in_index = dataset_names.index('imagenet')
+# accs = np.concatenate((accs[:,in_index:in_index+1],accs[:,:in_index],accs[:,in_index+1:]),axis=1)
+# new_dataset_names = ['imagenet']+[n for n in dataset_names if n!='imagenet']
+# pears = np.zeros((len(new_dataset_names),len(new_dataset_names)))
+# spear = np.zeros((len(new_dataset_names),len(new_dataset_names)))
+# for i in range(len(new_dataset_names)):
+#     for j in range(len(new_dataset_names)):
+#         pears[i,j] = pearsonr(accs[:,i],accs[:,j])[0]
+#         spear[i,j] = spearmanr(accs[:,i],accs[:,j])[0]
+
+# sns.set(font_scale=0.9)
+# df_cm = pd.DataFrame(pears.round(2), index = [i for i in new_dataset_names],
+#                   columns = [i for i in new_dataset_names])
+# plt.figure(figsize = (9,7))
+# sns.heatmap(df_cm, annot=True)
+# plt.show()
+# plt.title('Pearson correlation coefficient')
+# plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/pearson_correlation_{key}.png')
+# plt.clf()
+# df_cm = pd.DataFrame(spear.round(2), index = [i for i in new_dataset_names],
+#                   columns = [i for i in new_dataset_names])
+# plt.figure(figsize = (9,7))
+# sns.heatmap(df_cm, annot=True)
+# plt.show()
+# plt.title('Spearman correlation coefficient')
+# plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/spearman_correlation_{key}.png')
 exit()
 
 
