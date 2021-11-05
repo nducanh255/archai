@@ -21,9 +21,9 @@ import numpy as np
 import sacremoses
 import torch
 
-from . import nvidia_utils as utils
-from .nvidia_utils.vocabulary import OpenAIVocab
-from .nvidia_utils.vocabulary import Vocab
+import nvidia_utils as utils
+from nvidia_utils.vocabulary import OpenAIVocab
+from nvidia_utils.vocabulary import Vocab
 
 
 class LMOrderedIterator(object):
@@ -225,7 +225,8 @@ class LMMultiFileIterator(LMShuffledIterator):
         rank = utils.distributed.get_rank()
         chunk_len = len(paths) // world_size + 1 # NOTE: this causes a slight imbalance!
         paths_chunks = [paths[i:i+chunk_len] for i in range(0, len(paths), chunk_len)]
-        self.paths = paths_chunks[rank]        
+        self.paths = paths_chunks[rank]
+        print(self.paths)
 
     def get_sent_stream(self, path):
         sents = self.vocab.encode_file(path, add_double_eos=True)
@@ -328,7 +329,7 @@ def get_lm_corpus(datadir, dataset, vocab, max_size=None):
     else:
         raise RuntimeError('Unsupported vocab')
 
-    if os.path.exists(fn):
+    if os.path.exists(fn) and dataset != 'lm1b':
         logging.info('Loading cached dataset...')
         corpus = torch.load(fn)
     else:
@@ -349,7 +350,7 @@ def get_lm_corpus(datadir, dataset, vocab, max_size=None):
 
         corpus = Corpus(datadir, dataset, vocab, max_size=max_size, **kwargs)
         with utils.distributed.sync_workers() as rank:
-            if rank == 0:
+            if rank == 0 and dataset != 'lm1b':
                 torch.save(corpus, fn)
 
     return corpus
@@ -380,3 +381,16 @@ if __name__ == '__main__':
 
     corpus = get_lm_corpus(args.datadir, args.dataset, vocab='word')
     logging.info('Vocab size : {}'.format(len(corpus.vocab.idx2sym)))
+
+    # # DEBUG: iterate through the data for lm1b
+    # batch_size = 224
+    # tgt_len = 32
+    # ext_len = 0
+    # device = 'cuda'
+
+    # tr_iter = corpus.get_iterator('train', batch_size, tgt_len,
+    #                               device=device, ext_len=ext_len)
+
+    # for idx, _ in enumerate(tr_iter):
+    #     print(f'idx: {idx}')
+

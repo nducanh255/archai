@@ -466,12 +466,14 @@
                 "--warmup_step", "20000",
                 "--max_step", "500000",
                 "--lr", "0.00025",
+                "--eta_min", "0.0",
                 "--tgt_len", "32",
                 "--mem_len", "32",
                 "--eval_tgt_len", "32",
                 "--batch_size", "224",
                 "--multi_gpu", "ddp",
                 "--gpu0_bsz", "32",
+                "--fp16", "--apex_amp_opt_level", "O1"
             ],  
         },
         {

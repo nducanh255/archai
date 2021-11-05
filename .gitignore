@@ -121,3 +121,4 @@ amlt_logs/
 onnxruntime_profile_*
 
 *.zip
+config.yaml
