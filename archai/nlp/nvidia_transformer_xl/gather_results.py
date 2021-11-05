@@ -27,7 +27,7 @@ from archai.nlp.nvidia_transformer_xl.mem_transformer import PositionwiseFF, Mul
                                                             RelPartialLearnableMultiHeadAttn, RelLearnableMultiHeadAttn, DecoderLayer, \
                                                             RelLearnableDecoderLayer, RelPartialLearnableDecoderLayer, AdaptiveEmbedding, ProjectedAdaptiveLogSoftmax
 from archai.nlp.nvidia_transformer_xl.nvidia_utils.log_uniform_sampler import sample_logits
-from archai.nlp.nvidia_transformer_xl.utils import process_parameters
+from archai.nlp.nvidia_transformer_xl.utils import process_parameters, config2key, get_yaml_values
 from archai.nlp.nvidia_transformer_xl.profiler import get_model_profile
 
 def meta_constructor_mapping(loader, node):
@@ -365,7 +365,9 @@ def get_parser():
   parser.add_argument('--analyze_params', action='store_true',
                       help='analyze model parameter size')     
   parser.add_argument('--param_ranking', action='store_true',
-                      help='generate metrics w.r.t parameter size')    
+                      help='generate metrics w.r.t parameter size, separate experiments')   
+  parser.add_argument('--param_ranking_all', action='store_true',
+                      help='generate metrics w.r.t parameter size,merge all experiments')                      
   parser.add_argument('--cross_seeds', action='store_true',
                       help='generate metrics across various seeds')        
   parser.add_argument('--animation', action='store_true',
@@ -373,7 +375,9 @@ def get_parser():
   parser.add_argument('--export_to_csv', action='store_true',
                       help='export model configs and ppls to csv')   
   parser.add_argument('--similar_params', action='store_true',
-                      help='plot ppl versus parameter size for similar param experiment')          
+                      help='plot ppl versus parameter size for similar param experiment') 
+  parser.add_argument('--get_unique_archs', action='store_true',
+                      help='find the total number of unique architectures in an experiment')          
 
   args = parser.parse_args()
   return args
@@ -600,6 +604,7 @@ def main(args):
     common_ratios = {}
     spr_ranks = {}
     times = {}
+    n_params = {}
     topk_list = [10,20,30,40,50,100]
     
     # load groundtruth results 
@@ -617,7 +622,7 @@ def main(args):
     files = os.listdir(path_to_results)
     found_synflow = False
     for f in files:
-      if False:#'synflow_scores' in f:
+      if 'synflow_scores' in f:
         found_synflow = True
         break
     yaml_file = os.path.join(path_to_results, f)
@@ -649,6 +654,34 @@ def main(args):
                                               val_ppl_list_gt=val_ppl_list_gt, val_ppl_list_target=target_scores)
         common_ratios_synflow[topk] = common_ratio
         spr_ranks_synflow[topk] = spr_rank
+
+    yaml_file = os.path.join(path_to_results, 'params_summary.yaml')
+    n_all_params = None
+    if os.path.exists(yaml_file):
+      print('=> loading parameter count')
+      with open(yaml_file, 'r') as f:
+          n_all_params = yaml.safe_load(f)
+
+      common_configs = np.intersect1d(list(results['fear_stage_1'].keys()), list(scores.keys()))
+      val_ppl_list_gt = []
+      for k in common_configs:
+        val_ppl_list_gt.append(results['fear_stage_1'][k]['valid_perplexity'])
+        sorted_ground_truth = np.argsort(val_ppl_list_gt)
+
+      # n_param results:
+      n_params = []
+      for k in common_configs:
+        n_params.append(-(n_all_params[k]['FFN'] + n_all_params[k]['Attn']))
+      sorted_nparams = np.argsort(n_params)
+
+      # extract common ratio and spearmanrank
+      common_ratios_nparams = {}
+      spr_ranks_nparams = {}
+      for topk in topk_list:
+        common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth, sorted_target=sorted_nparams, \
+                                              val_ppl_list_gt=val_ppl_list_gt, val_ppl_list_target=n_params)
+        common_ratios_nparams[topk] = common_ratio
+        spr_ranks_nparams[topk] = spr_rank
 
     for exp_name in args.exp_name:
       if 'stage_1' in exp_name:
@@ -691,9 +724,9 @@ def main(args):
         common_configs = {}
         
         if 'constLR' in exp_name:
-          max_steps = str(500)#[str(i) for i in range(500, 5000, 500)] #[str(i) for i in range(5000, 40000, 5000)] + ['2500', '500']
+          max_steps = [str(i) for i in range(500, 5000, 1000)] #[str(i) for i in range(5000, 40000, 5000)] + ['2500', '500']
         else:
-          max_steps = str(5000) #[str(i) for i in range(5000, 40000, 5000)] #+ ['2500', '500']
+          max_steps = [str(i) for i in range(500, 4000, 1000)] + [str(i) for i in range(5000, 40000, 5000)] #+ ['2500', '500']
         for max_step, v in results_structured.items():
           if not max_step in max_steps:
             continue
@@ -765,51 +798,66 @@ def main(args):
     markers = ['.', '^', '*', 'v', 'd', 'X', 's']
     for topk in topk_list:
       plt.figure()
+      data, cr, sc = [], [], []
       for i, k in enumerate(common_ratios.keys()):
         if 'fear' in k:
-          plt.scatter(times[k][topk], common_ratios[k][topk], marker='.', s=150, c='limegreen')
-          plt.scatter(times[k][topk], spr_ranks[k][topk], marker='^', s=100, c='limegreen')
+          plt.scatter(times[k][topk], common_ratios[k][topk], marker='.', s=10, c='limegreen')
+          plt.scatter(times[k][topk], spr_ranks[k][topk], marker='^', s=10, c='limegreen')
         else:
-          plt.scatter(times[k][topk], common_ratios[k][topk], label='Common Ratio', marker='.', s=150, c='midnightblue')
-          plt.scatter(times[k][topk], spr_ranks[k][topk], label='Spearman Correlation', marker='^', s=100)
-      if scores:
-        plt.scatter(0, common_ratios_synflow[topk], label='synflow', marker=markers[i+1], s=80)
+          plt.scatter(times[k][topk], common_ratios[k][topk], label='Common Ratio', marker='.', s=10, c='midnightblue')
+          plt.scatter(times[k][topk], spr_ranks[k][topk], label='Spearman Correlation', marker='^', s=10)
       plt.ylabel('Metric')
       plt.xlabel('Time (s)')
       plt.title('Topk = %d %%' % topk)
       plt.grid(axis='y')
-      plt.xlim((0, 3000))
+      # plt.xlim((0, 3000))
       plt.ylim((0.0,1.1))
-      # plt.legend(loc='lower right')#'center left', bbox_to_anchor=(1, 0.5))
+      plt.legend(loc='lower right')#'center left', bbox_to_anchor=(1, 0.5))
       plt.savefig('common_ratio_spearman_topk_{}.png'.format(topk), bbox_inches="tight")
     
     
-    markers = ['.', '*', 'v', 'd', 'X', 's']
+    markers = ['.', '.', '*', 'v', 'd', 'X', 's']
     for topk in topk_list:
-      plt.figure()
+      plt.figure(figsize=(5.8,3))
+      data, values = [], []
       for i, k in enumerate(common_ratios.keys()):
-        plt.scatter(times[k][topk], common_ratios[k][topk], label=k, marker=markers[i], s=150)
+        data += times[k][topk]
+        values += common_ratios[k][topk]
+      idx = np.argsort(data)
+      data = np.asarray(data)[idx]
+      values = np.asarray(values)[idx]
+      plt.plot(data, values, marker=markers[i], markersize=10, color='midnightblue', label='Partial Training')
       if scores:
-        plt.scatter(0, common_ratios_synflow[topk], label='synflow', marker=markers[i+1], s=80)
+        plt.scatter(0, common_ratios_synflow[topk], label='Synaptic Flow', marker='d', s=100, color='green')
+      if n_all_params:
+        plt.scatter(0, common_ratios_nparams[topk], label='# Params', marker='*', s=150, color='tab:blue')
       plt.ylabel('Common ratio')
       plt.xlabel('Time (s)')
       plt.title('Topk = %d %%' % topk)
       plt.grid(axis='y')
-      plt.ylim((0.2,1.1))
-      # plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+      plt.ylim((0.4,1.1))
+      plt.legend(loc='lower right')#(loc='center left', bbox_to_anchor=(1, 0.5))
       plt.savefig('common_ratio_topk_{}.png'.format(topk), bbox_inches="tight")
 
-      plt.figure()
+      plt.figure(figsize=(5.8,3))
+      data, values = [], []
       for i, k in enumerate(spr_ranks.keys()):
-        plt.scatter(times[k][topk], spr_ranks[k][topk], label=k, marker=markers[i], s=150)
+        data += times[k][topk]
+        values += spr_ranks[k][topk]
+      idx = np.argsort(data)
+      data = np.asarray(data)[idx]
+      values = np.asarray(values)[idx]
+      plt.plot(data, values, marker=markers[i], markersize=10, color='midnightblue', label='Partial Training')
       if scores:
-        plt.scatter(0, spr_ranks_synflow[topk], label='synflow', marker=markers[i+1], s=80)
+        plt.scatter(0, spr_ranks_synflow[topk], label='Synaptic Flow', marker='d', s=100, color='green')
+      if n_all_params:
+        plt.scatter(0, spr_ranks_nparams[topk], label='# Params', marker='*', s=200, color='tab:blue')
       plt.ylabel('Spearman\'s Correlation')
       plt.xlabel('Time (s)')
       plt.title('Topk = %d %%' % topk)
-      plt.ylim((0.2,1.1))
+      plt.ylim((0.5,1.1))
       plt.grid(axis='y')
-      # plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+      plt.legend(loc='lower right')#(loc='center left', bbox_to_anchor=(1, 0.5))
       plt.savefig('spearman_topk_{}.png'.format(topk), bbox_inches="tight")
 
     # results = {}
@@ -1086,14 +1134,14 @@ def main(args):
     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     plt.savefig('pareto_params.png', bbox_inches="tight")
 
-    plt.figure()
+    plt.figure(figsize=(5,3))
     for k in legend_keys:
-      plt.scatter(-np.asarray(n_params_total[k])[sorted_ground_truth[k]], np.asarray(val_ppl_list_gt[k])[sorted_ground_truth[k]], label=k)
+      plt.scatter(-np.asarray(n_params_total[k])[sorted_ground_truth[k]], np.asarray(val_ppl_list_gt[k])[sorted_ground_truth[k]], label=k, s=25, color='midnightblue')
     plt.ylabel('Validation PPL')
     plt.xlabel('Total nParams')
-    plt.title('Pareto Curve')
+    # plt.title('Pareto Curve')
     plt.grid(axis='y')
-    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    # plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     plt.savefig('pareto_params_total.png', bbox_inches="tight")
     
     plt.figure()
@@ -1143,6 +1191,125 @@ def main(args):
     plt.legend(loc='upper right')
     # plt.title('ranking based on number of parameters')
     plt.savefig('spearman_topk_nparams_total.png', bbox_inches="tight")
+
+    plt.figure(figsize=(5,3))
+    for k in legend_keys:
+      plt.plot(topk_list, common_ratios[k], marker='.', markersize=10, label='Common Ratio')
+      plt.plot(topk_list, spr_ranks[k], marker='^', markersize=10, label=' Spearman Correlation')
+    # plt.ylabel('Common ratio')
+    plt.xlabel('Topk (%)')
+    plt.xticks(topk_list)
+    # plt.title('ranking based on number of parameters')
+    plt.grid(axis='y')
+    plt.ylim((0.0,1.1))
+    plt.legend(loc='lower right')
+    plt.savefig('common_ratio_spearman_topk_nparams.png', bbox_inches="tight")
+
+  elif args.param_ranking_all:
+    common_ratios = []
+    spr_ranks = []
+    
+    common_ratios_total = []
+    spr_ranks_total = []
+    
+    n_params = []
+    n_params_total = []
+
+    sorted_ground_truth = []
+    val_ppl_list_gt = []
+
+    results_gt = {}
+    n_all_params = {}
+    
+    for exp_name in args.exp_name:
+      if 'fear' in exp_name:
+        try:
+          idx = re.search('(fear_stage_1)', exp_name).span()[-1]
+        except:
+          idx = re.search('(fear_stage1)', exp_name).span()[-1]
+        legend_key = exp_name[idx+1:].split('_')[-1]
+        if len(legend_key)==0:
+          legend_key = 'homogeneous'
+      else:
+        legend_key = 'heterogeneous'
+      
+      path_to_results = os.path.join(args.results_dir, exp_name)
+      yaml_file = os.path.join(path_to_results, 'result_summary.yaml')
+      with open(yaml_file, 'r') as f:
+        results_gt_old = collections.OrderedDict(yaml.safe_load(f))
+      for k, v in results_gt_old.items():
+        results_gt[k+'_'+legend_key] = v
+
+      yaml_file = os.path.join(path_to_results, 'params_summary.yaml')
+      with open(yaml_file, 'r') as f:
+        n_all_params_old = yaml.safe_load(f)
+      for k, v in n_all_params_old.items():
+        n_all_params[k+'_'+legend_key] = v
+
+    common_configs = np.intersect1d(list(results_gt.keys()), list(n_all_params.keys()))
+    print('analyzing {} architectures'.format(len(common_configs)))
+
+    # fear_stage_1 results:
+    for k in common_configs:
+      val_ppl_list_gt.append(results_gt[k]['valid_perplexity'])
+    sorted_ground_truth = np.argsort(val_ppl_list_gt)
+
+    # n_param results:
+    for k in common_configs:
+      n_params.append(-(n_all_params[k]['FFN'] + n_all_params[k]['Attn']))
+      n_params_total.append(-n_all_params[k]['total'])
+    sorted_nparams = np.argsort(n_params)
+    sorted_nparams_total = np.argsort(n_params_total)
+
+    # extract common ratio and spearmanrank
+    topk_list = range(10,101,10)
+    for topk in topk_list:
+      common_ratio, spr_rank = get_metrics(topk, sorted_ground_truth=sorted_ground_truth, sorted_target=sorted_nparams, \
+                                            val_ppl_list_gt=val_ppl_list_gt, val_ppl_list_target=n_params)
+      common_ratios.append(common_ratio)
+      spr_ranks.append(spr_rank)
+
+      common_ratio_total, spr_rank_total = get_metrics(topk, sorted_ground_truth=sorted_ground_truth, sorted_target=sorted_nparams_total, \
+                                            val_ppl_list_gt=val_ppl_list_gt, val_ppl_list_target=n_params_total)
+      common_ratios_total.append(common_ratio_total)
+      spr_ranks_total.append(spr_rank_total)
+
+    plt.figure()
+    plt.scatter(-np.asarray(n_params)[sorted_ground_truth], np.asarray(val_ppl_list_gt)[sorted_ground_truth])
+    plt.ylabel('Validation PPL')
+    plt.xlabel('Decoder nParams')
+    plt.grid(axis='y')
+    plt.savefig('pareto_params.png', bbox_inches="tight")
+
+    plt.figure(figsize=(5,3))
+    plt.scatter(-np.asarray(n_params_total)[sorted_ground_truth], np.asarray(val_ppl_list_gt)[sorted_ground_truth], s=25, color='midnightblue')
+    plt.ylabel('Validation PPL')
+    plt.xlabel('Total nParams')
+    plt.grid(axis='y')
+    plt.savefig('pareto_params_total.png', bbox_inches="tight")
+
+
+    plt.figure(figsize=(7,4.2))
+    plt.plot(topk_list, common_ratios, marker='.', markersize=10, label='Common Ratio')
+    plt.plot(topk_list, spr_ranks, marker='^', markersize=10, label=' Spearman Corr.', color='midnightblue')
+    plt.plot(topk_list, common_ratios_total, marker='d', markersize=8, label='Common Ratio-total', color='tab:blue', linestyle='--')
+    plt.plot(topk_list, spr_ranks_total, marker='s', markersize=5, label=' Spearman Corr.-total', color='midnightblue', linestyle='--')
+    plt.xlabel('Topk (%)')
+    plt.xticks(topk_list)
+    plt.grid(axis='y')
+    plt.ylim((0.0,1.1))
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    plt.savefig('common_ratio_spearman_topk_nparams.png', bbox_inches="tight")
+
+    # plt.figure(figsize=(7,4.2))
+    # plt.plot(topk_list, common_ratios_total, marker='.', markersize=10, label='Common Ratio')
+    # plt.plot(topk_list, spr_ranks_total, marker='^', markersize=10, label=' Spearman Correlation')
+    # plt.xlabel('Topk (%)')
+    # plt.xticks(topk_list)
+    # plt.grid(axis='y')
+    # plt.ylim((0.0,1.1))
+    # plt.legend(loc='lower right')
+    # plt.savefig('common_ratio_spearman_topk_nparams_total.png', bbox_inches="tight")
 
   
   elif args.similar_params: # plots ppl versus parameter size pareto curve for similar params experiment
@@ -1427,6 +1594,83 @@ def main(args):
         
       df = pd.DataFrame(all_configs)
       df.to_csv('./{}_arch_summary.csv'.format(exp_name))     
+
+  
+  elif args.get_unique_archs:
+    unique_keys = []
+    unique_configs = []
+    total_count = 0
+    count_div_val = 0
+    for exp_name in args.exp_name:
+      path_to_results = os.path.join(args.results_dir, exp_name)
+      model_configs = recurse_dir(args, exp_name, path_to_results, filetypes='config.yaml')
+      total_count += len(model_configs.keys())
+
+      for k, config in model_configs.items():
+        model_key = config2key(config)
+        if not model_key in unique_keys:
+          print(model_key)
+          unique_keys.append(model_key)
+          unique_configs.append(config)
+
+          if config['div_val']==4:
+            count_div_val += 1
+    
+    print(f'found total {total_count} and {len(unique_keys)} unique architectures')
+    print(f'found {count_div_val} archs with div_val=4')
+
+    max_steps = 100000
+    bundle_count = 10
+    yaml_idx = 0
+    c = 0
+    while True:
+        with open('../archaiphilly/transformer_nas/transxl_base_lm1b.yaml') as file:
+          amlt_config = yaml.safe_load(file)
+        del amlt_config['jobs'][0]['command'][-1]
+        amlt_config['jobs'][0]['name'] = f'lm1b_config_{yaml_idx}'
+        
+        for i in range(bundle_count):
+          exp_name = 'j' + str(i)
+
+          if i+c >= len(unique_configs):
+            break
+          
+          config_num = c + i
+          config = unique_configs[config_num]
+          config['d_head'] = [int(config['d_model']/nh) for nh in config['n_head']]
+          command = 'python -m torch.distributed.launch --nproc_per_node=8 archai/nlp/nvidia_transformer_xl/train.py \
+                    --cuda --dataset lm1b --adaptive --div_val 4 --n_layer {} --d_model {} --n_head {} --d_head {} \
+                    --d_inner {} --dropout 0.00 --dropatt 0.00 --optim adam --warmup_step 20000 --max_step 100000 \
+                    --lr 0.00025 --eta_min 0.0 --tgt_len 32 --mem_len 32 --eval_tgt_len 32 --batch_size 224 --multi_gpu ddp \
+                    --gpu0_bsz 32 --experiment_name j{}'.format(config['n_layer'],
+                                                                config['d_model'],
+                                                                get_yaml_values(config['n_head']),
+                                                                get_yaml_values(config['d_head']),
+                                                                get_yaml_values(config['d_inner']),
+                                                                str(i))
+          amlt_config['jobs'][0]['command'].append(command)
+        
+        if i+c >= len(unique_configs):
+            break
+
+        config_file = 'nv_train_'+str(yaml_idx)+'.yaml'
+        path_to_configs = '../archaiphilly/transformer_nas/lm1b_random_archs'
+        os.makedirs(path_to_configs, exist_ok=True)        
+        f_name = os.path.join(path_to_configs, config_file)
+        with open(f_name, 'w') as file:
+            yaml.dump(amlt_config, file)
+
+        c += bundle_count
+        yaml_idx += 1
+
+    # exp_name = 'memformer_baselines'
+    # bash_f_name = 'amlt_run_memformerBase.sh'
+    # bash_file = os.path.join(path_to_configs, bash_f_name)
+    # if os.path.exists(bash_file):
+    #     os.remove(bash_file)  
+    # for i in range(config_idx):
+    #     with open(bash_file, 'a') as f:
+    #         f.write('amlt run --yes archai/nlp/nvidia_transformer_xl/configs/nv_train_{}.yaml {} -t {}\n'.format(i, exp_name, target))
 
 
   else:

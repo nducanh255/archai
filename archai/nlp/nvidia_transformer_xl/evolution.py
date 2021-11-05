@@ -25,7 +25,7 @@ model_config_defaults = {'d_head': None, 'n_token': 267736, 'dropout': 0.1, 'dro
                         'cutoffs': [19997, 39997, 199997], 'tie_projs': [False, True, True, True], 'tie_weight': True, 'dtype': None}
 
 class Converter(object):
-    def __init__(self, n_layer_choice, d_model_choice, d_inner_choice, n_head_choice):
+    def __init__(self, n_layer_choice, d_model_choice, d_inner_choice, n_head_choice, **kwargs):
         self.n_layer_choice = n_layer_choice
         self.d_model_choice = d_model_choice
         self.d_inner_choice = d_inner_choice
@@ -95,6 +95,25 @@ class Converter(object):
         current_index += self.max_n_layer
 
         return ','.join(str(k) for k in key_list)
+
+    def key2dict(self, key):
+        key_list = key.split(',')
+        key_list = [int(k) for k in key_list]
+
+        model_dict = {}
+        current_index = 0
+        model_dict['d_model'] = key_list[current_index]  # d_mdoel
+        current_index += 1
+
+        model_dict['n_layer'] = key_list[current_index]  # n_layer
+        current_index += 1
+
+        model_dict['d_inner'] = key_list[current_index: current_index + key_list[1]]  # d_inner
+        current_index += key_list[1]
+
+        model_dict['n_head'] = key_list[current_index: current_index + key_list[1]]  # n_head
+
+        return model_dict
 
     
     def get_gene_choice(self, d_inner_min=None):
@@ -511,7 +530,7 @@ class Evolution(object):
         if use_convex_hull:
             xs = self.all_params
             ys = self.all_latencies
-            hull_indices, eps_indices = self.get_convex_hull(xs, ys, eps, allow_decrease)
+            hull_indices, eps_indices = get_convex_hull(xs, ys, eps, allow_decrease)
 
             all_indices = hull_indices + eps_indices
 
@@ -538,124 +557,6 @@ class Evolution(object):
         print('number of points on the pareto front:', len(self.pareto['params']))            
         
         return
-
-    def get_convex_hull(self, xs, ys, eps=None, allow_decrease=False, allow_increase=False):
-        """
-        Andrew's Monotone Chain Algorithm: (https://en.wikipedia.org/wiki/Graham_scan)
-        Assume the data are sorted in order of xs, then the computation complexity is O(n)
-        If not sorted, then a sort by x-value is applied first. The complexity becomes O(nlog(n))
-        Return:
-        hull_indices (list): indices for the points on the hull exactly
-        eps_indices (list): indices for the points on the hull + eps tolerance
-        """
-        xs = list(xs)
-        ys = list(ys)
-
-        indices = list(range(len(xs)))
-        # check xs is sorted
-        is_monotone = True
-        for i in range(1, len(xs)):
-            if xs[i] < xs[i-1]:
-                is_monotone = False
-                break
-        if not is_monotone:
-            indices.sort(key=lambda i : (xs[i], ys[i]))
-
-        def _is_on_ray_left(x1, y1, x2, y2, x3, y3, inclusive=False, epsilon=0):
-            """
-            Return whether x3,y3 is on the left side of the ray x1,y1 -> x2,y2.
-            If inclusive, then the answer is left or on the ray.
-            If otherwise, then the answer is strictly left.
-            """
-            val = (x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1)
-            if inclusive:
-                return val >= epsilon
-            return val > epsilon
-        
-        def _remove_non_hull_idx(x1, y1, idxs):
-            while len(idxs) > 1:
-                x2, y2 = xs[idxs[-1]], ys[idxs[-1]]
-                x3, y3 = xs[idxs[-2]], ys[idxs[-2]]
-                if not _is_on_ray_left(x1, y1, x2, y2, x3, y3):
-                    if np.abs(x1 - x2) > 1e-6 or np.abs(y1 - y2) > 1e-6:
-                        # this ensures that the no points are duplicates
-                        break
-                del idxs[-1]
-            return idxs
-
-        hull_indices = []
-
-        if not allow_decrease:
-            xs.insert(0, xs[indices[0]]/2)
-            ys.insert(0, np.min(ys).tolist())
-            indices = (np.asarray(indices)+1).tolist()
-            indices.insert(0, 0)
-            # x1, y1 = xs[indices[0]] / 2, np.min(ys)
-            # hull_indices = _remove_non_hull_idx(x1, y1, hull_indices)
-
-        c = 0
-        min_y = float('inf')
-        for idx in indices:
-            x1, y1 = xs[idx], ys[idx]
-            min_y = min(y1, min_y)
-            hull_indices = _remove_non_hull_idx(x1, y1, hull_indices)
-            hull_indices.append(idx)
-
-            # plt.scatter(xs, ys, label='pts')
-            # hull_xs = [xs[i] for i in hull_indices]
-            # hull_ys = [ys[i] for i in hull_indices]
-            # plt.scatter(hull_xs, hull_ys, c='black', label='eps-hull')
-            # plt.savefig(os.path.join(self.results_path, 'debug_convex_hull_{}.png'.format(c)), dpi=plt.gcf().dpi, bbox_inches='tight')
-            # c += 1
-
-        if not allow_increase:
-            # use a fake final point at (2 * x_max , y_min) to remove increasing.
-            x1, y1 = xs[indices[-1]] * 2, min_y
-            hull_indices = _remove_non_hull_idx(x1, y1, hull_indices)
-
-        # compute epsilon hull (convex hull + (1+eps) band)
-        eps_indices = hull_indices
-        if eps is not None and eps > 0:
-            eps_indices = []
-            h_idx = 0 # right idx, in the hull_indices
-            for idx in indices:
-                x = xs[idx]
-                y = ys[idx]
-                if h_idx >= len(hull_indices):
-                    # Larger than the largest model on the hull
-                    #y_interp = min_y
-                    y_interp = ys[hull_indices[-1]]
-                elif idx == hull_indices[h_idx]:
-                    # critical pts on hull
-                    y_interp = y
-                    x1, y1 = x, y # hull point to left
-                    h_idx += 1
-                    if h_idx < len(hull_indices):
-                        x2, y2 = xs[hull_indices[h_idx]], ys[hull_indices[h_idx]]
-                    else:
-                        #x2, y2 = xs[indices[-1]] * 2, min_y
-                        x2, y2 = xs[indices[-1]] * 2, ys[hull_indices[-1]]
-                else:
-                    # Between pts of hull
-                    try:
-                        y_interp = y1 + (y2 - y1) / (x2 - x1) * (x - x1)
-                        if np.isnan(y_interp):
-                            y_interp = min(y1, y2)
-                    except:
-                        # numerical issues when x2, x1 are close
-                        y_interp = min(y1, y2)
-                if y <= y_interp * (1. + eps):
-                    eps_indices.append(idx)
-                    assert x1 <= x and x2 >= x, "idx={} idx[h_idx-1]={} idx[h_idx]={}  x={} y={} x1={} x2={} y1={} y2={} y_interp={}".format(\
-                        idx, hull_indices[h_idx-1], hull_indices[h_idx], x, y, x1, x2, y1, y2, y_interp)
-
-        if not allow_decrease:
-            hull_indices.pop(0)
-            hull_indices = (np.asarray(hull_indices)-1).tolist()
-            eps_indices.pop(0)
-            eps_indices = (np.asarray(eps_indices)-1).tolist()
-
-        return hull_indices, eps_indices
     
     def update_counts(self, population):
         n_repeated = 0
@@ -734,6 +635,125 @@ class Evolution(object):
         plt.savefig(os.path.join(self.results_path, fname), bbox_inches="tight")
 
 
+def get_convex_hull(xs, ys, eps=None, allow_decrease=False, allow_increase=False):
+    """
+    Andrew's Monotone Chain Algorithm: (https://en.wikipedia.org/wiki/Graham_scan)
+    Assume the data are sorted in order of xs, then the computation complexity is O(n)
+    If not sorted, then a sort by x-value is applied first. The complexity becomes O(nlog(n))
+    Return:
+    hull_indices (list): indices for the points on the hull exactly
+    eps_indices (list): indices for the points on the hull + eps tolerance
+    """
+    xs = list(xs)
+    ys = list(ys)
+
+    indices = list(range(len(xs)))
+    # check xs is sorted
+    is_monotone = True
+    for i in range(1, len(xs)):
+        if xs[i] < xs[i-1]:
+            is_monotone = False
+            break
+    if not is_monotone:
+        indices.sort(key=lambda i : (xs[i], ys[i]))
+
+    def _is_on_ray_left(x1, y1, x2, y2, x3, y3, inclusive=False, epsilon=0):
+        """
+        Return whether x3,y3 is on the left side of the ray x1,y1 -> x2,y2.
+        If inclusive, then the answer is left or on the ray.
+        If otherwise, then the answer is strictly left.
+        """
+        val = (x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1)
+        if inclusive:
+            return val >= epsilon
+        return val > epsilon
+    
+    def _remove_non_hull_idx(x1, y1, idxs):
+        while len(idxs) > 1:
+            x2, y2 = xs[idxs[-1]], ys[idxs[-1]]
+            x3, y3 = xs[idxs[-2]], ys[idxs[-2]]
+            if not _is_on_ray_left(x1, y1, x2, y2, x3, y3):
+                if np.abs(x1 - x2) > 1e-6 or np.abs(y1 - y2) > 1e-6:
+                    # this ensures that the no points are duplicates
+                    break
+            del idxs[-1]
+        return idxs
+
+    hull_indices = []
+
+    if not allow_decrease:
+        xs.insert(0, xs[indices[0]]/2)
+        ys.insert(0, np.min(ys).tolist())
+        indices = (np.asarray(indices)+1).tolist()
+        indices.insert(0, 0)
+        # x1, y1 = xs[indices[0]] / 2, np.min(ys)
+        # hull_indices = _remove_non_hull_idx(x1, y1, hull_indices)
+
+    c = 0
+    min_y = float('inf')
+    for idx in indices:
+        x1, y1 = xs[idx], ys[idx]
+        min_y = min(y1, min_y)
+        hull_indices = _remove_non_hull_idx(x1, y1, hull_indices)
+        hull_indices.append(idx)
+
+        # plt.scatter(xs, ys, label='pts')
+        # hull_xs = [xs[i] for i in hull_indices]
+        # hull_ys = [ys[i] for i in hull_indices]
+        # plt.scatter(hull_xs, hull_ys, c='black', label='eps-hull')
+        # plt.savefig(os.path.join(results_path, 'debug_convex_hull_{}.png'.format(c)), dpi=plt.gcf().dpi, bbox_inches='tight')
+        # c += 1
+
+    if not allow_increase:
+        # use a fake final point at (2 * x_max , y_min) to remove increasing.
+        x1, y1 = xs[indices[-1]] * 2, min_y
+        hull_indices = _remove_non_hull_idx(x1, y1, hull_indices)
+
+    # compute epsilon hull (convex hull + (1+eps) band)
+    eps_indices = hull_indices
+    if eps is not None and eps > 0:
+        eps_indices = []
+        h_idx = 0 # right idx, in the hull_indices
+        for idx in indices:
+            x = xs[idx]
+            y = ys[idx]
+            if h_idx >= len(hull_indices):
+                # Larger than the largest model on the hull
+                #y_interp = min_y
+                y_interp = ys[hull_indices[-1]]
+            elif idx == hull_indices[h_idx]:
+                # critical pts on hull
+                y_interp = y
+                x1, y1 = x, y # hull point to left
+                h_idx += 1
+                if h_idx < len(hull_indices):
+                    x2, y2 = xs[hull_indices[h_idx]], ys[hull_indices[h_idx]]
+                else:
+                    #x2, y2 = xs[indices[-1]] * 2, min_y
+                    x2, y2 = xs[indices[-1]] * 2, ys[hull_indices[-1]]
+            else:
+                # Between pts of hull
+                try:
+                    y_interp = y1 + (y2 - y1) / (x2 - x1) * (x - x1)
+                    if np.isnan(y_interp):
+                        y_interp = min(y1, y2)
+                except:
+                    # numerical issues when x2, x1 are close
+                    y_interp = min(y1, y2)
+            if y <= y_interp * (1. + eps):
+                eps_indices.append(idx)
+                assert x1 <= x and x2 >= x, "idx={} idx[h_idx-1]={} idx[h_idx]={}  x={} y={} x1={} x2={} y1={} y2={} y_interp={}".format(\
+                    idx, hull_indices[h_idx-1], hull_indices[h_idx], x, y, x1, x2, y1, y2, y_interp)
+
+    if not allow_decrease:
+        hull_indices.pop(0)
+        hull_indices = (np.asarray(hull_indices)-1).tolist()
+        eps_indices.pop(0)
+        eps_indices = (np.asarray(eps_indices)-1).tolist()
+
+    return hull_indices, eps_indices
+        
+
 def test_converter():
     config = {
         'd_model': 512,
@@ -791,7 +811,7 @@ def test_convex_hull(args):
     print(eps)
 
     # compute eps convex hull.
-    hull_indices, indices = alg.get_convex_hull(xs, ys, eps, allow_decrease=True, allow_increase=False)
+    hull_indices, indices = get_convex_hull(xs, ys, eps, allow_decrease=True, allow_increase=False)
 
     # plot
     hull_xs = [xs[i] for i in indices]
@@ -1156,10 +1176,12 @@ def get_gt_pareto(args, exp_name, path_to_dir, start_config, ppl_eps=0.1, latenc
     gt_latencies = []
     gt_val_ppls = []
     is_pareto = []
+    gt_keys = []
     for job_name, result in gt_results.items():
         gene = alg.converter.config2gene(result)
         key = alg.converter.gene2key(gene) #','.join([str(g) for g in gene])
-        if key in latencies.keys():
+
+        if key in latencies.keys() and not key in gt_keys:
             config_number = re.search('config_([0-9]+)_', job_name).group(1)
             # print(job_name, config_number)
             if int(config_number) < start_config:
@@ -1171,6 +1193,7 @@ def get_gt_pareto(args, exp_name, path_to_dir, start_config, ppl_eps=0.1, latenc
                     is_pareto.append(loaded_pareto[key])
                 else:
                     is_pareto.append(True if 'pareto' in job_name else False)
+                gt_keys.append(key)
             except:
                 pass
             
@@ -1184,7 +1207,7 @@ def get_gt_pareto(args, exp_name, path_to_dir, start_config, ppl_eps=0.1, latenc
         is_gt_pareto = np.zeros_like(is_pareto)
         xs = gt_latencies
         ys = np.asarray(gt_val_ppls)
-        gt_pareto_indices, _ = alg.get_convex_hull(xs, ys, eps=0., allow_decrease=True, allow_increase=False)
+        gt_pareto_indices, _ = get_convex_hull(xs, ys, eps=0., allow_decrease=True, allow_increase=False)
         is_gt_pareto[gt_pareto_indices] = 1.0
     else:
         # extract the actual pareto front based on val ppl and latency
@@ -1230,22 +1253,105 @@ def get_gt_pareto(args, exp_name, path_to_dir, start_config, ppl_eps=0.1, latenc
     mean_ppl_difference = get_diff_with_pareto(gt_latencies, gt_val_ppls, is_gt_pareto, is_pareto, min_acceptable_latency_diff=min_acceptable_latency_diff)
     print('mean ppl difference between proxy and gt pareto: {:.1f}%'.format(mean_ppl_difference))
     
-    plt.figure()
-    plt.scatter(np.asarray(gt_latencies)[~is_pareto] * 1000., np.asarray(gt_val_ppls)[~is_pareto], s=5)
-    plt.scatter(np.asarray(gt_latencies)[is_pareto] * 1000., np.asarray(gt_val_ppls)[is_pareto], s=5)
+    plt.figure(figsize=(5,3))
+    plt.scatter(np.asarray(gt_latencies)[~is_pareto] * 1000., np.asarray(gt_val_ppls)[~is_pareto], s=5, label='Ground-truth', color='midnightblue')
+    plt.scatter(np.asarray(gt_latencies)[is_pareto] * 1000., np.asarray(gt_val_ppls)[is_pareto], s=5, label='Proxy pareto', color='tab:orange')
     # plt.scatter(np.asarray(gt_latencies)[is_gt_pareto] * 1000., np.asarray(gt_val_ppls)[is_gt_pareto], s=5)
     # plt.scatter(np.asarray(gt_val_ppls)[~is_pareto], np.asarray(gt_latencies)[~is_pareto] * 1000., s=10)
     # plt.scatter(np.asarray(gt_val_ppls)[is_pareto], np.asarray(gt_latencies)[is_pareto] * 1000., s=10)
     if baseline_exp:
-        plt.scatter(np.asarray(latencies_baseline) * 1000., np.asarray(val_ppls_baseline), s=10, marker='*', c='red')
+        plt.scatter(np.asarray(latencies_baseline) * 1000., np.asarray(val_ppls_baseline), s=25, marker='*', c='red', label='Baseline')
         plt.xlim((min(np.min(gt_latencies), np.min(latencies_baseline))*1000-10, np.max(gt_latencies)*1000+10))
     else:
         plt.xlim(np.min(gt_latencies)*1000-10, np.max(gt_latencies)*1000+10)
     plt.xlabel('Latency (ms)')
-    plt.ylabel('Val PPL')  
-    plt.title('Pareto Curve')
+    plt.ylabel('Val PPL')
+    # plt.title('Pareto Curve')
     plt.grid(axis='y')
+    plt.legend(handletextpad=0.1, borderpad=0)
     fname = 'gt_pareto_latency{}.png'.format('' if hybrid else '_params')
+    plt.savefig(os.path.join(results_path, fname), bbox_inches="tight")
+
+
+def compare_w_baseline(args, exp_name, path_to_dir, start_config, ppl_eps=0.1, latency_eps = 0.01, hybrid=False, use_convex_hull=False, 
+                       min_acceptable_latency_diff=0, baseline_exp=None):
+    gt_results = gather_results(exp_name, os.path.join(path_to_dir, exp_name), filetypes=['config.yaml', '.json'], verbose=False)
+    print('found %d model configurations' % len(gt_results.keys()))
+
+    print('Loading the latencies from log file')
+    results_path = args['results_path']
+    path_to_pkl = os.path.join(results_path, 'latencies.pkl')
+    with open(path_to_pkl, 'rb') as f:
+        latencies = pickle.load(f)
+    print(len(latencies.keys()))
+
+    assert baseline_exp is not None, 'please provide a baseline'
+    print('Loading the baseline')
+    latencies_baseline, val_ppls_baseline = analyze_baseline(args, exp_name=baseline_exp, path_to_dir=path_to_dir)
+
+    # load previous pareto
+    loaded_pareto = None
+    fname = 'pareto{}'.format('' if hybrid else '_params')
+    fname += '_convexHull' if use_convex_hull else ''
+    path_to_pkl = os.path.join(results_path, fname+'.pkl')
+    
+    if os.path.exists(path_to_pkl):
+        print('Loading proxy pareto')
+        with open(path_to_pkl, 'rb') as f:
+            loaded_pareto = pickle.load(f)
+    
+    alg = Evolution(**args)
+
+    gt_latencies = []
+    gt_val_ppls = []
+    gt_keys = []
+    for job_name, result in gt_results.items():
+        gene = alg.converter.config2gene(result)
+        key = alg.converter.gene2key(gene) #','.join([str(g) for g in gene])
+
+        if key in latencies.keys() and not key in gt_keys:
+            config_number = re.search('config_([0-9]+)_', job_name).group(1)
+            # print(job_name, config_number)
+            if int(config_number) < start_config:
+                continue
+            try:
+                if (loaded_pareto and loaded_pareto[key]) or (not loaded_pareto and 'pareto' in job_name):
+                    gt_val_ppls.append(result['valid_perplexity'])
+                    gt_latencies.append(latencies[key])
+                    gt_keys.append(key)
+            except:
+                pass
+    gt_latencies = np.asarray(gt_latencies)
+    gt_val_ppls = np.asarray(gt_val_ppls)
+    print(f'found {len(gt_val_ppls)} models on the proxy pareto')
+    
+    latency_from_pareto = []
+    val_ppl_from_pareto = []
+    for lat_b, ppl_b in zip(latencies_baseline, val_ppls_baseline):
+        idx = np.argsort(np.absolute(gt_latencies-lat_b))[0]
+        latency_from_pareto.append(gt_latencies[idx])
+        val_ppl_from_pareto.append(gt_val_ppls[idx])
+    
+    indices, _ = get_convex_hull(gt_latencies, gt_val_ppls, allow_decrease=True, allow_increase=False)
+    gt_latencies = gt_latencies[indices]
+    gt_val_ppls = gt_val_ppls[indices]
+
+    print('baseline: (latnecy, ppl)', [(l, p) for l, p in zip(latencies_baseline, val_ppls_baseline)])
+    print('pareto: (latnecy, ppl)', [(l, p) for l, p in zip(latency_from_pareto, val_ppl_from_pareto)])
+    print('convex hull: (latnecy, ppl)', [(l, p) for l, p in zip(gt_latencies, gt_val_ppls)])
+    
+    plt.figure(figsize=(5,3))
+    # plt.plot(np.asarray(latency_from_pareto) * 1000., val_ppl_from_pareto, markersize=10, label='LTS', color='midnightblue', marker='.')
+    plt.plot(np.asarray(gt_latencies) * 1000., gt_val_ppls, markersize=10, label='LTS', color='midnightblue', marker='.')
+    plt.plot(np.asarray(latencies_baseline[:6]) * 1000., val_ppls_baseline[:6], markersize=5, label='Scaled Transformer', color='tab:blue', marker='d')
+    # plt.xlim((min(np.min(latency_from_pareto), np.min(latencies_baseline))*1000-10, np.max(latency_from_pareto)*1000+10))
+    plt.xlim((min(np.min(gt_latencies), np.min(latencies_baseline))*1000-10, np.max(gt_latencies)*1000+10))
+    plt.xlabel('Latency (ms)')
+    plt.ylabel('Val PPL')
+    # plt.title('Pareto Curve')
+    plt.grid(axis='y')
+    plt.legend(handletextpad=0.1, borderpad=0)
+    fname = 'baseline_comp.png'
     plt.savefig(os.path.join(results_path, fname), bbox_inches="tight")
 
 
@@ -1305,7 +1411,7 @@ def get_final_pareto_front(args, eps=0.05, hybrid=False, use_convex_hull=False):
         else:
             xs = all_params[idx:]
             ys = all_latencies[idx:]
-        pareto_indices, _ = alg.get_convex_hull(xs, ys, eps=0., allow_decrease=False)
+        pareto_indices, _ = get_convex_hull(xs, ys, eps=0., allow_decrease=False)
         for i in range(len(all_params)):
             if i < idx and hybrid:
                 is_pareto_dict[seen_keys[i]] = False
@@ -1458,8 +1564,19 @@ if __name__=='__main__':
     random.seed(seed)
     torch.manual_seed(seed)
 
-    args = {'default_path': './evo_search','population_size':50, 'parent_size':10, 'mutation_size':20, 'mutation_prob':0.3, 'crossover_size':20, 
-            'n_iter':30, 'n_layer_choice':[3,4,5,6,7,8], 'd_model_choice':[128, 256, 512], 'd_inner_choice':list(range(512, 2049, 50))+[2048], 'n_head_choice':[2,4,8],
+    # args = {'default_path': './evo_search','population_size':50, 'parent_size':10, 'mutation_size':20, 'mutation_prob':0.3, 'crossover_size':20, 
+    #         'n_iter':30, 'n_layer_choice':[3,4,5,6,7,8], 'd_model_choice':[128, 256, 512], 'd_inner_choice':list(range(512, 2049, 50))+[2048], 'n_head_choice':[2,4,8],
+    #         'param_constraint':5e6, 'latency_scale':2., 'n_threads':1, 'latency_repeat':5, 'pareto_search':True,
+    #         ################### extracting pareto
+    #         'eps':0.05, 'use_convex_hull':False,
+    #         ################### brute_force
+    #         'nsamples':20000, 'batch':1000, 'do_train':False,
+    #         ################### evaluation scheme  (set start_train to bigger than n_iter to disable training for evaluation)
+    #         'start_train':40, 'train_local':True, 'n_gpus':4, 'gpu_config':'dgx1_4gpu_fp32', 'config_file':'wt103_base.yaml', 'max_step':500, 'experiment_name':'evolution', 
+    #         'scheduler':'constant', 'use_valid':True}
+
+    args = {'default_path': './evo_search','population_size':100, 'parent_size':20, 'mutation_size':40, 'mutation_prob':0.3, 'crossover_size':40, 
+            'n_iter':30, 'n_layer_choice':[3,4,5,6,7,8,9,10,11,12], 'd_model_choice':[128, 256, 512, 650, 800], 'd_inner_choice':list(range(512, 2049, 50))+[2048, 3072], 'n_head_choice':[2,4,8],
             'param_constraint':5e6, 'latency_scale':2., 'n_threads':1, 'latency_repeat':5, 'pareto_search':True,
             ################### extracting pareto
             'eps':0.05, 'use_convex_hull':False,
@@ -1478,8 +1595,8 @@ if __name__=='__main__':
         dir_name += '_wTrain'
 
     # dir_name = 'test'
-    # args['results_path'] = os.path.join(args['default_path'], dir_name)
-    args['results_path'] = os.path.join(args['default_path'], 'param_threshold_5.0_D3_V2')
+    args['results_path'] = os.path.join(args['default_path'], dir_name+'_K80')
+    # args['results_path'] = os.path.join(args['default_path'], 'param_threshold_5.0_D3_V2')
     # args['results_path'] = os.path.join(args['default_path'], 'param_threshold_5.0_pareto')
 
     # test_converter()
@@ -1487,7 +1604,7 @@ if __name__=='__main__':
     # test_pareto(args, eps=0.01, decreasing=False)
     
     #--------------- run evolutionary search
-    # test_evo_search(args, brute_force=False)
+    test_evo_search(args, brute_force=False)
     
     #--------------- submit ground-truth training jobs over the entire population after search
     # submit_gt_jobs(args, max_step=40000, start_config=0, bundle_count=20, n_gpus=8, gpu_config='dgx1_8gpu_fp32', targets=['NLX-NDv2'])
@@ -1502,16 +1619,40 @@ if __name__=='__main__':
     # eps = ppl_eps if (args['start_train'] < args['n_iter'] and hybrid) else param_eps
     # get_final_pareto_front(args, eps=eps, hybrid=hybrid, use_convex_hull=use_convex_hull)    
 
+    # #--------------- load the proxy pareto and show configs
+    # loaded_pareto = None
+    # fname = 'pareto{}'.format('' if hybrid else '_params')
+    # fname += '_convexHull' if use_convex_hull else ''
+    # path_to_pkl = os.path.join(args['results_path'], fname+'.pkl')
+    # with open(path_to_pkl, 'rb') as f:
+    #     loaded_pareto = pickle.load(f)
+    # path_to_pkl = os.path.join(args['results_path'], 'latencies.pkl')
+    # with open(path_to_pkl, 'rb') as f:
+    #     latencies = pickle.load(f)
+    
+    # converter = Converter(**args)
+    # model_list = []
+    # for k in loaded_pareto.keys():
+    #     model_config = converter.key2dict(k)
+    #     model_config['latency'] = latencies[k] * 1000
+    #     model_list.append(model_config)
+
+    # with open(os.path.join(args['results_path'], 'pareto_summary.pkl'), 'wb') as f:
+    #     print('Summarizing the proxy pareto')
+    #     pickle.dump(model_list, f)
+
     #--------------- compare ground-truth pareto with the proxy pareto
-    gt_exp_name = 'evolution_40000'
-    path_to_amlt_results = './amlt_logs'
-    os.makedirs(path_to_amlt_results, exist_ok=True)
+    # gt_exp_name = 'evolution_40000'
+    # path_to_amlt_results = './amlt_logs'
+    # os.makedirs(path_to_amlt_results, exist_ok=True)
     # command = 'amlt results {} -I "*.json"  -o {} --no-md5'.format(gt_exp_name, path_to_amlt_results)
     # os.system(command)
     # command = 'amlt results {} -I "*.yaml"  -o {} --no-md5'.format(gt_exp_name, path_to_amlt_results)
     # os.system(command)
-    get_gt_pareto(args, exp_name=gt_exp_name, path_to_dir=path_to_amlt_results, start_config=0, 
-                    ppl_eps=0.1, latency_eps=0.01, hybrid=hybrid, use_convex_hull=use_convex_hull, min_acceptable_latency_diff=2, baseline_exp='evolution_baselines')
+    # get_gt_pareto(args, exp_name=gt_exp_name, path_to_dir=path_to_amlt_results, start_config=0, 
+    #                 ppl_eps=0.1, latency_eps=0.01, hybrid=hybrid, use_convex_hull=use_convex_hull, min_acceptable_latency_diff=2, baseline_exp=None)#'evolution_baselines')
+
+    # compare_w_baseline(args, exp_name=gt_exp_name, path_to_dir=path_to_amlt_results, start_config=0, baseline_exp='evolution_baselines')
 
     #---------------- print ppl versus nparams pareto
     # with open('amlt_logs/evolution_40000/params_summary.yaml') as f:
@@ -1543,3 +1684,21 @@ if __name__=='__main__':
     # plt.grid(axis='y')
     # fname = 'pareto_params.png'
     # plt.savefig(os.path.join(args['results_path'], fname), bbox_inches="tight")
+
+    #---------------- check whether all jobs have finished running
+    # gt_results = gather_results(gt_exp_name, os.path.join(path_to_amlt_results, gt_exp_name), filetypes=['config.yaml', '.json'], verbose=False)
+    
+    # counts = {i: 0 for i in range(58)}
+    # for k in gt_results.keys():
+    #     config_number = int(re.search('config_([0-9]+)', k).group(1))
+    #     counts[config_number] += 1
+
+    # for k, v in counts.items():
+    #     if k != 57 and v != 20:
+    #         print(k, v)
+    #     elif k==57 and v != 2:
+    #         print(k, v)
+
+
+
+

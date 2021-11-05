@@ -31,7 +31,7 @@ generation_seed = 4568
 np.random.seed(generation_seed)
 random.seed(generation_seed)
 
-phase = 5   # 1: submit jobs (optionally with fear stage 1 activated), 2: fear stage 2, 3: baseline, 4: similar parameter exploration, 5: trasnformer-XL baseline
+phase = 6   # 1: submit jobs (optionally with fear stage 1 activated), 2: fear stage 2, 3: baseline, 4: similar parameter exploration, 5: trasnformer-XL baseline  #6: submit same jobs as a different config
 activate_fear = False
 n_unfreeze = 3  # used in phase 2
 different_seeds = None #[1111,1009,1200,1234,1302,1562,2222,3334,3425,4567]
