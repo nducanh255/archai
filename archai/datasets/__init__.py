@@ -33,6 +33,8 @@ from .providers.simclr_mit67provider import SimClrMit67Provider
 from .providers.simclr_sport8provider import SimClrSport8Provider
 from .providers.simclr_svhnprovider import SimClrSvhnProvider
 from .providers.simclr_imagenetprovider import SimClrImageNetProvider
+from .providers.simclr_inat21provider import SimClrINat21Provider
+from .providers.simclr_inat21miniprovider import SimClrINat21MiniProvider
 from .providers.simclr_imagenet_downsampledprovider import SimClrImageNet32Provider, SimClrImageNet64Provider
 
 
