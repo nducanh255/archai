@@ -41,11 +41,11 @@ def param_plots(params, models, dataset_name, dataset, key):
     plt.clf()
     g = sns.lmplot('Net Params', f'{dataset_name} Accuracy', df, order=2, truncate=False)
     plt.show()
-    plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/params_{dataset}_{key}.png')
+    plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/params_{dataset}_{key}.pdf')
     plt.clf()
     g = sns.lmplot('Bottom Params / Top Params', f'{dataset_name} Accuracy', df, order=2, truncate=False)
     plt.show()
-    plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/top_bottom_params_{dataset}_{key}.png')
+    plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/top_bottom_params_{dataset}_{key}.pdf')
     plt.clf()
     if dataset == 'imagenet':
         cur_top_params = [params[net]['top_params'] for net in models if params[net]['bottom_params'] in bottom_dict]
@@ -59,16 +59,16 @@ def param_plots(params, models, dataset_name, dataset, key):
         # labels = g._legend_data.keys()
         # g.fig.legend(handles=handles, labels=labels, loc='upper left')
         # plt.legend(bbox_to_anchor=(1.05, 1), loc='lower center', borderaxespad=0)
-        plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/top_params_legend_{dataset}_{key}.png')
+        plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/top_params_legend_{dataset}_{key}.pdf')
 
     plt.clf()
     g = sns.lmplot('Bottom Params', f'{dataset_name} Accuracy', df, order=2, truncate=False)
     plt.show()
-    plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/bottom_params_{dataset}_{key}.png')
+    plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/bottom_params_{dataset}_{key}.pdf')
     plt.clf()
     g = sns.lmplot('Top Params', f'{dataset_name} Accuracy', df, order=2, truncate=False)
     plt.show()
-    plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/top_params_{dataset}_{key}.png')
+    plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/top_params_{dataset}_{key}.pdf')
 # key = 'resnet'
 key = 'resnet'
 with open(f'/vulcanscratch/sgirish/dummy/resnet_params.json','r') as f:
@@ -96,7 +96,6 @@ with open('/vulcanscratch/sgirish/eval_models.csv') as csv_file:
                 imagenet_mobilenet_models[name.strip().split('-')[-1]] = float(row['epoch_top1_test'])
 imagenet_models = imagenet_resnet_models if key == 'resnet' else imagenet_mobilenet_models
 
-###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!REMEMBER TO CHANGE c10r20 to c100r20 ON VULCAN!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 # params = {}
 # if key == 'resnet':
 #     with open('confs/algos/simclr_resnets.yaml', 'r') as f:
@@ -173,24 +172,40 @@ sns.set_style("darkgrid")
 # grid = sns.FacetGrid(df, col = "Dataset", col_wrap=5, sharey=False, sharex=True, col_order=[n for n in dataset_names if n!='imagenet'])
 # grid.map(sns.lmplot, "ImageNet Accuracy", "Accuracy")
 # grid.add_legend()
-g = sns.lmplot(x="ImageNet Accuracy", y="Accuracy", col="Dataset", col_order=[n for n in dataset_names if n!='imagenet'],
+
+if key == 'resnet':
+    corr = {'aircraft':-0.38, 'cars196':-0.3,'cifar10':0.85,'cifar100':0.91,'cub200':0.64,
+            'dogs120':0.9,'flower102':0.38,'mit67':0.57,'sport8':-0.14,'svhn':0.44}
+else:
+    corr = {'aircraft':-0.38, 'cars196':-0.3,'cifar10':0.85,'cifar100':0.91,'cub200':0.64,
+            'dogs120':0.9,'flower102':0.38,'mit67':0.57,'sport8':-0.14,'svhn':0.44}
+corr_inv = {v:k for k,v in corr.items()}
+corrs = list(corr.values())
+corrs.sort(reverse=True)
+dataset_names_sorted = [corr_inv[c] for c in corrs]
+
+g = sns.lmplot(x="ImageNet Accuracy", y="Accuracy", col="Dataset", col_order=dataset_names_sorted,
                data=df, col_wrap=5, sharey=False, sharex=True, truncate=False)
 
-in_min = min(list(imagenet_models_subset.values()))
-in_max = max(list(imagenet_models_subset.values()))
-for i in range(10):
-    dataset_name = [n for n in dataset_names if n!='imagenet'][i]
-    # print(dataset_name, cur_accs.min(),cur_accs.max())
-    cur_accs = [a for i,a in enumerate(acc) if dataset[i]==dataset_name and model[i] in imagenet_models_subset]
-    g.axes[i].set_ylim((min(cur_accs)*0.998,max(cur_accs)*1.002))
-    g.axes[i].set_xlim((in_min,in_max))
-plt.show()
-plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/downstream_accs_{key}.png')
-    
 cur_dataset = ['imagenet']+[n for n in dataset_names if n!='cifar10' and n!='imagenet']
 cur_dataset_names = {'aircraft':'Aircraft', 'flower102':'Flowers102', 'cars196':'Stanford Cars', 'imagenet':'ImageNet',
                      'cifar10':'Cifar10', 'cifar100':'Cifar100', 'cub200':'Caltech Birds', 'dogs120':'Stanford Dogs',
                      'mit67':'MIT67', 'sport8':'Sports', 'svhn':'SVHN'}
+cur_dataset_names_map = cur_dataset_names
+in_min = min(list(imagenet_models_subset.values()))
+in_max = max(list(imagenet_models_subset.values()))
+for i in range(10):
+    dataset_name = dataset_names_sorted[i]
+    # print(dataset_name, cur_accs.min(),cur_accs.max())
+    cur_accs = [a for i,a in enumerate(acc) if dataset[i]==dataset_name and model[i] in imagenet_models_subset]
+    g.axes[i].set_ylim((min(cur_accs)*0.998,max(cur_accs)*1.002))
+    g.axes[i].set_xlim((in_min,in_max))
+    g.axes[i].set_title(cur_dataset_names[dataset_name])
+    # g.axes[i].text(0,0, "An annotation", horizontalalignment='center', size='medium', color='black', weight='semibold')
+    g.axes[i].annotate(f'Linear corr. coefficient={corr[dataset_name]}', xy=(0.3,0.5), xycoords='figure fraction',xytext=(0.2,0.05), 
+                        textcoords='axes fraction', fontsize=14)
+plt.show()
+plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/downstream_accs_{key}.pdf')
 cur_dataset_names = [cur_dataset_names[k] for k in cur_dataset]
 if key == 'resnet':
     min_vals = {'aircraft':38.0, 'flower102':91.5, 'cars196':32.0, 'imagenet':54.0, 'cifar10':82.0, 'cifar100':59.0,
@@ -208,15 +223,17 @@ dataset_plot = [dataset[i] for i in range(len(acc)) if dataset[i] in cur_dataset
 df = pd.DataFrame(list(zip(params_x, acc_y, dataset_plot)), columns=['Params (in Million)', 'Accuracy','Dataset'])
 plt.clf()
 plt.grid()
-g = sns.lmplot(x="Params (in Million)", y="Accuracy", col="Dataset", col_order=cur_dataset,
+dataset_names_sortedv2 = ['imagenet']+[n for n in dataset_names_sorted if n!='cifar10']
+g = sns.lmplot(x="Params (in Million)", y="Accuracy", col="Dataset", col_order=dataset_names_sortedv2,
             data=df, col_wrap=5, sharey=False, sharex=True, truncate=False, order=2)
 for j in range(len(cur_dataset)):
-    cur_accs = [acc[i] for i in range(len(acc)) if dataset[i] == cur_dataset[j] and key in model[i] and \
+    cur_accs = [acc[i] for i in range(len(acc)) if dataset[i] == dataset_names_sortedv2[j] and key in model[i] and \
                 params[model[i]]['params']<max_params and acc[i]>min_vals[dataset[i]]]
     g.axes[j].set_xlim((min(params_x)*0.998,max(params_x)*1.002))
     g.axes[j].set_ylim((min(cur_accs)*0.998,max(cur_accs)*1.002))
+    g.axes[j].set_title(cur_dataset_names_map[dataset_names_sortedv2[j]])
 plt.show()
-plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/downstream_params_{key}.png')
+plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/downstream_params_{key}.pdf')
 
 # param_plots(params, imagenet_models, 'ImageNet', 'imagenet', key)
 for plot_dataset, plot_dataset_name, min_acc in zip(cur_dataset,cur_dataset_names,[min_vals[d] for d in cur_dataset]):
@@ -226,32 +243,32 @@ for plot_dataset, plot_dataset_name, min_acc in zip(cur_dataset,cur_dataset_name
     param_plots(params, cur_accs, plot_dataset_name, plot_dataset, key)
 
 
-# in_index = dataset_names.index('imagenet')
-# accs = np.concatenate((accs[:,in_index:in_index+1],accs[:,:in_index],accs[:,in_index+1:]),axis=1)
-# new_dataset_names = ['imagenet']+[n for n in dataset_names if n!='imagenet']
-# pears = np.zeros((len(new_dataset_names),len(new_dataset_names)))
-# spear = np.zeros((len(new_dataset_names),len(new_dataset_names)))
-# for i in range(len(new_dataset_names)):
-#     for j in range(len(new_dataset_names)):
-#         pears[i,j] = pearsonr(accs[:,i],accs[:,j])[0]
-#         spear[i,j] = spearmanr(accs[:,i],accs[:,j])[0]
+in_index = dataset_names.index('imagenet')
+accs = np.concatenate((accs[:,in_index:in_index+1],accs[:,:in_index],accs[:,in_index+1:]),axis=1)
+new_dataset_names = ['imagenet']+[n for n in dataset_names if n!='imagenet']
+pears = np.zeros((len(new_dataset_names),len(new_dataset_names)))
+spear = np.zeros((len(new_dataset_names),len(new_dataset_names)))
+for i in range(len(new_dataset_names)):
+    for j in range(len(new_dataset_names)):
+        pears[i,j] = pearsonr(accs[:,i],accs[:,j])[0]
+        spear[i,j] = spearmanr(accs[:,i],accs[:,j])[0]
 
-# sns.set(font_scale=0.9)
-# df_cm = pd.DataFrame(pears.round(2), index = [i for i in new_dataset_names],
-#                   columns = [i for i in new_dataset_names])
-# plt.figure(figsize = (9,7))
-# sns.heatmap(df_cm, annot=True)
-# plt.show()
-# plt.title('Pearson correlation coefficient')
-# plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/pearson_correlation_{key}.png')
-# plt.clf()
-# df_cm = pd.DataFrame(spear.round(2), index = [i for i in new_dataset_names],
-#                   columns = [i for i in new_dataset_names])
-# plt.figure(figsize = (9,7))
-# sns.heatmap(df_cm, annot=True)
-# plt.show()
-# plt.title('Spearman correlation coefficient')
-# plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/spearman_correlation_{key}.png')
+sns.set(font_scale=0.9)
+df_cm = pd.DataFrame(pears.round(2), index = [i for i in new_dataset_names],
+                  columns = [i for i in new_dataset_names])
+plt.figure(figsize = (9,7))
+sns.heatmap(df_cm, annot=True)
+plt.show()
+plt.title('Pearson correlation coefficient')
+plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/pearson_correlation_{key}.pdf')
+plt.clf()
+df_cm = pd.DataFrame(spear.round(2), index = [i for i in new_dataset_names],
+                  columns = [i for i in new_dataset_names])
+plt.figure(figsize = (9,7))
+sns.heatmap(df_cm, annot=True)
+plt.show()
+plt.title('Spearman correlation coefficient')
+plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/spearman_correlation_{key}.pdf')
 exit()
 
 
