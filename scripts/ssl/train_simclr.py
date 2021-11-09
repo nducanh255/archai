@@ -7,6 +7,7 @@ import yaml
 import time
 import torch
 import shutil
+import argparse
 from archai.networks_ssl.simclr import ModelSimCLRResNet, ModelSimCLRVGGNet, ModelSimCLRViT, ModelSimCLRDenseNet, ModelSimCLREfficientNet, ModelSimCLRMobileNet
 from archai.common import utils
 from archai.common.trainer_ssl import TrainerSimClr
@@ -15,6 +16,12 @@ from archai.common.common import common_init, common_init_dist, create_conf, get
 from archai.datasets import data
 from archai.common.checkpoint import CheckPoint
 from archai.common.dist_utils import ApexUtils
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--debug', help='put script to sleep for 7 days', action='store_true')
+args, extra_args = parser.parse_known_args()
+if args.debug:
+    time.sleep(7 * 24 * 3600)
 
 def train_test(conf_main:Config):
     conf_loader = conf_main['loader']
