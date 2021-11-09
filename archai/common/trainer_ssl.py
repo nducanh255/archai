@@ -294,12 +294,14 @@ class TrainerSimClr(EnforceOverrides):
             self._checkpoint.commit()
             
             save_intermediate = self._conf_train['save_intermediate']
-            intermediatedir = self._conf_train['intermediatedir']
+            intermediatedir = utils.full_path(self._conf_train['intermediatedir'])
             if save_intermediate:
                 logdir = utils.full_path(os.environ['logdir'])
                 for folder in os.listdir(logdir):
                     srcdir = os.path.join(logdir,folder)
                     destdir = os.path.join(intermediatedir,folder)
+                    if not os.path.exists(destdir):
+                        os.makedirs(destdir,exist_ok=True)
                     if os.path.exists(destdir):
                         if os.path.isdir(destdir):
                             shutil.rmtree(destdir)
