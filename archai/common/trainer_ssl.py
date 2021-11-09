@@ -7,6 +7,7 @@ from typing import Callable, Tuple, Optional
 import os
 import wandb
 import torch
+import distutils.dir_util
 from torch import nn, Tensor
 from torch.optim.optimizer import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
@@ -294,24 +295,24 @@ class TrainerSimClr(EnforceOverrides):
             self._checkpoint.commit()
             
             save_intermediate = self._conf_train['save_intermediate']
-            intermediatedir = utils.full_path(self._conf_train['intermediatedir']) if self._conf_train['intermediatedir'] \
-                                else self._conf_train['intermediatedir']
             if save_intermediate:
                 logdir = utils.full_path(os.environ['logdir'])
-                for folder in os.listdir(logdir):
-                    srcdir = os.path.join(logdir,folder)
-                    destdir = os.path.join(intermediatedir,folder)
-                    if not os.path.exists(destdir):
-                        os.makedirs(destdir,exist_ok=True)
-                    if os.path.exists(destdir):
-                        if os.path.isdir(destdir):
-                            shutil.rmtree(destdir)
-                        else:
-                            os.remove(destdir)
-                    if os.path.isdir(srcdir):
-                        shutil.copytree(srcdir,destdir)
-                    else:
-                        shutil.copy(srcdir,destdir)
+                intermediatedir = utils.full_path(self._conf_train['intermediatedir'])
+                distutils.dir_util.copy_tree(logdir, intermediatedir)
+                # for folder in os.listdir(logdir):
+                #     srcdir = os.path.join(logdir,folder)
+                #     destdir = os.path.join(intermediatedir,folder)
+                #     if not os.path.exists(destdir):
+                #         os.makedirs(destdir,exist_ok=True)
+                #     if os.path.exists(destdir):
+                #         if os.path.isdir(destdir):
+                #             shutil.rmtree(destdir)
+                #         else:
+                #             os.remove(destdir)
+                #     if os.path.isdir(srcdir):
+                #         shutil.copytree(srcdir,destdir)
+                #     else:
+                #         shutil.copy(srcdir,destdir)
                 print(f'Copied files from logdir {logdir} to intermediate dir {intermediatedir}')
 
     def pre_step(self, xi:Tensor, xj:Tensor)->None:

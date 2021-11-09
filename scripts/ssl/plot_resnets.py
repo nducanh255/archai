@@ -69,8 +69,8 @@ def param_plots(params, models, dataset_name, dataset, key):
     g = sns.lmplot('Top Params', f'{dataset_name} Accuracy', df, order=2, truncate=False)
     plt.show()
     plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/top_params_{dataset}_{key}.pdf')
+key = 'mobilenet'
 # key = 'resnet'
-key = 'resnet'
 with open(f'/vulcanscratch/sgirish/dummy/resnet_params.json','r') as f:
     resnet_params = json.load(f)
 with open(f'/vulcanscratch/sgirish/dummy/mobilenet_params.json','r') as f:
@@ -243,32 +243,32 @@ for plot_dataset, plot_dataset_name, min_acc in zip(cur_dataset,cur_dataset_name
     param_plots(params, cur_accs, plot_dataset_name, plot_dataset, key)
 
 
-in_index = dataset_names.index('imagenet')
-accs = np.concatenate((accs[:,in_index:in_index+1],accs[:,:in_index],accs[:,in_index+1:]),axis=1)
-new_dataset_names = ['imagenet']+[n for n in dataset_names if n!='imagenet']
-pears = np.zeros((len(new_dataset_names),len(new_dataset_names)))
-spear = np.zeros((len(new_dataset_names),len(new_dataset_names)))
-for i in range(len(new_dataset_names)):
-    for j in range(len(new_dataset_names)):
-        pears[i,j] = pearsonr(accs[:,i],accs[:,j])[0]
-        spear[i,j] = spearmanr(accs[:,i],accs[:,j])[0]
+# in_index = dataset_names.index('imagenet')
+# accs = np.concatenate((accs[:,in_index:in_index+1],accs[:,:in_index],accs[:,in_index+1:]),axis=1)
+# new_dataset_names = ['imagenet']+dataset_names_sorted
+# pears = np.zeros((len(new_dataset_names),len(new_dataset_names)))
+# spear = np.zeros((len(new_dataset_names),len(new_dataset_names)))
+# for i in range(len(new_dataset_names)):
+#     for j in range(len(new_dataset_names)):
+#         pears[i,j] = pearsonr(accs[:,i],accs[:,j])[0]
+#         spear[i,j] = spearmanr(accs[:,i],accs[:,j])[0]
 
-sns.set(font_scale=0.9)
-df_cm = pd.DataFrame(pears.round(2), index = [i for i in new_dataset_names],
-                  columns = [i for i in new_dataset_names])
-plt.figure(figsize = (9,7))
-sns.heatmap(df_cm, annot=True)
-plt.show()
-plt.title('Pearson correlation coefficient')
-plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/pearson_correlation_{key}.pdf')
-plt.clf()
-df_cm = pd.DataFrame(spear.round(2), index = [i for i in new_dataset_names],
-                  columns = [i for i in new_dataset_names])
-plt.figure(figsize = (9,7))
-sns.heatmap(df_cm, annot=True)
-plt.show()
-plt.title('Spearman correlation coefficient')
-plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/spearman_correlation_{key}.pdf')
+# sns.set(font_scale=0.9)
+# df_cm = pd.DataFrame(pears.round(2), index = [i for i in new_dataset_names],
+#                   columns = [i for i in new_dataset_names])
+# plt.figure(figsize = (9,7))
+# sns.heatmap(df_cm, annot=True)
+# plt.show()
+# plt.title('Pearson correlation coefficient')
+# plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/pearson_correlation_{key}.pdf')
+# plt.clf()
+# df_cm = pd.DataFrame(spear.round(2), index = [i for i in new_dataset_names],
+#                   columns = [i for i in new_dataset_names])
+# plt.figure(figsize = (9,7))
+# sns.heatmap(df_cm, annot=True)
+# plt.show()
+# plt.title('Spearman correlation coefficient')
+# plt.savefig(f'/vulcanscratch/sgirish/results_imagenet/spearman_correlation_{key}.pdf')
 exit()
 
 
