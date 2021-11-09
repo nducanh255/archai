@@ -86,7 +86,10 @@ def train_test(conf_main:Config):
         model = ModelSimCLRMobileNet(hidden_dim = conf_model["hidden_dim"], out_features = conf_model["out_features"],
                 inverted_residual_setting = inverted_residual_setting, width_mult = conf_model['width_mult'], compress = conf_model['compress']
                 )
-    model = model.to(torch.device('cuda', 0))
+    apex = ApexUtils(conf_common['apex'], logger=None)
+    apex.sync_devices()
+    apex.barrier()
+    model = model.to(apex.device)
     print('Number of trainable params: {:.2f}M'
           .format(sum(p.numel() for p in model.backbone.parameters() if p.requires_grad)/1e6))
     # get data
@@ -94,9 +97,6 @@ def train_test(conf_main:Config):
 
     # train!
     ckpt = CheckPoint(conf_checkpoint, load_existing=False)
-    apex = ApexUtils(conf_common['apex'], logger=None)
-    apex.sync_devices()
-    apex.barrier()
     if conf_checkpoint['resume']:
         resumedir = conf_checkpoint['resumedir']
         experiment_name = conf_checkpoint['experiment_name']
